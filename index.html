@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EL-Net - Panel</title>
-    <link rel="stylesheet" href="styles.css?v=7">
+    <link rel="stylesheet" href="styles.css?v=8">
 </head>
 
 <body>
@@ -42,6 +42,7 @@
                 <div>
                     <strong>EL-Net</strong>
                     <span>Panel firmowy</span>
+                    <span id="app-version" class="app-version"></span>
                 </div>
             </div>
 
@@ -51,6 +52,7 @@
                 <button class="nav-link" data-section="kosztorysy">Kosztorysy</button>
                 <button class="nav-link" data-section="uslugi">Usługi</button>
                 <button class="nav-link" data-section="inwestycje">Inwestycje</button>
+                <button id="nav-administrator" class="nav-link hidden" data-section="administrator">Administrator</button>
             </nav>
 
             <div class="user-box">
@@ -206,7 +208,8 @@
                                 </div>
 
                                 <div class="summary-box">
-                                <span>VAT</span>
+                                    <span>VAT</span>
+                                    <strong id="suma-vat">0.00 PLN</strong>
                                 </div>
 
                                 <div class="summary-box total">
@@ -539,9 +542,56 @@
         </div>
     </div>
 </section>
+
+            <section id="section-administrator" class="app-section">
+                <div class="hero-card">
+                    <span class="badge">ADMINISTRATOR</span>
+                    <h1>Panel administratora</h1>
+                    <p>Informacje o aplikacji i szybkie działania administracyjne.</p>
+                </div>
+
+                <div class="card">
+                    <h2>Informacje o systemie</h2>
+
+                    <div class="form-group">
+                        <label>Wersja aplikacji</label>
+                        <div id="admin-version">-</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>E-mail użytkownika</label>
+                        <div id="admin-email">-</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Rola użytkownika</label>
+                        <div id="admin-role">-</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Liczba usług</label>
+                        <div id="admin-uslugi-count">0</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Liczba kosztorysów</label>
+                        <div id="admin-kosztorysy-count">0</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Liczba inwestycji</label>
+                        <div id="admin-inwestycje-count">0</div>
+                    </div>
+
+                    <div class="button-row">
+                        <button id="btn-admin-refresh" class="btn btn-secondary">Odśwież dane</button>
+                        <button id="btn-admin-clear" class="btn btn-danger">Wyczyść pamięć i wyloguj</button>
+                    </div>
+                </div>
+            </section>
         </main>
     </div>
 
-    <script src="script.js?v=7"></script>
+    <script src="script.js?v=8"></script>
 </body>
 </html>
