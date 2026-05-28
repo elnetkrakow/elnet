@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.05.29-03";
+const APP_VERSION = "2026.05.29-05";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -114,6 +114,9 @@ function podepnijZdarzenia() {
 
     const btnZamknijInwestycje = document.getElementById("btn-zamknij-inwestycje");
     if (btnZamknijInwestycje) btnZamknijInwestycje.addEventListener("click", zamknijPanelInwestycji);
+
+    const btnDrukujInwestycje = document.getElementById("btn-drukuj-inwestycje");
+    if (btnDrukujInwestycje) btnDrukujInwestycje.addEventListener("click", drukujInwestycje);
 
     const btnDodajZaliczke = document.getElementById("btn-dodaj-zaliczke");
     if (btnDodajZaliczke) btnDodajZaliczke.addEventListener("click", dodajZaliczke);
@@ -414,11 +417,85 @@ function esc(v) {
 function renderujPulpit() {
     const sumaBrutto = kosztorysy.reduce((s, k) => s + Number(k.brutto || 0), 0);
     const aktywne = inwestycje.filter(i => i.status === "aktywna").length;
+    const sumaZaliczek = inwestycjeZaliczki.reduce((s, z) => s + Number(z.kwota || 0), 0);
+    const sumaKosztow = inwestycjeKoszty.reduce((s, k) => s + Number(k.kwota || 0), 0);
+    const roznica = sumaZaliczek - sumaKosztow;
+
+    const ostatnieKosztorysy = [...kosztorysy]
+        .sort((a, b) => new Date(b.data) - new Date(a.data))
+        .slice(0, 5);
+
+    const ostatnieInwestycje = [...inwestycje]
+        .slice(-5)
+        .reverse();
 
     document.getElementById("stat-kosztorysy").textContent = kosztorysy.length;
     document.getElementById("stat-suma-brutto").textContent = `${sumaBrutto.toFixed(2)} PLN`;
     document.getElementById("stat-uslugi").textContent = uslugi.length;
     document.getElementById("stat-inwestycje").textContent = aktywne;
+    document.getElementById("stat-zaliczek").textContent = `${sumaZaliczek.toFixed(2)} PLN`;
+    document.getElementById("stat-kosztow").textContent = `${sumaKosztow.toFixed(2)} PLN`;
+    document.getElementById("stat-roznica").textContent = `${roznica.toFixed(2)} PLN`;
+
+    const ostatnieKosztorysyEl = document.getElementById("ostatnie-kosztorysy");
+    if (ostatnieKosztorysyEl) {
+        if (!ostatnieKosztorysy.length) {
+            ostatnieKosztorysyEl.innerHTML = `<p>Brak danych.</p>`;
+        } else {
+            ostatnieKosztorysyEl.innerHTML = `
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Nazwa</th>
+                                <th>Brutto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${ostatnieKosztorysy.map(k => `
+                                <tr>
+                                    <td>${esc(k.data || "-")}</td>
+                                    <td>${esc(k.nazwa || "-")}</td>
+                                    <td>${Number(k.brutto || 0).toFixed(2)} PLN</td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+    }
+
+    const ostatnieInwestycjeEl = document.getElementById("ostatnie-inwestycje");
+    if (ostatnieInwestycjeEl) {
+        if (!ostatnieInwestycje.length) {
+            ostatnieInwestycjeEl.innerHTML = `<p>Brak danych.</p>`;
+        } else {
+            ostatnieInwestycjeEl.innerHTML = `
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nazwa</th>
+                                <th>Klient</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${ostatnieInwestycje.map(i => `
+                                <tr>
+                                    <td>${esc(i.nazwa || "-")}</td>
+                                    <td>${esc(i.klient || "-")}</td>
+                                    <td>${esc(i.status || "-")}</td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+    }
 }
 
 // ==========================================
@@ -983,6 +1060,131 @@ window.drukujKosztorys = function(id) {
         </body>
         </html>
     `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+};
+
+window.drukujInwestycje = function() {
+    if (!aktywnaInwestycjaId) {
+        alert("Brak otwartej inwestycji do wydruku.");
+        return;
+    }
+
+    const inwestycja = inwestycje.find(i => String(i.id) === String(aktywnaInwestycjaId));
+    if (!inwestycja) {
+        alert("Nie znaleziono inwestycji do wydruku.");
+        return;
+    }
+
+    const zaliczki = inwestycjeZaliczki.filter(z => String(z.inwestycja_id) === String(aktywnaInwestycjaId));
+    const koszty = inwestycjeKoszty.filter(k => String(k.inwestycja_id) === String(aktywnaInwestycjaId));
+    const sumaZaliczek = zaliczki.reduce((sum, z) => sum + Number(z.kwota || 0), 0);
+    const sumaKosztow = koszty.reduce((sum, k) => sum + Number(k.kwota || 0), 0);
+    const roznica = sumaZaliczek - sumaKosztow;
+    const dataWydruku = new Date().toLocaleDateString("pl-PL");
+
+    const zaliczkiHtml = zaliczki.length
+        ? zaliczki.map(z => `
+                <tr>
+                    <td>${esc(z.data)}</td>
+                    <td>${Number(z.kwota || 0).toFixed(2)} PLN</td>
+                    <td>${esc(z.sposob_platnosci || "-")}</td>
+                    <td>${esc(z.opis || "")}</td>
+                </tr>
+            `).join("")
+        : `<tr><td colspan="4">Brak zaliczek</td></tr>`;
+
+    const kosztyHtml = koszty.length
+        ? koszty.map(k => `
+                <tr>
+                    <td>${esc(k.data)}</td>
+                    <td>${Number(k.kwota || 0).toFixed(2)} PLN</td>
+                    <td>${esc(k.kategoria || "-")}</td>
+                    <td>${esc(k.opis || "")}</td>
+                </tr>
+            `).join("")
+        : `<tr><td colspan="4">Brak kosztów</td></tr>`;
+
+    const html = `
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>EL-Net — Rozliczenie inwestycji</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+                h1, h2 { margin: 0 0 12px; }
+                p { margin: 4px 0; }
+                .section { margin-top: 18px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { border: 1px solid #333; padding: 8px 10px; text-align: left; }
+                th { background: #f2f2f2; }
+                .summary-box { margin: 6px 0; }
+                .summary-box strong { display: inline-block; min-width: 120px; }
+            </style>
+        </head>
+        <body>
+            <h1>EL-Net — Rozliczenie inwestycji</h1>
+            <div class="section">
+                <h2>Inwestycja</h2>
+                <p><strong>Nazwa:</strong> ${esc(inwestycja.nazwa || "-")}</p>
+                <p><strong>Klient:</strong> ${esc(inwestycja.klient || "-")}</p>
+                <p><strong>Adres:</strong> ${esc(inwestycja.adres || "-")}</p>
+                <p><strong>Status:</strong> ${esc(inwestycja.status || "-")}</p>
+                <p><strong>Data wydruku:</strong> ${esc(dataWydruku)}</p>
+            </div>
+
+            <div class="section">
+                <h2>Podsumowanie</h2>
+                <p class="summary-box"><strong>Suma zaliczek:</strong> ${sumaZaliczek.toFixed(2)} PLN</p>
+                <p class="summary-box"><strong>Suma kosztów:</strong> ${sumaKosztow.toFixed(2)} PLN</p>
+                <p class="summary-box"><strong>Różnica:</strong> ${roznica.toFixed(2)} PLN</p>
+            </div>
+
+            <div class="section">
+                <h2>Zaliczki</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Kwota</th>
+                            <th>Sposób płatności</th>
+                            <th>Opis</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${zaliczkiHtml}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="section">
+                <h2>Koszty</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Kwota</th>
+                            <th>Kategoria</th>
+                            <th>Opis</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${kosztyHtml}
+                    </tbody>
+                </table>
+            </div>
+        </body>
+        </html>
+    `;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+        alert("Nie udało się otworzyć okna drukowania.");
+        return;
+    }
 
     printWindow.document.write(html);
     printWindow.document.close();

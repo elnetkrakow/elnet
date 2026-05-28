@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EL-Net - Panel</title>
-    <link rel="stylesheet" href="styles.css?v=20260529-03">
+    <link rel="stylesheet" href="styles.css?v=20260529-05">
 </head>
 
 <body>
@@ -90,6 +90,21 @@
                         <span>Inwestycje aktywne</span>
                         <strong id="stat-inwestycje">0</strong>
                     </div>
+
+                    <div class="stat-card">
+                        <span>Suma zaliczek</span>
+                        <strong id="stat-zaliczek">0.00 PLN</strong>
+                    </div>
+
+                    <div class="stat-card">
+                        <span>Suma kosztów</span>
+                        <strong id="stat-kosztow">0.00 PLN</strong>
+                    </div>
+
+                    <div class="stat-card">
+                        <span>Różnica inwestycji</span>
+                        <strong id="stat-roznica">0.00 PLN</strong>
+                    </div>
                 </div>
 
                 <div class="cards-grid">
@@ -109,6 +124,22 @@
                         <h2>🏗️ Inwestycje</h2>
                         <p>Kontrola zaliczek, kosztów i rozliczeń dla konkretnych inwestycji.</p>
                         <button class="btn btn-secondary" data-go="inwestycje">Otwórz inwestycje</button>
+                    </div>
+                </div>
+
+                <div class="layout-two">
+                    <div class="card">
+                        <h2>Ostatnie kosztorysy</h2>
+                        <div id="ostatnie-kosztorysy">
+                            <p>Brak danych.</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>Ostatnie inwestycje</h2>
+                        <div id="ostatnie-inwestycje">
+                            <p>Brak danych.</p>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -412,7 +443,10 @@
     <div id="panel-inwestycji" class="card hidden">
         <div class="card-header">
             <h2 id="wybrana-inwestycja-title">Wybrana inwestycja</h2>
-            <button id="btn-zamknij-inwestycje" class="btn btn-danger small-btn">Zamknij</button>
+            <div class="button-row">
+                <button id="btn-drukuj-inwestycje" class="btn btn-secondary small-btn">Drukuj rozliczenie</button>
+                <button id="btn-zamknij-inwestycje" class="btn btn-danger small-btn">Zamknij</button>
+            </div>
         </div>
 
         <div class="investment-summary-grid">
@@ -594,6 +628,6 @@
         </main>
     </div>
 
-    <script src="script.js?v=20260529-03"></script>
+    <script src="script.js?v=20260529-05"></script>
 </body>
 </html>
