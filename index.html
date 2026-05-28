@@ -3,55 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EL-Net - Inteligentne Domy i Instalacje</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>EL-NET - Logowanie do systemu</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-color: #1e293b;
+            --accent-color: #10b981;
+            --text-color: #f8fafc;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-panel {
+            background-color: var(--panel-color);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        h2 { color: var(--accent-color); margin-bottom: 25px; }
+        .form-group { text-align: left; margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #94a3b8; font-size: 14px; }
+        input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            background-color: #0f172a;
+            color: white;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        input:focus { border-color: var(--accent-color); outline: none; }
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+        .btn-login:hover { background-color: #059669; }
+        #error-msg { color: #ef4444; margin-top: 15px; font-size: 14px; display: none; }
+    </style>
 </head>
 <body>
-    <header class="no-print">
-        <div class="logo-nav-container">
-            <img src="logo.png" alt="EL-Net Logo" class="mini-logo">
-            <div class="logo-text">EL-Net</div>
-        </div>
-        <nav>
-            <a href="index.html" class="active">Home</a>
-            <a href="wycena.html">Wycena</a>
-            <a href="kosztorysy.html">Kosztorysy</a>
-            <a href="uslugi.html">Usługi</a>
-        </nav>
-    </header>
 
-    <main class="container">
-        <!-- Sekcja Główna Powitalna -->
-        <section class="card home-hero">
-            <div class="home-logo-wrapper">
-                <img src="logo.png" alt="EL-Net Dariusz Wawrzynek" class="main-hero-logo">
-            </div>
-            <h1 class="company-full-name">EL-Net Dariusz Wawrzynek</h1>
-            <p class="company-subtitle">Firma Instalacyjno-Remontowa</p>
-            
-            <div class="eco-badge">
-                <span class="leaf-icon">🌱</span> Nowoczesność & Ekologia w Twoim Domu
-            </div>
-        </section>
+<div class="login-panel">
+    <h2>⚡ SYSTEM EL-NET</h2>
+    <p style="color: #94a3b8; font-size: 14px; margin-bottom: 20px;">Zaloguj się, aby uzyskać dostęp do kalkulatora wycen</p>
+    
+    <div class="form-group">
+        <label for="login-email">Adres E-mail</label>
+        <input type="email" id="login-email" placeholder="np. darek@elnet.pl">
+    </div>
+    
+    <div class="form-group">
+        <label for="login-password">Hasło</label>
+        <input type="password" id="login-password" placeholder="••••••••">
+    </div>
 
-        <!-- Trzy filary działalności -->
-        <div class="home-grid">
-            <div class="card home-feature">
-                <div class="feature-icon">🏠⚡</div>
-                <h3>Smart Home</h3>
-                <p>Projektowanie i montaż inteligentnych systemów sterowania budynkiem. Komfort, automatyzacja i pełna kontrola z dowolnego miejsca na ziemi.</p>
-            </div>
-            <div class="card home-feature">
-                <div class="feature-icon">🔋🍃</div>
-                <h3>Eko-Efektywność</h3>
-                <p>Instalacje zorientowane na optymalizację zużycia energii. Łączymy nowoczesną elektronikę z troską o środowisko i Twój portfel.</p>
-            </div>
-            <div class="card home-feature">
-                <div class="feature-icon">🛠️💼</div>
-                <h3>Kompleksowe Remonty</h3>
-                <p>Profesjonalne wykonawstwo instalacji elektrycznych, wodno-kanalizacyjnych i prac remontowych na najwyższym poziomie inżynieryjnym.</p>
-            </div>
-        </div>
-    </main>
+    <button class="btn-login" id="btn-submit-login">Zaloguj się</button>
+    <div id="error-msg">Błędny e-mail lub hasło! Sprawdź dane.</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="script.js"></script>
+<script>
+    // Obsługa kliknięcia enter na formularzu
+    document.getElementById("login-password").addEventListener("keypress", function(e) {
+        if (e.key === "Enter") document.getElementById("btn-submit-login").click();
+    });
+</script>
 </body>
 </html>
