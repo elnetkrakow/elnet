@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EL-Net - Panel</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- EKRAN LOGOWANIA -->
+    <main id="login-screen" class="login-screen">
+        <section class="login-card">
+            <img src="logo.png" alt="EL-Net Logo" class="login-logo">
+
+            <h1>EL-Net</h1>
+            <p>System wycen, kosztorysów i inwestycji</p>
+
+            <div class="form-group">
+                <label for="login-email">Adres e-mail</label>
+                <input type="email" id="login-email" placeholder="np. elnetkrakow@gmail.com">
+            </div>
+
+            <div class="form-group">
+                <label for="login-password">Hasło</label>
+                <input type="password" id="login-password" placeholder="Wpisz hasło">
+            </div>
+
+            <button id="btn-login" class="btn btn-main">Zaloguj się</button>
+
+            <p id="login-error" class="error-message">
+                Błędny e-mail lub hasło.
+            </p>
+        </section>
+    </main>
+
+    <!-- APLIKACJA PO ZALOGOWANIU -->
+    <div id="app-screen" class="app-screen hidden">
+        <header class="topbar">
+            <div class="brand">
+                <img src="logo.png" alt="EL-Net Logo" class="brand-logo">
+                <div>
+                    <strong>EL-Net</strong>
+                    <span>Panel firmowy</span>
+                </div>
+            </div>
+
+            <nav class="main-nav">
+                <button class="nav-link active" data-section="pulpit">Pulpit</button>
+                <button class="nav-link" data-section="wycena">Wycena</button>
+                <button class="nav-link" data-section="kosztorysy">Kosztorysy</button>
+                <button class="nav-link" data-section="uslugi">Usługi</button>
+                <button class="nav-link" data-section="inwestycje">Inwestycje</button>
+            </nav>
+
+            <div class="user-box">
+                <span id="user-info">Niezalogowany</span>
+                <button id="btn-logout" class="btn btn-danger">Wyloguj</button>
+            </div>
+        </header>
+
+        <main class="container">
+            <!-- PULPIT -->
+            <section id="section-pulpit" class="app-section active-section">
+                <div class="hero-card">
+                    <span class="badge">PULPIT</span>
+                    <h1>Witaj w systemie EL-Net</h1>
+                    <p>Centrum zarządzania wycenami, kosztorysami, usługami i inwestycjami.</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span>Kosztorysy</span>
+                        <strong id="stat-kosztorysy">0</strong>
+                    </div>
+
+                    <div class="stat-card">
+                        <span>Suma brutto kosztorysów</span>
+                        <strong id="stat-suma-brutto">0.00 PLN</strong>
+                    </div>
+
+                    <div class="stat-card">
+                        <span>Usługi w bazie</span>
+                        <strong id="stat-uslugi">0</strong>
+                    </div>
+
+                    <div class="stat-card">
+                        <span>Inwestycje aktywne</span>
+                        <strong id="stat-inwestycje">0</strong>
+                    </div>
+                </div>
+
+                <div class="cards-grid">
+                    <div class="card">
+                        <h2>🧾 Szybka wycena</h2>
+                        <p>Dodaj prace, ilości, ceny i oblicz wartość netto, VAT oraz brutto.</p>
+                        <button class="btn btn-main" data-go="wycena">Przejdź do wyceny</button>
+                    </div>
+
+                    <div class="card">
+                        <h2>📁 Kosztorysy</h2>
+                        <p>Przegląd zapisanych kosztorysów i późniejsza edycja ofert.</p>
+                        <button class="btn btn-secondary" data-go="kosztorysy">Zobacz kosztorysy</button>
+                    </div>
+
+                    <div class="card">
+                        <h2>🏗️ Inwestycje</h2>
+                        <p>Kontrola zaliczek, kosztów i rozliczeń dla konkretnych inwestycji.</p>
+                        <button class="btn btn-secondary" data-go="inwestycje">Otwórz inwestycje</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- WYCENA -->
+            <section id="section-wycena" class="app-section">
+                <div class="hero-card">
+                    <span class="badge">KALKULATOR</span>
+                    <h1>Wycena prac</h1>
+                    <p>Dodaj wykonane prace, ustaw ilość, cenę, rabat lub marżę.</p>
+                </div>
+
+                <div class="layout-two">
+                    <div class="card">
+                        <h2>Dodaj pozycję</h2>
+
+                        <div class="form-group">
+                            <label for="wycena-usluga">Rodzaj usługi</label>
+                            <select id="wycena-usluga">
+                                <option value="">Brak usług w bazie</option>
+                            </select>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="wycena-jednostka">Jednostka</label>
+                                <select id="wycena-jednostka">
+                                    <option value="szt.">szt.</option>
+                                    <option value="m">m</option>
+                                    <option value="m²">m²</option>
+                                    <option value="roboczogodzina">roboczogodzina</option>
+                                    <option value="usługa">usługa</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="wycena-ilosc">Ilość</label>
+                                <input type="number" id="wycena-ilosc" min="0" step="0.01" placeholder="np. 10">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="wycena-cena">Cena netto PLN</label>
+                            <input type="number" id="wycena-cena" min="0" step="0.01" placeholder="0.00">
+                        </div>
+
+                        <button id="btn-dodaj-pozycje" class="btn btn-main">Dodaj do wyceny</button>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Zestawienie prac</h2>
+                            <button id="btn-wyczysc-wycene" class="btn btn-danger small-btn">Wyczyść</button>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Nazwa</th>
+                                        <th>Jedn.</th>
+                                        <th>Ilość</th>
+                                        <th>Cena netto</th>
+                                        <th>Wartość netto</th>
+                                        <th>VAT</th>
+                                        <th>Brutto</th>
+                                        <th>Akcja</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabela-wyceny">
+                                    <tr>
+                                        <td colspan="8" class="empty-row">Brak pozycji w wycenie.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="summary-panel">
+                            <div class="form-group correction-box">
+                                <label for="wycena-korekta">Korekta ceny % / marża dodatnia / rabat ujemny</label>
+                                <input type="number" id="wycena-korekta" value="0" step="0.01">
+                            </div>
+
+                            <div class="summary-boxes">
+                                <div class="summary-box">
+                                    <span>Netto</span>
+                                    <strong id="suma-netto">0.00 PLN</strong>
+                                </div>
+
+                                <div class="summary-box">
+                                    <span>VAT 23%</span>
+                                    <strong id="suma-vat">0.00 PLN</strong>
+                                </div>
+
+                                <div class="summary-box total">
+                                    <span>Brutto</span>
+                                    <strong id="suma-brutto">0.00 PLN</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <h2>Zapisz kosztorys</h2>
+
+                        <div class="save-row">
+                            <input type="text" id="kosztorys-nazwa" placeholder="np. Jan Kowalski - domek pod lasem">
+                            <button id="btn-zapisz-kosztorys" class="btn btn-main">Zapisz</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- KOSZTORYSY -->
+            <section id="section-kosztorysy" class="app-section">
+                <div class="hero-card">
+                    <span class="badge">ARCHIWUM</span>
+                    <h1>Kosztorysy</h1>
+                    <p>Lista zapisanych wycen i ofert.</p>
+                </div>
+
+                <div class="card">
+                    <div class="toolbar">
+                        <input type="text" id="szukaj-kosztorys" placeholder="Szukaj kosztorysu...">
+                        <select id="sortuj-kosztorys">
+                            <option value="najnowsze">Najnowsze</option>
+                            <option value="nazwa-az">Nazwa A-Z</option>
+                            <option value="brutto-malejaco">Brutto od najwyższej</option>
+                            <option value="brutto-rosnaco">Brutto od najniższej</option>
+                        </select>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Nazwa</th>
+                                    <th>Netto</th>
+                                    <th>Brutto</th>
+                                    <th>Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-kosztorysow">
+                                <tr>
+                                    <td colspan="5" class="empty-row">Brak zapisanych kosztorysów.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- USŁUGI -->
+            <section id="section-uslugi" class="app-section">
+                <div class="hero-card">
+                    <span class="badge">CENNIK</span>
+                    <h1>Baza usług</h1>
+                    <p>Dodawaj i edytuj stawki używane później w kalkulatorze wycen.</p>
+                </div>
+
+                <div class="layout-two">
+                    <div class="card">
+                        <h2 id="uslugi-form-title">Dodaj usługę</h2>
+
+                        <div class="form-group">
+                            <label for="usluga-nazwa">Nazwa usługi</label>
+                            <input type="text" id="usluga-nazwa" placeholder="np. Montaż rozdzielnicy">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="usluga-jednostka">Jednostka</label>
+                                <select id="usluga-jednostka">
+                                    <option value="szt.">szt.</option>
+                                    <option value="m">m</option>
+                                    <option value="m²">m²</option>
+                                    <option value="roboczogodzina">roboczogodzina</option>
+                                    <option value="usługa">usługa</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="usluga-cena">Cena netto</label>
+                                <input type="number" id="usluga-cena" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+
+                        <button id="btn-zapisz-usluge" class="btn btn-main">Zapisz usługę</button>
+                        <button id="btn-anuluj-usluge" class="btn btn-danger hidden">Anuluj edycję</button>
+                    </div>
+
+                    <div class="card">
+                        <div class="toolbar">
+                            <input type="text" id="szukaj-uslugi" placeholder="Szukaj usługi...">
+                            <select id="sortuj-uslugi">
+                                <option value="nazwa-az">Nazwa A-Z</option>
+                                <option value="nazwa-za">Nazwa Z-A</option>
+                                <option value="cena-rosnaco">Cena od najniższej</option>
+                                <option value="cena-malejaco">Cena od najwyższej</option>
+                            </select>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Nazwa</th>
+                                        <th>Jedn.</th>
+                                        <th>Cena netto</th>
+                                        <th>Akcje</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabela-uslug">
+                                    <tr>
+                                        <td colspan="4" class="empty-row">Brak usług w bazie.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- INWESTYCJE -->
+            <section id="section-inwestycje" class="app-section">
+                <div class="hero-card">
+                    <span class="badge">INWESTYCJE</span>
+                    <h1>Inwestycje, zaliczki i koszty</h1>
+                    <p>Kontroluj pobrane zaliczki, koszty i rozliczenie każdej inwestycji.</p>
+                </div>
+
+                <div class="layout-two">
+                    <div class="card">
+                        <h2>Dodaj inwestycję</h2>
+
+                        <div class="form-group">
+                            <label for="inwestycja-nazwa">Nazwa inwestycji</label>
+                            <input type="text" id="inwestycja-nazwa" placeholder="np. Dom jednorodzinny - Kraków">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="inwestycja-klient">Klient</label>
+                            <input type="text" id="inwestycja-klient" placeholder="Imię, nazwisko lub firma">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="inwestycja-adres">Adres</label>
+                            <input type="text" id="inwestycja-adres" placeholder="Adres inwestycji">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="inwestycja-status">Status</label>
+                            <select id="inwestycja-status">
+                                <option value="aktywna">Aktywna</option>
+                                <option value="zakończona">Zakończona</option>
+                                <option value="wstrzymana">Wstrzymana</option>
+                            </select>
+                        </div>
+
+                        <button id="btn-dodaj-inwestycje" class="btn btn-main">Dodaj inwestycję</button>
+                    </div>
+
+                    <div class="card">
+                        <h2>Lista inwestycji</h2>
+
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Nazwa</th>
+                                        <th>Klient</th>
+                                        <th>Status</th>
+                                        <th>Zaliczki</th>
+                                        <th>Koszty</th>
+                                        <th>Różnica</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabela-inwestycji">
+                                    <tr>
+                                        <td colspan="6" class="empty-row">Brak inwestycji w bazie.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
