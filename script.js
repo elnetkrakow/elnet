@@ -4,6 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
+const APP_VERSION = "2026.05.29-03";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -18,6 +19,7 @@ let aktywnaInwestycjaId = null;
 
 let wycenaPozycje = [];
 let edytowanaUslugaId = null;
+let edytowanaInwestycjaId = null;
 
 function headers() {
     return {
@@ -119,6 +121,19 @@ function podepnijZdarzenia() {
     const btnDodajKoszt = document.getElementById("btn-dodaj-koszt");
     if (btnDodajKoszt) btnDodajKoszt.addEventListener("click", dodajKoszt);
 
+    const btnAnulujInwestycje = document.getElementById("btn-anuluj-inwestycje");
+    if (btnAnulujInwestycje) btnAnulujInwestycje.addEventListener("click", anulujEdycjeInwestycji);
+
+    const btnAdminRefresh = document.getElementById("btn-admin-refresh");
+    if (btnAdminRefresh) btnAdminRefresh.addEventListener("click", odswiezDane);
+
+    const btnAdminClear = document.getElementById("btn-admin-clear");
+    if (btnAdminClear) btnAdminClear.addEventListener("click", () => {
+        localStorage.clear();
+        sessionStorage.clear();
+        location.reload();
+    });
+
     const dzisiaj = new Date().toISOString().slice(0, 10);
 
     const zaliczkaData = document.getElementById("zaliczka-data");
@@ -210,7 +225,36 @@ function pokazAplikacje() {
         userInfo.textContent = `${zalogowanyUser.email} (${rolaUsera.toUpperCase()})`;
     }
 
+    const versionInfo = document.getElementById("app-version");
+    if (versionInfo) {
+        versionInfo.textContent = `v${APP_VERSION}`;
+    }
+
+    const adminNav = document.getElementById("nav-administrator");
+    if (adminNav) {
+        adminNav.classList.toggle("hidden", rolaUsera !== "admin");
+    }
+
+    aktualizujWidokPoRoli();
     pokazSekcje("pulpit");
+}
+
+function aktualizujWidokPoRoli() {
+    const cardUslugiForm = document.getElementById("card-uslugi-form");
+    const cardWycenaForm = document.getElementById("card-wycena-form");
+    const cardKosztorysSave = document.getElementById("card-kosztorys-save");
+    const cardInwestycjeForm = document.getElementById("card-inwestycje-form");
+    const cardZaliczkaForm = document.getElementById("card-zaliczka-form");
+    const cardKosztForm = document.getElementById("card-koszt-form");
+    const btnWyczyscWycene = document.getElementById("btn-wyczysc-wycene");
+
+    if (cardUslugiForm) cardUslugiForm.classList.toggle("hidden", rolaUsera !== "admin");
+    if (cardWycenaForm) cardWycenaForm.classList.toggle("hidden", rolaUsera === "guest");
+    if (cardKosztorysSave) cardKosztorysSave.classList.toggle("hidden", rolaUsera === "guest");
+    if (cardInwestycjeForm) cardInwestycjeForm.classList.toggle("hidden", rolaUsera === "guest");
+    if (cardZaliczkaForm) cardZaliczkaForm.classList.toggle("hidden", rolaUsera === "guest");
+    if (cardKosztForm) cardKosztForm.classList.toggle("hidden", rolaUsera === "guest");
+    if (btnWyczyscWycene) btnWyczyscWycene.classList.toggle("hidden", rolaUsera === "guest");
 }
 
 // ==========================================
@@ -327,6 +371,23 @@ function renderujWszystko() {
     renderujKosztorysy();
     renderujUslugi();
     renderujInwestycje();
+    renderujAdministrator();
+}
+
+function renderujAdministrator() {
+    const elVersion = document.getElementById("admin-version");
+    const elEmail = document.getElementById("admin-email");
+    const elRola = document.getElementById("admin-role");
+    const elUslugi = document.getElementById("admin-uslugi-count");
+    const elKosztorysy = document.getElementById("admin-kosztorysy-count");
+    const elInwestycje = document.getElementById("admin-inwestycje-count");
+
+    if (elVersion) elVersion.textContent = APP_VERSION;
+    if (elEmail) elEmail.textContent = zalogowanyUser?.email || "-";
+    if (elRola) elRola.textContent = rolaUsera || "-";
+    if (elUslugi) elUslugi.textContent = uslugi.length;
+    if (elKosztorysy) elKosztorysy.textContent = kosztorysy.length;
+    if (elInwestycje) elInwestycje.textContent = inwestycje.length;
 }
 
 function cenaUslugi(u) {
@@ -403,19 +464,25 @@ function renderujUslugi() {
         return;
     }
 
-    tbody.innerHTML = lista.map(u => `
-        <tr>
-            <td>${esc(u.nazwa)}</td>
-            <td>${esc(jednostkaUslugi(u))}</td>
-            <td><strong>${cenaUslugi(u).toFixed(2)} PLN</strong></td>
-            <td>
+    tbody.innerHTML = lista.map(u => {
+        const akcje = rolaUsera === "admin"
+            ? `
                 <div class="table-actions">
                     <button class="btn btn-secondary" onclick="edytujUsluge('${esc(u.id)}')">Edytuj</button>
                     <button class="btn btn-danger" onclick="usunUsluge('${esc(u.id)}')">Usuń</button>
                 </div>
-            </td>
-        </tr>
-    `).join("");
+            `
+            : "";
+
+        return `
+            <tr>
+                <td>${esc(u.nazwa)}</td>
+                <td>${esc(jednostkaUslugi(u))}</td>
+                <td><strong>${cenaUslugi(u).toFixed(2)} PLN</strong></td>
+                <td>${akcje}</td>
+            </tr>
+        `;
+    }).join("");
 }
 
 async function zapiszUsluge() {
@@ -471,6 +538,11 @@ async function zapiszUsluge() {
 }
 
 window.edytujUsluge = function(id) {
+    if (rolaUsera !== "admin") {
+        alert("Tylko administrator może edytować usługi.");
+        return;
+    }
+
     const u = uslugi.find(x => String(x.id) === String(id));
     if (!u) return;
 
@@ -537,6 +609,11 @@ function ustawCeneWybranejUslugi() {
 }
 
 function dodajPozycjeDoWyceny() {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może modyfikować wyceny.");
+        return;
+    }
+
     const id = document.getElementById("wycena-usluga").value;
     const u = uslugi.find(x => String(x.id) === String(id));
 
@@ -588,6 +665,9 @@ function renderujWycene() {
         const vatProcent = Number(p.vatProcent || 23);
         const vat = netto * (vatProcent / 100);
         const brutto = netto + vat;
+        const akcja = rolaUsera !== "guest"
+            ? `<button class="btn btn-danger small-btn" onclick="usunPozycjeWyceny('${p.id}')">Usuń</button>`
+            : "";
 
         return `
             <tr>
@@ -598,9 +678,7 @@ function renderujWycene() {
                 <td>${netto.toFixed(2)} PLN</td>
                 <td>${vatProcent}%</td>
                 <td>${brutto.toFixed(2)} PLN</td>
-                <td>
-                    <button class="btn btn-danger small-btn" onclick="usunPozycjeWyceny('${p.id}')">Usuń</button>
-                </td>
+                <td>${akcja}</td>
             </tr>
         `;
     }).join("");
@@ -609,6 +687,11 @@ function renderujWycene() {
 }
 
 window.usunPozycjeWyceny = function(id) {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może modyfikować wyceny.");
+        return;
+    }
+
     wycenaPozycje = wycenaPozycje.filter(p => p.id !== id);
     renderujWycene();
 };
@@ -759,21 +842,30 @@ function renderujKosztorysy() {
         return;
     }
 
-    tbody.innerHTML = lista.map(k => `
-        <tr>
-            <td>${esc(k.data)}</td>
-            <td><strong>${esc(k.nazwa)}</strong></td>
-            <td>${Number(k.netto || 0).toFixed(2)} PLN</td>
-            <td>${Number(k.brutto || 0).toFixed(2)} PLN</td>
-            <td>
-                <div class="table-actions">
-                    <button class="btn btn-secondary" onclick="wczytajKosztorys('${esc(k.id)}')">Edytuj</button>
-                    <button class="btn btn-secondary" onclick="drukujKosztorys('${esc(k.id)}')">Drukuj</button>
-                    <button class="btn btn-danger" onclick="usunKosztorys('${esc(k.id)}')">Usuń</button>
-                </div>
-            </td>
-        </tr>
-    `).join("");
+    tbody.innerHTML = lista.map(k => {
+        const edytuj = rolaUsera !== "guest"
+            ? `<button class="btn btn-secondary" onclick="wczytajKosztorys('${esc(k.id)}')">Edytuj</button>`
+            : "";
+        const usun = rolaUsera === "admin"
+            ? `<button class="btn btn-danger" onclick="usunKosztorys('${esc(k.id)}')">Usuń</button>`
+            : "";
+
+        return `
+            <tr>
+                <td>${esc(k.data)}</td>
+                <td><strong>${esc(k.nazwa)}</strong></td>
+                <td>${Number(k.netto || 0).toFixed(2)} PLN</td>
+                <td>${Number(k.brutto || 0).toFixed(2)} PLN</td>
+                <td>
+                    <div class="table-actions">
+                        ${edytuj}
+                        <button class="btn btn-secondary" onclick="drukujKosztorys('${esc(k.id)}')">Drukuj</button>
+                        ${usun}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
 }
 
 window.drukujKosztorys = function(id) {
@@ -899,6 +991,11 @@ window.drukujKosztorys = function(id) {
 };
 
 window.wczytajKosztorys = function(id) {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może edytować kosztorysów.");
+        return;
+    }
+
     const k = kosztorysy.find(x => String(x.id) === String(id));
     if (!k) return;
 
@@ -971,6 +1068,13 @@ function renderujInwestycje() {
         const koszty = sumaKosztowDlaInwestycji(i.id);
         const roznica = zaliczki - koszty;
 
+        const akcje = rolaUsera === "admin"
+            ? `
+                <button class="btn btn-secondary small-btn" onclick="edytujInwestycje('${esc(i.id)}')">Edytuj</button>
+                <button class="btn btn-danger small-btn" onclick="usunInwestycje('${esc(i.id)}')">Usuń</button>
+            `
+            : "";
+
         return `
             <tr>
                 <td><strong>${esc(i.nazwa)}</strong><br><small>${esc(i.adres || "")}</small></td>
@@ -980,9 +1084,8 @@ function renderujInwestycje() {
                 <td>${koszty.toFixed(2)} PLN</td>
                 <td><strong>${roznica.toFixed(2)} PLN</strong></td>
                 <td>
-                    <button class="btn btn-secondary small-btn" onclick="otworzInwestycje('${esc(i.id)}')">
-                        Otwórz
-                    </button>
+                    <button class="btn btn-secondary small-btn" onclick="otworzInwestycje('${esc(i.id)}')">Otwórz</button>
+                    ${akcje}
                 </td>
             </tr>
         `;
@@ -1019,11 +1122,21 @@ async function dodajInwestycje() {
     };
 
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje`, {
-            method: "POST",
-            headers: headers(),
-            body: JSON.stringify(payload)
-        });
+        let res;
+
+        if (edytowanaInwestycjaId) {
+            res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?id=eq.${edytowanaInwestycjaId}`, {
+                method: "PATCH",
+                headers: headers(),
+                body: JSON.stringify(payload)
+            });
+        } else {
+            res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje`, {
+                method: "POST",
+                headers: headers(),
+                body: JSON.stringify(payload)
+            });
+        }
 
         if (!res.ok) throw new Error(await res.text());
 
@@ -1031,6 +1144,13 @@ async function dodajInwestycje() {
         document.getElementById("inwestycja-klient").value = "";
         document.getElementById("inwestycja-adres").value = "";
         document.getElementById("inwestycja-status").value = "aktywna";
+        edytowanaInwestycjaId = null;
+
+        const btnDodaj = document.getElementById("btn-dodaj-inwestycje");
+        if (btnDodaj) btnDodaj.textContent = "Dodaj inwestycję";
+
+        const btnAnuluj = document.getElementById("btn-anuluj-inwestycje");
+        if (btnAnuluj) btnAnuluj.classList.add("hidden");
 
         await pobierzInwestycje();
         renderujInwestycje();
@@ -1052,12 +1172,79 @@ window.otworzInwestycje = function(id) {
     }
 };
 
+window.edytujInwestycje = function(id) {
+    if (rolaUsera !== "admin") {
+        alert("Tylko administrator może edytować inwestycje.");
+        return;
+    }
+
+    const inwestycja = inwestycje.find(i => String(i.id) === String(id));
+    if (!inwestycja) return;
+
+    edytowanaInwestycjaId = inwestycja.id;
+    document.getElementById("inwestycja-nazwa").value = inwestycja.nazwa || "";
+    document.getElementById("inwestycja-klient").value = inwestycja.klient || "";
+    document.getElementById("inwestycja-adres").value = inwestycja.adres || "";
+    document.getElementById("inwestycja-status").value = inwestycja.status || "aktywna";
+
+    const btnDodaj = document.getElementById("btn-dodaj-inwestycje");
+    if (btnDodaj) btnDodaj.textContent = "Zapisz zmiany";
+
+    const btnAnuluj = document.getElementById("btn-anuluj-inwestycje");
+    if (btnAnuluj) btnAnuluj.classList.remove("hidden");
+};
+
+function anulujEdycjeInwestycji() {
+    edytowanaInwestycjaId = null;
+    document.getElementById("inwestycja-nazwa").value = "";
+    document.getElementById("inwestycja-klient").value = "";
+    document.getElementById("inwestycja-adres").value = "";
+    document.getElementById("inwestycja-status").value = "aktywna";
+
+    const btnDodaj = document.getElementById("btn-dodaj-inwestycje");
+    if (btnDodaj) btnDodaj.textContent = "Dodaj inwestycję";
+
+    const btnAnuluj = document.getElementById("btn-anuluj-inwestycje");
+    if (btnAnuluj) btnAnuluj.classList.add("hidden");
+}
+
 function zamknijPanelInwestycji() {
     aktywnaInwestycjaId = null;
 
     const panel = document.getElementById("panel-inwestycji");
     if (panel) {
         panel.classList.add("hidden");
+    }
+}
+
+window.usunInwestycje = async function(id) {
+    if (rolaUsera !== "admin") {
+        alert("Tylko administrator może usuwać inwestycje.");
+        return;
+    }
+
+    if (!confirm("Usunąć inwestycję razem z jej zaliczkami i kosztami?")) return;
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?id=eq.${id}`, {
+            method: "DELETE",
+            headers: headers()
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+
+        await pobierzInwestycje();
+        await pobierzInwestycjeZaliczki();
+        await pobierzInwestycjeKoszty();
+        renderujInwestycje();
+        renderujPulpit();
+
+        if (String(aktywnaInwestycjaId) === String(id)) {
+            zamknijPanelInwestycji();
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Nie udało się usunąć inwestycji.");
     }
 }
 
@@ -1094,17 +1281,21 @@ function renderujTabeleZaliczek(lista) {
         return;
     }
 
-    tbody.innerHTML = lista.map(z => `
-        <tr>
-            <td>${esc(z.data)}</td>
-            <td><strong>${Number(z.kwota || 0).toFixed(2)} PLN</strong></td>
-            <td>${esc(z.sposob_platnosci || "-")}</td>
-            <td>${esc(z.opis || "")}</td>
-            <td>
-                <button class="btn btn-danger small-btn" onclick="usunZaliczke('${esc(z.id)}')">Usuń</button>
-            </td>
-        </tr>
-    `).join("");
+    tbody.innerHTML = lista.map(z => {
+        const akcja = rolaUsera === "admin"
+            ? `<button class="btn btn-danger small-btn" onclick="usunZaliczke('${esc(z.id)}')">Usuń</button>`
+            : "";
+
+        return `
+            <tr>
+                <td>${esc(z.data)}</td>
+                <td><strong>${Number(z.kwota || 0).toFixed(2)} PLN</strong></td>
+                <td>${esc(z.sposob_platnosci || "-")}</td>
+                <td>${esc(z.opis || "")}</td>
+                <td>${akcja}</td>
+            </tr>
+        `;
+    }).join("");
 }
 
 function renderujTabeleKosztow(lista) {
@@ -1116,20 +1307,33 @@ function renderujTabeleKosztow(lista) {
         return;
     }
 
-    tbody.innerHTML = lista.map(k => `
-        <tr>
-            <td>${esc(k.data)}</td>
-            <td><strong>${Number(k.kwota || 0).toFixed(2)} PLN</strong></td>
-            <td>${esc(k.kategoria || "-")}</td>
-            <td>${esc(k.opis || "")}</td>
-            <td>
-                <button class="btn btn-danger small-btn" onclick="usunKoszt('${esc(k.id)}')">Usuń</button>
-            </td>
-        </tr>
-    `).join("");
+    tbody.innerHTML = lista.map(k => {
+        const akcja = rolaUsera === "admin"
+            ? `<button class="btn btn-danger small-btn" onclick="usunKoszt('${esc(k.id)}')">Usuń</button>`
+            : "";
+
+        return `
+            <tr>
+                <td>${esc(k.data)}</td>
+                <td><strong>${Number(k.kwota || 0).toFixed(2)} PLN</strong></td>
+                <td>${esc(k.kategoria || "-")}</td>
+                <td>${esc(k.opis || "")}</td>
+                <td>${akcja}</td>
+            </tr>
+        `;
+    }).join("");
 }
 
 async function dodajZaliczke() {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może dodawać zaliczek.");
+        return;
+    }
+    if (rolaUsera === "guest") {
+        alert("Gość nie może dodawać zaliczek.");
+        return;
+    }
+
     if (!aktywnaInwestycjaId) {
         alert("Najpierw otwórz inwestycję.");
         return;
@@ -1181,6 +1385,11 @@ async function dodajZaliczke() {
 }
 
 async function dodajKoszt() {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może dodawać kosztów.");
+        return;
+    }
+
     if (!aktywnaInwestycjaId) {
         alert("Najpierw otwórz inwestycję.");
         return;
