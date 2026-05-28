@@ -1,0 +1,87 @@
+﻿<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EL-Net - Usługi</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Skrypt zabezpieczający -->
+    <script src="auth.js"></script>
+</head>
+<body>
+    <header class="no-print">
+        <div class="logo-nav-container">
+            <img src="logo.png" alt="EL-Net Logo" class="mini-logo">
+            <div class="logo-text">EL-Net</div>
+        </div>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="wycena.html">Wycena</a>
+            <a href="kosztorysy.html">Kosztorysy</a>
+            <a href="uslugi.html" class="active">Usługi</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        <section class="card">
+            <span class="badge">KONFIGURACJA STAWEK</span>
+            <h1>Baza cen startowych (Lista Usług)</h1>
+            <p>Zarządzaj swoimi stawkami netto oraz dodawaj nowe rodzaje usług do systemu.</p>
+        </section>
+
+        <div class="grid-layout">
+            <!-- Formularz dodawania nowej pracy -->
+            <section class="card">
+                <h2 id="form-title">Dodaj nową usługę do listy</h2>
+                <div class="form-group">
+                    <label>Nazwa usługi / pracy</label>
+                    <input type="text" id="nowa-usluga-nazwa" placeholder="np. Montaż rozdzielnicy elektrycznej">
+                </div>
+                <div class="form-group">
+                    <label>Domyślna cena Netto (PLN)</label>
+                    <input type="number" id="nowa-usluga-cena" placeholder="0.00" step="any">
+                </div>
+                <button id="btn-dodaj-usluge" class="btn">Dodaj pozycję do bazy usług</button>
+                <button id="btn-anuluj-edycje" class="btn btn-danger" style="display: none; margin-top: 10px;">Anuluj edycję</button>
+            </section>
+
+            <!-- Tabela cennika z filtrami i wyszukiwarką -->
+            <section class="card">
+                <div class="cennik-toolbar">
+                    <div class="toolbar-search">
+                        <label>🔍 Wyszukaj usługę</label>
+                        <input type="text" id="cennik-szukaj" placeholder="Wpisz szukaną frazę...">
+                    </div>
+                    <div class="toolbar-sort">
+                        <label>🔀 Sortowanie listy</label>
+                        <select id="cennik-sortuj">
+                            <option value="alfabetycznie-az">Alfabetycznie: A do Z</option>
+                            <option value="alfabetycznie-za">Alfabetycznie: Z do A</option>
+                            <option value="cena-rosnaco">Cena: od najniższej</option>
+                            <option value="cena-malejaco">Cena: od najwyższej</option>
+                        </select>
+                    </div>
+                </div>
+
+                <h2>Twoje pozycje i ceny startowe</h2>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nazwa usługi</th>
+                                <th width="150">Cena Netto (PLN)</th>
+                                <th width="180" style="text-align: center;">Akcje</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-cennika">
+                            <!-- Generowane automatycznie przez JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
