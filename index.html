@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EL-Net - Panel</title>
-    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="stylesheet" href="styles.css?v=5">
 </head>
 
 <body>
@@ -332,72 +332,208 @@
             </section>
 
             <!-- INWESTYCJE -->
-            <section id="section-inwestycje" class="app-section">
-                <div class="hero-card">
-                    <span class="badge">INWESTYCJE</span>
-                    <h1>Inwestycje, zaliczki i koszty</h1>
-                    <p>Kontroluj pobrane zaliczki, koszty i rozliczenie każdej inwestycji.</p>
+<section id="section-inwestycje" class="app-section">
+    <div class="hero-card">
+        <span class="badge">INWESTYCJE</span>
+        <h1>Inwestycje, zaliczki i koszty</h1>
+        <p>Kontroluj pobrane zaliczki, koszty i rozliczenie każdej inwestycji.</p>
+    </div>
+
+    <div class="layout-two">
+        <div class="card">
+            <h2>Dodaj inwestycję</h2>
+
+            <div class="form-group">
+                <label for="inwestycja-nazwa">Nazwa inwestycji</label>
+                <input type="text" id="inwestycja-nazwa" placeholder="np. Dom jednorodzinny - Kraków">
+            </div>
+
+            <div class="form-group">
+                <label for="inwestycja-klient">Klient</label>
+                <input type="text" id="inwestycja-klient" placeholder="Imię, nazwisko lub firma">
+            </div>
+
+            <div class="form-group">
+                <label for="inwestycja-adres">Adres</label>
+                <input type="text" id="inwestycja-adres" placeholder="Adres inwestycji">
+            </div>
+
+            <div class="form-group">
+                <label for="inwestycja-status">Status</label>
+                <select id="inwestycja-status">
+                    <option value="aktywna">Aktywna</option>
+                    <option value="zakończona">Zakończona</option>
+                    <option value="wstrzymana">Wstrzymana</option>
+                </select>
+            </div>
+
+            <button id="btn-dodaj-inwestycje" class="btn btn-main">Dodaj inwestycję</button>
+        </div>
+
+        <div class="card">
+            <h2>Lista inwestycji</h2>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nazwa</th>
+                            <th>Klient</th>
+                            <th>Status</th>
+                            <th>Zaliczki</th>
+                            <th>Koszty</th>
+                            <th>Różnica</th>
+                            <th>Akcja</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-inwestycji">
+                        <tr>
+                            <td colspan="7" class="empty-row">Brak inwestycji w bazie.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="panel-inwestycji" class="card hidden">
+        <div class="card-header">
+            <h2 id="wybrana-inwestycja-title">Wybrana inwestycja</h2>
+            <button id="btn-zamknij-inwestycje" class="btn btn-danger small-btn">Zamknij</button>
+        </div>
+
+        <div class="investment-summary-grid">
+            <div class="summary-box">
+                <span>Suma zaliczek</span>
+                <strong id="inwestycja-suma-zaliczki">0.00 PLN</strong>
+            </div>
+
+            <div class="summary-box">
+                <span>Suma kosztów</span>
+                <strong id="inwestycja-suma-koszty">0.00 PLN</strong>
+            </div>
+
+            <div class="summary-box total">
+                <span>Różnica</span>
+                <strong id="inwestycja-roznica">0.00 PLN</strong>
+            </div>
+        </div>
+
+        <div class="layout-two">
+            <div class="card inner-card">
+                <h2>Dodaj zaliczkę</h2>
+
+                <div class="form-group">
+                    <label for="zaliczka-data">Data</label>
+                    <input type="date" id="zaliczka-data">
                 </div>
 
-                <div class="layout-two">
-                    <div class="card">
-                        <h2>Dodaj inwestycję</h2>
-
-                        <div class="form-group">
-                            <label for="inwestycja-nazwa">Nazwa inwestycji</label>
-                            <input type="text" id="inwestycja-nazwa" placeholder="np. Dom jednorodzinny - Kraków">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="inwestycja-klient">Klient</label>
-                            <input type="text" id="inwestycja-klient" placeholder="Imię, nazwisko lub firma">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="inwestycja-adres">Adres</label>
-                            <input type="text" id="inwestycja-adres" placeholder="Adres inwestycji">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="inwestycja-status">Status</label>
-                            <select id="inwestycja-status">
-                                <option value="aktywna">Aktywna</option>
-                                <option value="zakończona">Zakończona</option>
-                                <option value="wstrzymana">Wstrzymana</option>
-                            </select>
-                        </div>
-
-                        <button id="btn-dodaj-inwestycje" class="btn btn-main">Dodaj inwestycję</button>
-                    </div>
-
-                    <div class="card">
-                        <h2>Lista inwestycji</h2>
-
-                        <div class="table-wrapper">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Nazwa</th>
-                                        <th>Klient</th>
-                                        <th>Status</th>
-                                        <th>Zaliczki</th>
-                                        <th>Koszty</th>
-                                        <th>Różnica</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tabela-inwestycji">
-                                    <tr>
-                                        <td colspan="6" class="empty-row">Brak inwestycji w bazie.</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                <div class="form-group">
+                    <label for="zaliczka-kwota">Kwota</label>
+                    <input type="number" id="zaliczka-kwota" step="0.01" min="0" placeholder="0.00">
                 </div>
-            </section>
+
+                <div class="form-group">
+                    <label for="zaliczka-platnosc">Sposób płatności</label>
+                    <select id="zaliczka-platnosc">
+                        <option value="gotówka">Gotówka</option>
+                        <option value="przelew">Przelew</option>
+                        <option value="blik">BLIK</option>
+                        <option value="inne">Inne</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="zaliczka-opis">Opis</label>
+                    <input type="text" id="zaliczka-opis" placeholder="np. pierwsza zaliczka">
+                </div>
+
+                <button id="btn-dodaj-zaliczke" class="btn btn-main">Dodaj zaliczkę</button>
+            </div>
+
+            <div class="card inner-card">
+                <h2>Dodaj koszt</h2>
+
+                <div class="form-group">
+                    <label for="koszt-data">Data</label>
+                    <input type="date" id="koszt-data">
+                </div>
+
+                <div class="form-group">
+                    <label for="koszt-kwota">Kwota</label>
+                    <input type="number" id="koszt-kwota" step="0.01" min="0" placeholder="0.00">
+                </div>
+
+                <div class="form-group">
+                    <label for="koszt-kategoria">Kategoria</label>
+                    <select id="koszt-kategoria">
+                        <option value="materiały">Materiały</option>
+                        <option value="robocizna">Robocizna</option>
+                        <option value="podwykonawca">Podwykonawca</option>
+                        <option value="transport">Transport</option>
+                        <option value="inne">Inne</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="koszt-opis">Opis</label>
+                    <input type="text" id="koszt-opis" placeholder="np. przewody, rozdzielnica, osprzęt">
+                </div>
+
+                <button id="btn-dodaj-koszt" class="btn btn-main">Dodaj koszt</button>
+            </div>
+        </div>
+
+        <div class="layout-two">
+            <div class="card inner-card">
+                <h2>Zaliczki</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Kwota</th>
+                                <th>Płatność</th>
+                                <th>Opis</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-zaliczek">
+                            <tr>
+                                <td colspan="4" class="empty-row">Brak zaliczek.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card inner-card">
+                <h2>Koszty</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Kwota</th>
+                                <th>Kategoria</th>
+                                <th>Opis</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-kosztow">
+                            <tr>
+                                <td colspan="4" class="empty-row">Brak kosztów.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
         </main>
     </div>
 
-    <script src="script.js?v=3"></script>
+    <script src="script.js?v=5"></script>
 </body>
 </html>
