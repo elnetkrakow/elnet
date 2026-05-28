@@ -697,3 +697,21 @@ td {
         max-width: none;
     }
 }
+
+.investment-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.inner-card {
+    box-shadow: none;
+    background: rgba(30, 41, 59, 0.35);
+}
+
+@media (max-width: 800px) {
+    .investment-summary-grid {
+        grid-template-columns: 1fr;
+    }
+}

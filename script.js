@@ -12,8 +12,11 @@ let rolaUsera = "guest";
 let uslugi = [];
 let kosztorysy = [];
 let inwestycje = [];
-let wycenaPozycje = [];
+let inwestycjeZaliczki = [];
+let inwestycjeKoszty = [];
+let aktywnaInwestycjaId = null;
 
+let wycenaPozycje = [];
 let edytowanaUslugaId = null;
 
 function headers() {
@@ -106,6 +109,23 @@ function podepnijZdarzenia() {
 
     const btnDodajInwestycje = document.getElementById("btn-dodaj-inwestycje");
     if (btnDodajInwestycje) btnDodajInwestycje.addEventListener("click", dodajInwestycje);
+
+    const btnZamknijInwestycje = document.getElementById("btn-zamknij-inwestycje");
+    if (btnZamknijInwestycje) btnZamknijInwestycje.addEventListener("click", zamknijPanelInwestycji);
+
+    const btnDodajZaliczke = document.getElementById("btn-dodaj-zaliczke");
+    if (btnDodajZaliczke) btnDodajZaliczke.addEventListener("click", dodajZaliczke);
+
+    const btnDodajKoszt = document.getElementById("btn-dodaj-koszt");
+    if (btnDodajKoszt) btnDodajKoszt.addEventListener("click", dodajKoszt);
+
+    const dzisiaj = new Date().toISOString().slice(0, 10);
+
+    const zaliczkaData = document.getElementById("zaliczka-data");
+    if (zaliczkaData) zaliczkaData.value = dzisiaj;
+
+    const kosztData = document.getElementById("koszt-data");
+    if (kosztData) kosztData.value = dzisiaj;
 }
 
 // ==========================================
@@ -218,7 +238,9 @@ async function odswiezDane() {
     await Promise.all([
         pobierzUslugi(),
         pobierzKosztorysy(),
-        pobierzInwestycje()
+        pobierzInwestycje(),
+        pobierzInwestycjeZaliczki(),
+        pobierzInwestycjeKoszty()
     ]);
 
     renderujWszystko();
@@ -263,6 +285,34 @@ async function pobierzInwestycje() {
     } catch (err) {
         console.error("Błąd inwestycji:", err);
         inwestycje = [];
+    }
+}
+
+async function pobierzInwestycjeZaliczki() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje_zaliczki?select=*&order=data.desc`, {
+            headers: headers()
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+        inwestycjeZaliczki = await res.json();
+    } catch (err) {
+        console.error("Błąd zaliczek:", err);
+        inwestycjeZaliczki = [];
+    }
+}
+
+async function pobierzInwestycjeKoszty() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje_koszty?select=*&order=data.desc`, {
+            headers: headers()
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+        inwestycjeKoszty = await res.json();
+    } catch (err) {
+        console.error("Błąd kosztów:", err);
+        inwestycjeKoszty = [];
     }
 }
 
@@ -498,6 +548,7 @@ function dodajPozycjeDoWyceny() {
     const ilosc = Number(document.getElementById("wycena-ilosc").value);
     const cena = Number(document.getElementById("wycena-cena").value);
     const jednostka = document.getElementById("wycena-jednostka").value;
+    const vatProcent = Number(document.getElementById("wycena-vat").value);
 
     if (isNaN(ilosc) || ilosc <= 0) {
         alert("Wpisz poprawną ilość.");
@@ -514,7 +565,8 @@ function dodajPozycjeDoWyceny() {
         nazwa: u.nazwa,
         jednostka,
         ilosc,
-        cenaNetto: cena
+        cenaNetto: cena,
+        vatProcent
     });
 
     document.getElementById("wycena-ilosc").value = "";
@@ -533,7 +585,8 @@ function renderujWycene() {
 
     tbody.innerHTML = wycenaPozycje.map(p => {
         const netto = p.ilosc * p.cenaNetto;
-        const vat = netto * 0.23;
+        const vatProcent = Number(p.vatProcent || 23);
+        const vat = netto * (vatProcent / 100);
         const brutto = netto + vat;
 
         return `
@@ -543,7 +596,7 @@ function renderujWycene() {
                 <td>${p.ilosc}</td>
                 <td>${p.cenaNetto.toFixed(2)} PLN</td>
                 <td>${netto.toFixed(2)} PLN</td>
-                <td>23%</td>
+                <td>${vatProcent}%</td>
                 <td>${brutto.toFixed(2)} PLN</td>
                 <td>
                     <button class="btn btn-danger small-btn" onclick="usunPozycjeWyceny('${p.id}')">Usuń</button>
@@ -561,17 +614,47 @@ window.usunPozycjeWyceny = function(id) {
 };
 
 function przeliczWycene() {
-    let netto = wycenaPozycje.reduce((s, p) => s + p.ilosc * p.cenaNetto, 0);
     const korekta = Number(document.getElementById("wycena-korekta")?.value || 0);
+    const mnoznikKorekty = 1 + korekta / 100;
 
-    netto = netto * (1 + korekta / 100);
+    let sumaNettoPoKorekcie = 0;
+    let sumaVAT = 0;
 
-    const vat = netto * 0.23;
-    const brutto = netto + vat;
+    wycenaPozycje.forEach(p => {
+        const rawVat = p.vatProcent;
+        const vatProcent = rawVat == null || rawVat === "" ? 23 : Number(rawVat);
+        const vatStawka = Number.isFinite(vatProcent) ? vatProcent : 23;
+        const nettoPoKorekcie = p.ilosc * p.cenaNetto * mnoznikKorekty;
+        const vat = nettoPoKorekcie * (vatStawka / 100);
 
-    document.getElementById("suma-netto").textContent = `${netto.toFixed(2)} PLN`;
-    document.getElementById("suma-vat").textContent = `${vat.toFixed(2)} PLN`;
-    document.getElementById("suma-brutto").textContent = `${brutto.toFixed(2)} PLN`;
+        sumaNettoPoKorekcie += nettoPoKorekcie;
+        sumaVAT += vat;
+    });
+
+    const brutto = sumaNettoPoKorekcie + sumaVAT;
+
+    const elNetto = document.getElementById("suma-netto");
+    const elVat = document.getElementById("suma-vat");
+    const elBrutto = document.getElementById("suma-brutto");
+
+    if (!elNetto || !elVat || !elBrutto) {
+        console.error("Brak wymaganych elementów podsumowania wyceny.");
+        return {
+            netto: sumaNettoPoKorekcie,
+            vat: sumaVAT,
+            brutto
+        };
+    }
+
+    elNetto.textContent = `${sumaNettoPoKorekcie.toFixed(2)} PLN`;
+    elVat.textContent = `${sumaVAT.toFixed(2)} PLN`;
+    elBrutto.textContent = `${brutto.toFixed(2)} PLN`;
+
+    return {
+        netto: sumaNettoPoKorekcie,
+        vat: sumaVAT,
+        brutto
+    };
 }
 
 function wyczyscWycene() {
@@ -599,16 +682,29 @@ async function zapiszKosztorys() {
         return;
     }
 
-    let netto = wycenaPozycje.reduce((s, p) => s + p.ilosc * p.cenaNetto, 0);
     const korekta = Number(document.getElementById("wycena-korekta").value || 0);
-    netto = netto * (1 + korekta / 100);
+    const mnoznikKorekty = 1 + korekta / 100;
+
+    let netto = 0;
+    let sumaVAT = 0;
+
+    wycenaPozycje.forEach(p => {
+        const vatProcent = Number(p.vatProcent || 23);
+        const nettoPoKorekcie = p.ilosc * p.cenaNetto * mnoznikKorekty;
+        const vat = nettoPoKorekcie * (vatProcent / 100);
+
+        netto += nettoPoKorekcie;
+        sumaVAT += vat;
+    });
+
+    const brutto = netto + sumaVAT;
 
     const payload = {
         nazwa,
         pozycje: wycenaPozycje,
         korekta,
         netto,
-        brutto: netto * 1.23,
+        brutto,
         data: new Date().toLocaleDateString("pl-PL"),
         user_id: zalogowanyUser?.id
     };
@@ -672,12 +768,135 @@ function renderujKosztorysy() {
             <td>
                 <div class="table-actions">
                     <button class="btn btn-secondary" onclick="wczytajKosztorys('${esc(k.id)}')">Edytuj</button>
+                    <button class="btn btn-secondary" onclick="drukujKosztorys('${esc(k.id)}')">Drukuj</button>
                     <button class="btn btn-danger" onclick="usunKosztorys('${esc(k.id)}')">Usuń</button>
                 </div>
             </td>
         </tr>
     `).join("");
 }
+
+window.drukujKosztorys = function(id) {
+    const kosztorys = kosztorysy.find(x => String(x.id) === String(id));
+    if (!kosztorys) {
+        console.error("Nie znaleziono kosztorysu do druku.");
+        return;
+    }
+
+    let pozycje = kosztorys.pozycje;
+    if (typeof pozycje === "string") {
+        try {
+            pozycje = JSON.parse(pozycje);
+        } catch (err) {
+            console.error("Błąd parsowania pozycji kosztorysu:", err);
+            return;
+        }
+    }
+
+    if (!Array.isArray(pozycje)) {
+        console.error("Niepoprawny format pozycji kosztorysu.");
+        return;
+    }
+
+    let sumaNetto = 0;
+    let sumaVAT = 0;
+    let sumaBrutto = 0;
+
+    const rows = pozycje.map(p => {
+        const vatProcent = p.vatProcent == null || p.vatProcent === "" ? 23 : Number(p.vatProcent);
+        const vatPerc = Number.isFinite(vatProcent) ? vatProcent : 23;
+        const netto = Number(p.ilosc || 0) * Number(p.cenaNetto || 0);
+        const vat = netto * (vatPerc / 100);
+        const brutto = netto + vat;
+
+        sumaNetto += netto;
+        sumaVAT += vat;
+        sumaBrutto += brutto;
+
+        return `
+            <tr>
+                <td>${esc(p.nazwa || "")}</td>
+                <td>${esc(p.jednostka || "")}</td>
+                <td>${Number(p.ilosc || 0).toFixed(2)}</td>
+                <td>${Number(p.cenaNetto || 0).toFixed(2)} PLN</td>
+                <td>${netto.toFixed(2)} PLN</td>
+                <td>${vatPerc}%</td>
+                <td>${brutto.toFixed(2)} PLN</td>
+            </tr>
+        `;
+    }).join("");
+
+    const vatPodsumowanie = Number.isFinite(Number(kosztorys.vat)) ? Number(kosztorys.vat) : sumaVAT;
+    const bruttoPodsumowanie = Number.isFinite(Number(kosztorys.brutto)) ? Number(kosztorys.brutto) : sumaNetto + vatPodsumowanie;
+    const nettoPodsumowanie = Number.isFinite(Number(kosztorys.netto)) ? Number(kosztorys.netto) : sumaNetto;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+        console.error("Nie udało się otworzyć okna do druku.");
+        return;
+    }
+
+    const html = `
+        <!DOCTYPE html>
+        <html lang="pl">
+        <head>
+            <meta charset="UTF-8">
+            <title>Drukuj kosztorys</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                h1, h2, h3 { margin: 0 0 10px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #000; padding: 6px 8px; text-align: left; }
+                th { background: #f0f0f0; }
+                .summary { margin-top: 20px; width: 100%; }
+                .summary td { border: none; padding: 4px 8px; }
+                .summary .label { width: 80%; }
+                .summary .value { text-align: right; }
+            </style>
+        </head>
+        <body>
+            <h1>EL-Net</h1>
+            <h2>${esc(kosztorys.nazwa || "Kosztorys")}</h2>
+            <p>Data: ${esc(kosztorys.data || "-")}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nazwa</th>
+                        <th>Jedn.</th>
+                        <th>Ilość</th>
+                        <th>Cena netto</th>
+                        <th>Wartość netto</th>
+                        <th>VAT</th>
+                        <th>Brutto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                </tbody>
+            </table>
+            <table class="summary">
+                <tr>
+                    <td class="label"><strong>Netto</strong></td>
+                    <td class="value">${nettoPodsumowanie.toFixed(2)} PLN</td>
+                </tr>
+                <tr>
+                    <td class="label"><strong>VAT</strong></td>
+                    <td class="value">${vatPodsumowanie.toFixed(2)} PLN</td>
+                </tr>
+                <tr>
+                    <td class="label"><strong>Brutto</strong></td>
+                    <td class="value">${bruttoPodsumowanie.toFixed(2)} PLN</td>
+                </tr>
+            </table>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+};
 
 window.wczytajKosztorys = function(id) {
     const k = kosztorysy.find(x => String(x.id) === String(id));
@@ -725,29 +944,53 @@ window.usunKosztorys = async function(id) {
 // INWESTYCJE
 // ==========================================
 
+function sumaZaliczekDlaInwestycji(inwestycjaId) {
+    return inwestycjeZaliczki
+        .filter(z => String(z.inwestycja_id) === String(inwestycjaId))
+        .reduce((s, z) => s + Number(z.kwota || 0), 0);
+}
+
+function sumaKosztowDlaInwestycji(inwestycjaId) {
+    return inwestycjeKoszty
+        .filter(k => String(k.inwestycja_id) === String(inwestycjaId))
+        .reduce((s, k) => s + Number(k.kwota || 0), 0);
+}
+
 function renderujInwestycje() {
     const tbody = document.getElementById("tabela-inwestycji");
     if (!tbody) return;
 
     if (!inwestycje.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Brak inwestycji w bazie.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Brak inwestycji w bazie.</td></tr>`;
         return;
     }
 
     tbody.innerHTML = inwestycje.map(i => {
         const statusClass = `status-${String(i.status || "aktywna").toLowerCase()}`;
+        const zaliczki = sumaZaliczekDlaInwestycji(i.id);
+        const koszty = sumaKosztowDlaInwestycji(i.id);
+        const roznica = zaliczki - koszty;
 
         return `
             <tr>
                 <td><strong>${esc(i.nazwa)}</strong><br><small>${esc(i.adres || "")}</small></td>
                 <td>${esc(i.klient || "-")}</td>
                 <td><span class="status-pill ${statusClass}">${esc(i.status || "aktywna")}</span></td>
-                <td>0.00 PLN</td>
-                <td>0.00 PLN</td>
-                <td><strong>0.00 PLN</strong></td>
+                <td>${zaliczki.toFixed(2)} PLN</td>
+                <td>${koszty.toFixed(2)} PLN</td>
+                <td><strong>${roznica.toFixed(2)} PLN</strong></td>
+                <td>
+                    <button class="btn btn-secondary small-btn" onclick="otworzInwestycje('${esc(i.id)}')">
+                        Otwórz
+                    </button>
+                </td>
             </tr>
         `;
     }).join("");
+
+    if (aktywnaInwestycjaId) {
+        renderujPanelInwestycji();
+    }
 }
 
 async function dodajInwestycje() {
@@ -797,3 +1040,241 @@ async function dodajInwestycje() {
         alert("Nie udało się zapisać inwestycji. Sprawdź tabelę inwestycje i RLS.");
     }
 }
+
+window.otworzInwestycje = function(id) {
+    aktywnaInwestycjaId = id;
+    renderujPanelInwestycji();
+
+    const panel = document.getElementById("panel-inwestycji");
+    if (panel) {
+        panel.classList.remove("hidden");
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+};
+
+function zamknijPanelInwestycji() {
+    aktywnaInwestycjaId = null;
+
+    const panel = document.getElementById("panel-inwestycji");
+    if (panel) {
+        panel.classList.add("hidden");
+    }
+}
+
+function renderujPanelInwestycji() {
+    const inwestycja = inwestycje.find(i => String(i.id) === String(aktywnaInwestycjaId));
+    if (!inwestycja) return;
+
+    const title = document.getElementById("wybrana-inwestycja-title");
+    if (title) {
+        title.textContent = `${inwestycja.nazwa} — ${inwestycja.klient || "bez klienta"}`;
+    }
+
+    const zaliczkiLista = inwestycjeZaliczki.filter(z => String(z.inwestycja_id) === String(aktywnaInwestycjaId));
+    const kosztyLista = inwestycjeKoszty.filter(k => String(k.inwestycja_id) === String(aktywnaInwestycjaId));
+
+    const sumaZaliczek = zaliczkiLista.reduce((s, z) => s + Number(z.kwota || 0), 0);
+    const sumaKosztow = kosztyLista.reduce((s, k) => s + Number(k.kwota || 0), 0);
+    const roznica = sumaZaliczek - sumaKosztow;
+
+    document.getElementById("inwestycja-suma-zaliczki").textContent = `${sumaZaliczek.toFixed(2)} PLN`;
+    document.getElementById("inwestycja-suma-koszty").textContent = `${sumaKosztow.toFixed(2)} PLN`;
+    document.getElementById("inwestycja-roznica").textContent = `${roznica.toFixed(2)} PLN`;
+
+    renderujTabeleZaliczek(zaliczkiLista);
+    renderujTabeleKosztow(kosztyLista);
+}
+
+function renderujTabeleZaliczek(lista) {
+    const tbody = document.getElementById("tabela-zaliczek");
+    if (!tbody) return;
+
+    if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Brak zaliczek.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = lista.map(z => `
+        <tr>
+            <td>${esc(z.data)}</td>
+            <td><strong>${Number(z.kwota || 0).toFixed(2)} PLN</strong></td>
+            <td>${esc(z.sposob_platnosci || "-")}</td>
+            <td>${esc(z.opis || "")}</td>
+            <td>
+                <button class="btn btn-danger small-btn" onclick="usunZaliczke('${esc(z.id)}')">Usuń</button>
+            </td>
+        </tr>
+    `).join("");
+}
+
+function renderujTabeleKosztow(lista) {
+    const tbody = document.getElementById("tabela-kosztow");
+    if (!tbody) return;
+
+    if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Brak kosztów.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = lista.map(k => `
+        <tr>
+            <td>${esc(k.data)}</td>
+            <td><strong>${Number(k.kwota || 0).toFixed(2)} PLN</strong></td>
+            <td>${esc(k.kategoria || "-")}</td>
+            <td>${esc(k.opis || "")}</td>
+            <td>
+                <button class="btn btn-danger small-btn" onclick="usunKoszt('${esc(k.id)}')">Usuń</button>
+            </td>
+        </tr>
+    `).join("");
+}
+
+async function dodajZaliczke() {
+    if (!aktywnaInwestycjaId) {
+        alert("Najpierw otwórz inwestycję.");
+        return;
+    }
+
+    const data = document.getElementById("zaliczka-data").value;
+    const kwota = Number(document.getElementById("zaliczka-kwota").value);
+    const sposob_platnosci = document.getElementById("zaliczka-platnosc").value;
+    const opis = document.getElementById("zaliczka-opis").value.trim();
+
+    if (!data) {
+        alert("Wybierz datę zaliczki.");
+        return;
+    }
+
+    if (isNaN(kwota) || kwota <= 0) {
+        alert("Wpisz poprawną kwotę zaliczki.");
+        return;
+    }
+
+    const payload = {
+        inwestycja_id: aktywnaInwestycjaId,
+        data,
+        kwota,
+        sposob_platnosci,
+        opis,
+        user_id: zalogowanyUser?.id
+    };
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje_zaliczki`, {
+            method: "POST",
+            headers: headers(),
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+
+        document.getElementById("zaliczka-kwota").value = "";
+        document.getElementById("zaliczka-opis").value = "";
+
+        await pobierzInwestycjeZaliczki();
+        renderujInwestycje();
+        renderujPanelInwestycji();
+    } catch (err) {
+        console.error(err);
+        alert("Nie udało się zapisać zaliczki.");
+    }
+}
+
+async function dodajKoszt() {
+    if (!aktywnaInwestycjaId) {
+        alert("Najpierw otwórz inwestycję.");
+        return;
+    }
+
+    const data = document.getElementById("koszt-data").value;
+    const kwota = Number(document.getElementById("koszt-kwota").value);
+    const kategoria = document.getElementById("koszt-kategoria").value;
+    const opis = document.getElementById("koszt-opis").value.trim();
+
+    if (!data) {
+        alert("Wybierz datę kosztu.");
+        return;
+    }
+
+    if (isNaN(kwota) || kwota <= 0) {
+        alert("Wpisz poprawną kwotę kosztu.");
+        return;
+    }
+
+    const payload = {
+        inwestycja_id: aktywnaInwestycjaId,
+        data,
+        kwota,
+        kategoria,
+        opis,
+        user_id: zalogowanyUser?.id
+    };
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje_koszty`, {
+            method: "POST",
+            headers: headers(),
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+
+        document.getElementById("koszt-kwota").value = "";
+        document.getElementById("koszt-opis").value = "";
+
+        await pobierzInwestycjeKoszty();
+        renderujInwestycje();
+        renderujPanelInwestycji();
+    } catch (err) {
+        console.error(err);
+        alert("Nie udało się zapisać kosztu.");
+    }
+}
+
+window.usunZaliczke = async function(id) {
+    if (rolaUsera !== "admin") {
+        alert("Tylko administrator może usuwać zaliczki.");
+        return;
+    }
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje_zaliczki?id=eq.${id}`, {
+            method: "DELETE",
+            headers: headers()
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+
+        await pobierzInwestycjeZaliczki();
+        await pobierzInwestycje();
+        renderujInwestycje();
+        renderujPanelInwestycji();
+    } catch (err) {
+        console.error(err);
+        alert("Nie udało się usunąć zaliczki.");
+    }
+};
+
+window.usunKoszt = async function(id) {
+    if (rolaUsera !== "admin") {
+        alert("Tylko administrator może usuwać koszty.");
+        return;
+    }
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje_koszty?id=eq.${id}`, {
+            method: "DELETE",
+            headers: headers()
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+
+        await pobierzInwestycjeKoszty();
+        await pobierzInwestycje();
+        renderujInwestycje();
+        renderujPanelInwestycji();
+    } catch (err) {
+        console.error(err);
+        alert("Nie udało się usunąć koszt.");
+    }
+};
