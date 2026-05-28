@@ -1,34 +1,31 @@
 ﻿// ==========================================
-// SYSTEM EL-NET - SKRYPT LOGIKI GŁÓWNEJ
+// SYSTEM EL-NET - LOGIKA CHMURY SUPABASE
 // ==========================================
 
-// 1. INICJALIZACJA BAZY DANYCH W LOCALSTORAGE (Cennik usług i Archiwum kosztorysów)
-const domyslnyCennik = [
-    { id: "1", nazwa: "Montaż rozdzielnicy elektrycznej", cena: 450.00 },
-    { id: "2", nazwa: "Układanie kabla 3x1.5 / 3x2.5 (mb)", cena: 8.50 },
-    { id: "3", nazwa: "Montaż gniazda / łącznika (punkt)", cena: 25.00 },
-    { id: "4", nazwa: "Instalacja systemu Smart Home (roboczogodzina)", cena: 120.00 }
-];
+// 1. KONFIGURACJA POŁĄCZENIA Z BAZĄ SUPABASE
+const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
 
-if (!localStorage.getItem("elnet_uslugi")) {
-    localStorage.setItem("elnet_uslugi", JSON.stringify(domyslnyCennik));
-}
-if (!localStorage.getItem("elnet_kosztorysy")) {
-    localStorage.setItem("elnet_kosztorysy", JSON.stringify([]));
-}
+// Inicjalizacja nagłówków dla zapytań HTTP do Supabase REST API
+const supabaseHeaders = {
+    "apikey": SUPABASE_ANON_KEY,
+    "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json"
+};
 
-let bazaUslug = JSON.parse(localStorage.getItem("elnet_uslugi"));
-let bazaKosztorysow = JSON.parse(localStorage.getItem("elnet_kosztorysy"));
-
-// Podręczna tablica dla aktualnie tworzonej wyceny
+// Podręczne zmienne robocze systemu
+let bazaUslug = [];
+let bazaKosztorysow = [];
 let aktualnaWycena = [];
-let edytowanyKosztorysId = null; // Przechowuje ID kosztorysu, jeśli go edytujemy
+let edytowanyKosztorysId = null;
 let edytowanaUslugaId = null;
 
-// STREFA STARTOWA - ROZPOZNAWANIE AKTYWNEJ PODSTRONY
-document.addEventListener("DOMContentLoaded", function() {
+// STREFA STARTOWA - ŁADOWANIE SYSTEMU I DETEKCJA STRON
+document.addEventListener("DOMContentLoaded", async function() {
+    
     // Podstrona: WYCENA (wycena.html)
     if (document.getElementById("rodzaj-prac")) {
+        await pobierzUslugiZChmury();
         renderujOpcjeUslug();
         ustawCeneDlaWybranejUslugi();
         
@@ -36,17 +33,18 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById("btn-dodaj").addEventListener("click", dodajPozycjeDoWyceny);
         document.getElementById("btn-wyczysc").addEventListener("click", wyczyscWycene);
         document.getElementById("korekta-procent").addEventListener("input", przeliczPodsumowanie);
-        document.getElementById("btn-zapisz-kosztorys").addEventListener("click", zapiszKosztorysWBazie);
+        document.getElementById("btn-zapisz-kosztorys").addEventListener("click", zapiszKosztorysWChmurze);
 
-        // Sprawdź czy nie weszliśmy tu w trybie edycji z zakładki Kosztorysy
         const parametrEdycji = sessionStorage.getItem("edycja_kosztorysu_id");
         if (parametrEdycji) {
+            await pobierzKosztorysyZChmury();
             wczytajKosztorysDoEdycji(parametrEdycji);
         }
     }
 
     // Podstrona: KOSZTORYSY (kosztorysy.html)
     if (document.getElementById("tabela-kosztorysow")) {
+        await pobierzKosztorysyZChmury();
         renderujBazeKosztorysow();
         document.getElementById("szukaj-kosztorys").addEventListener("input", renderujBazeKosztorysow);
         document.getElementById("sortuj-kosztorys").addEventListener("change", renderujBazeKosztorysow);
@@ -54,6 +52,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // Podstrona: USŁUGI (uslugi.html)
     if (document.getElementById("tabela-cennika")) {
+        await pobierzUslugiZChmury();
         renderujTabeleCennika();
         document.getElementById("btn-dodaj-usluge").addEventListener("click", obslugaFormularzaUslugi);
         document.getElementById("btn-anuluj-edycje").addEventListener("click", anulujEdycjeUslugi);
@@ -63,17 +62,43 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 // ==========================================
+// FUNKCJE KOMUNIKACJI Z SERWEREM (API CHMURY)
+// ==========================================
+
+async function pobierzUslugiZChmury() {
+    try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/uslugi?select=*`, { headers: supabaseHeaders });
+        if (!response.ok) throw new Error("Błąd pobierania usług");
+        bazaUslug = await response.json();
+    } catch (error) {
+        console.error(error);
+        alert("Błąd połączenia z bazą chmury (Usługi). Sprawdź konfigurację API.");
+    }
+}
+
+async function pobierzKosztorysyZChmury() {
+    try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/kosztorysy?select=*`, { headers: supabaseHeaders });
+        if (!response.ok) throw new Error("Błąd pobierania kosztorysów");
+        bazaKosztorysow = await response.json();
+    } catch (error) {
+        console.error(error);
+        alert("Błąd połączenia z bazą chmury (Kosztorysy).");
+    }
+}
+
+// ==========================================
 // LOGIKA ZAKŁADKI: WYCENA (wycena.html)
 // ==========================================
 function renderujOpcjeUslug() {
     const select = document.getElementById("rodzaj-prac");
+    if (!select) return;
     select.innerHTML = "";
-    // Sortuj alfabetycznie do selecta
     const posortowane = [...bazaUslug].sort((a, b) => a.nazwa.localeCompare(b.nazwa));
     posortowane.forEach(usluga => {
         const opcja = document.createElement("option");
         opcja.value = usluga.id;
-        opcja.textContent = `${usluga.nazwa} (${usluga.cena.toFixed(2)} PLN)`;
+        opcja.textContent = `${usluga.nazwa} (${parseFloat(usluga.cena).toFixed(2)} PLN)`;
         select.appendChild(opcja);
     });
 }
@@ -122,7 +147,7 @@ function renderujTabeleWyceny() {
         return;
     }
 
-    aktualnaWycena.forEach((pozycja, index) => {
+    aktualnaWycena.forEach((pozycja) => {
         const wartoscNetto = pozycja.ilosc * pozycja.cenaNetto;
         const kwotaVat = wartoscNetto * 0.23;
         const wartoscBrutto = wartoscNetto + kwotaVat;
@@ -132,7 +157,7 @@ function renderujTabeleWyceny() {
             <td>${pozycja.nazwa}</td>
             <td>${pozycja.jednostka}</td>
             <td>${pozycja.ilosc}</td>
-            <td>${pozycja.cenaNetto.toFixed(2)} PLN</td>
+            <td>${parseFloat(pozycja.cenaNetto).toFixed(2)} PLN</td>
             <td>${wartoscNetto.toFixed(2)} PLN</td>
             <td>23%</td>
             <td>${wartoscBrutto.toFixed(2)} PLN</td>
@@ -179,15 +204,15 @@ function wyczyscWycene() {
     }
 }
 
-// 💾 FUNKCJA ZAPISUJĄCA KOSZTORYS DO LOCALSTORAGE
-function zapiszKosztorysWBazie() {
+// ZAPIS/AKTUALIZACJA KOSZTORYSU W CHMURZE
+async function zapiszKosztorysWChmurze() {
     const nazwaKlienta = document.getElementById("nazwa-klienta-zapis").value.trim();
     if (!nazwaKlienta) {
-        alert("Wpisz nazwę kosztorysu lub dane klienta, aby zapisać dokument!");
+        alert("Wpisz nazwę kosztorysu lub dane klienta!");
         return;
     }
     if (aktualnaWycena.length === 0) {
-        alert("Nie można zapisać pustego kosztorysu! Dodaj najpierw jakieś pozycje robocze.");
+        alert("Nie można zapisać pustego kosztorysu!");
         return;
     }
 
@@ -197,42 +222,49 @@ function zapiszKosztorysWBazie() {
     const finalNetto = sumaNettoBase * (1 + (korektaProcent / 100));
     const finalBrutto = finalNetto * 1.23;
 
-    if (edytowanyKosztorysId) {
-        // Aktualizacja istniejącego kosztorysu (tryb edycji)
-        const indeks = bazaKosztorysow.findIndex(k => k.id === edytowanyKosztorysId);
-        if (indeks !== -1) {
-            bazaKosztorysow[indeks].nazwa = nazwaKlienta;
-            bazaKosztorysow[indeks].pozycje = aktualnaWycena;
-            bazaKosztorysow[indeks].korekta = korektaProcent;
-            bazaKosztorysow[indeks].netto = finalNetto;
-            bazaKosztorysow[indeks].brutto = finalBrutto;
-            bazaKosztorysow[indeks].data = new Date().toLocaleDateString("pl-PL") + " (edytowany)";
-        }
-        alert("Kosztorys został pomyślnie zaktualizowany w bazie!");
-        edytowanyKosztorysId = null;
-        sessionStorage.removeItem("edycja_kosztorysu_id");
-    } else {
-        // Dodanie nowego kosztorysu do bazy
-        const nowyKosztorys = {
-            id: Date.now().toString(),
-            nazwa: nazwaKlienta,
-            data: new Date().toLocaleDateString("pl-PL"),
-            pozycje: aktualnaWycena,
-            korekta: korektaProcent,
-            netto: finalNetto,
-            brutto: finalBrutto
-        };
-        bazaKosztorysow.push(nowyKosztorys);
-        alert("Kosztorys został pomyślnie zapisany w bazie danych!");
-    }
+    const daneKosztorysu = {
+        nazwa: nazwaKlienta,
+        pozycje: aktualnaWycena,
+        korekta: korektaProcent,
+        netto: finalNetto,
+        brutto: finalBrutto,
+        data: new Date().toLocaleDateString("pl-PL")
+    };
 
-    localStorage.setItem("elnet_kosztorysy", JSON.stringify(bazaKosztorysow));
-    
-    // Czyszczenie ekranu po zapisie
-    aktualnaWycena = [];
-    document.getElementById("nazwa-klienta-zapis").value = "";
-    document.getElementById("korekta-procent").value = "0";
-    renderujTabeleWyceny();
+    try {
+        if (edytowanyKosztorysId) {
+            // Metoda PATCH dla aktualizacji rekordu
+            daneKosztorysu.data += " (edytowany)";
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/kosztorysy?id=eq.${edytowanyKosztorysId}`, {
+                method: "PATCH",
+                headers: supabaseHeaders,
+                body: JSON.stringify(daneKosztorysu)
+            });
+            if (!response.ok) throw new Error("Błąd podczas edycji wyceny");
+            alert("Kosztorys pomyślnie zaktualizowany w chmurze Supabase!");
+            edytowanyKosztorysId = null;
+            sessionStorage.removeItem("edycja_kosztorysu_id");
+        } else {
+            // Metoda POST dla nowego rekordu
+            daneKosztorysu.id = Date.now().toString();
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/kosztorysy`, {
+                method: "POST",
+                headers: supabaseHeaders,
+                body: JSON.stringify(daneKosztorysu)
+            });
+            if (!response.ok) throw new Error("Błąd podczas zapisu nowej wyceny");
+            alert("Kosztorys został bezpiecznie zapisany w chmurze!");
+        }
+
+        aktualnaWycena = [];
+        document.getElementById("nazwa-klienta-zapis").value = "";
+        document.getElementById("korekta-procent").value = "0";
+        renderujTabeleWyceny();
+
+    } catch (error) {
+        console.error(error);
+        alert("Wystąpił problem z zapisem do bazy danych online.");
+    }
 }
 
 function wczytajKosztorysDoEdycji(id) {
@@ -241,7 +273,7 @@ function wczytajKosztorysDoEdycji(id) {
         edytowanyKosztorysId = kosztorys.id;
         document.getElementById("nazwa-klienta-zapis").value = kosztorys.nazwa;
         document.getElementById("korekta-procent").value = kosztorys.korekta || 0;
-        aktualnaWycena = [...kosztorys.pozycje];
+        aktualnaWycena = typeof kosztorys.pozycje === 'string' ? JSON.parse(kosztorys.pozycje) : kosztorys.pozycje;
         renderujTabeleWyceny();
     }
 }
@@ -252,22 +284,20 @@ function wczytajKosztorysDoEdycji(id) {
 function renderujBazeKosztorysow() {
     const tbody = document.getElementById("tabela-kosztorysow");
     if (!tbody) return;
-
     tbody.innerHTML = "";
+
     let lista = [...bazaKosztorysow];
 
-    // 1. Filtrowanie (Wyszukiwarka)
     const fraza = document.getElementById("szukaj-kosztorys").value.toLowerCase();
     if (fraza) {
         lista = lista.filter(k => k.nazwa.toLowerCase().includes(fraza) || k.data.toLowerCase().includes(fraza));
     }
 
-    // 2. Sortowanie
     const typSortowania = document.getElementById("sortuj-kosztorys").value;
     if (typSortowania === "data-nowsze") {
-        lista.sort((a, b) => b.id - a.id);
+        lista.sort((a, b) => b.id.localeCompare(a.id));
     } else if (typSortowania === "data-starsze") {
-        lista.sort((a, b) => a.id - b.id);
+        lista.sort((a, b) => a.id.localeCompare(b.id));
     } else if (typSortowania === "nazwa-az") {
         lista.sort((a, b) => a.nazwa.localeCompare(b.nazwa));
     } else if (typSortowania === "nazwa-za") {
@@ -279,7 +309,7 @@ function renderujBazeKosztorysow() {
     }
 
     if (lista.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #888; padding: 30px;">Brak kosztorysów pasujących do podanych kryteriów.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #888; padding: 30px;">Brak kosztorysów w chmurze.</td></tr>`;
         return;
     }
 
@@ -288,11 +318,11 @@ function renderujBazeKosztorysow() {
         wiersz.innerHTML = `
             <td>${kosztorys.data}</td>
             <td style="font-weight: bold; color: #2c3e50;">${kosztorys.nazwa}</td>
-            <td>${kosztorys.netto.toFixed(2)} PLN</td>
-            <td style="color: #27ae60; font-weight: bold;">${kosztorys.brutto.toFixed(2)} PLN</td>
+            <td>${parseFloat(kosztorys.netto).toFixed(2)} PLN</td>
+            <td style="color: #27ae60; font-weight: bold;">${parseFloat(kosztorys.brutto).toFixed(2)} PLN</td>
             <td style="text-align: center;">
                 <button class="btn btn-success" style="padding: 4px 10px; font-size: 12px; width: auto; background-color: #2980b9;" onclick="edytujKosztorys('${kosztorys.id}')">🛠️ Edycja</button>
-                <button class="btn btn-danger" style="padding: 4px 10px; font-size: 12px; width: auto;" onclick="usunKosztorysZArchiwum('${kosztorys.id}')">🗑️ Usuń</button>
+                <button class="btn btn-danger" style="padding: 4px 10px; font-size: 12px; width: auto;" onclick="usunKosztorysZChmury('${kosztorys.id}')">🗑️ Usuń</button>
             </td>
         `;
         tbody.appendChild(wiersz);
@@ -304,11 +334,19 @@ window.edytujKosztorys = function(id) {
     window.location.href = "wycena.html";
 };
 
-window.usunKosztorysZArchiwum = function(id) {
-    if (confirm("Czy na pewno chcesz bezpowrotnie usunąć ten kosztorys z bazy danych?")) {
-        bazaKosztorysow = bazaKosztorysow.filter(k => k.id !== id);
-        localStorage.setItem("elnet_kosztorysy", JSON.stringify(bazaKosztorysow));
-        renderujBazeKosztorysow();
+window.usunKosztorysZChmury = function(id) {
+    if (confirm("Czy na pewno chcesz bezpowrotnie usunąć ten kosztorys z bazy online?")) {
+        fetch(`${SUPABASE_URL}/rest/v1/kosztorysy?id=eq.${id}`, {
+            method: "DELETE",
+            headers: supabaseHeaders
+        }).then(res => {
+            if (res.ok) {
+                bazaKosztorysow = bazaKosztorysow.filter(k => k.id !== id);
+                renderujBazeKosztorysow();
+            } else {
+                alert("Nie udało się usunąć rekordu z chmury.");
+            }
+        });
     }
 };
 
@@ -342,47 +380,54 @@ function renderujTabeleCennika() {
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td>${usluga.nazwa}</td>
-            <td><b>${usluga.cena.toFixed(2)} PLN</b></td>
+            <td><b>${parseFloat(usluga.cena).toFixed(2)} PLN</b></td>
             <td style="text-align: center;">
                 <button class="btn" style="padding: 4px 10px; font-size: 12px; width: auto; background-color: #f39c12;" onclick="przygotujEdycjeUslugi('${usluga.id}')">Opcje</button>
-                <button class="btn btn-danger" style="padding: 4px 10px; font-size: 12px; width: auto;" onclick="usunUsluge('${usluga.id}')">Usuń</button>
+                <button class="btn btn-danger" style="padding: 4px 10px; font-size: 12px; width: auto;" onclick="usunUslugeZChmury('${usluga.id}')">Usuń</button>
             </td>
         `;
         tbody.appendChild(tr);
     });
 }
 
-function obslugaFormularzaUslugi() {
+async function obslugaFormularzaUslugi() {
     const nazwa = document.getElementById("nowa-usluga-nazwa").value.trim();
     const cena = parseFloat(document.getElementById("nowa-usluga-cena").value);
 
     if (!nazwa || isNaN(cena) || cena < 0) {
-        alert("Wpisz poprawną nazwę usługi oraz jej stawkę netto!");
+        alert("Wpisz poprawną nazwę usługi oraz stawkę!");
         return;
     }
 
-    if (edytowanaUslugaId) {
-        const indeks = bazaUslug.findIndex(u => u.id === edytowanaUslugaId);
-        if (indeks !== -1) {
-            bazaUslug[indeks].nazwa = nazwa;
-            bazaUslug[indeks].cena = cena;
+    try {
+        if (edytowanaUslugaId) {
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/uslugi?id=eq.${edytowanaUslugaId}`, {
+                method: "PATCH",
+                headers: supabaseHeaders,
+                body: JSON.stringify({ nazwa, cena })
+            });
+            if (!response.ok) throw new Error();
+            edytowanaUslugaId = null;
+            document.getElementById("btn-dodaj-usluge").textContent = "Dodaj pozycję do bazy usług";
+            document.getElementById("btn-anuluj-edycje").style.display = "none";
+            document.getElementById("form-title").textContent = "Dodaj nową usługę do listy";
+        } else {
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/uslugi`, {
+                method: "POST",
+                headers: supabaseHeaders,
+                body: JSON.stringify({ id: Date.now().toString(), nazwa, cena })
+            });
+            if (!response.ok) throw new Error();
         }
-        edytowanaUslugaId = null;
-        document.getElementById("btn-dodaj-usluge").textContent = "Dodaj pozycję do bazy usług";
-        document.getElementById("btn-anuluj-edycje").style.display = "none";
-        document.getElementById("form-title").textContent = "Dodaj nową usługę do listy";
-    } else {
-        bazaUslug.push({
-            id: Date.now().toString(),
-            nazwa: nazwa,
-            cena: cena
-        });
-    }
 
-    localStorage.setItem("elnet_uslugi", JSON.stringify(bazaUslug));
-    document.getElementById("nowa-usluga-nazwa").value = "";
-    document.getElementById("nowa-usluga-cena").value = "";
-    renderujTabeleCennika();
+        document.getElementById("nowa-usluga-nazwa").value = "";
+        document.getElementById("nowa-usluga-cena").value = "";
+        await pobierzUslugiZChmury();
+        renderujTabeleCennika();
+
+    } catch (e) {
+        alert("Wystąpił błąd zapisu usługi w chmurze.");
+    }
 }
 
 window.przygotujEdycjeUslugi = function(id) {
@@ -406,10 +451,14 @@ function anulujEdycjeUslugi() {
     document.getElementById("form-title").textContent = "Dodaj nową usługę do listy";
 }
 
-window.usunUsluge = function(id) {
-    if (confirm("Czy chcesz usunąć tę usługę z cennika domyślnego?")) {
-        bazaUslug = bazaUslug.filter(u => u.id !== id);
-        localStorage.setItem("elnet_uslugi", JSON.stringify(bazaUslug));
-        renderujTabeleCennika();
+window.usunUslugeZChmury = function(id) {
+    if (confirm("Czy chcesz usunąć tę usługę z chmury?")) {
+        fetch(`${SUPABASE_URL}/rest/v1/uslugi?id=eq.${id}`, {
+            method: "DELETE",
+            headers: supabaseHeaders
+        }).then(async () => {
+            await pobierzUslugiZChmury();
+            renderujTabeleCennika();
+        });
     }
 };
