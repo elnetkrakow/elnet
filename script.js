@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.05.29-10";
+const APP_VERSION = "2026.05.29-24";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -18,9 +18,17 @@ let inwestycjeKoszty = [];
 let logi = [];
 let aktywnaInwestycjaId = null;
 
+let magazyn = [];
+let terminarz = [];
+let calendarDate = new Date();
+let edytowanyTerminId = null;
+
 let wycenaPozycje = [];
 let edytowanaUslugaId = null;
 let edytowanaInwestycjaId = null;
+let trybEdycjiKosztorysu = false;
+let edytowanyKosztorysId = null;
+let aktualnyDrukowanyKosztorysId = null;
 
 function headers() {
     return {
@@ -158,11 +166,42 @@ function podepnijZdarzenia() {
     const wycenaUsluga = document.getElementById("wycena-usluga");
     if (wycenaUsluga) wycenaUsluga.addEventListener("change", ustawCeneWybranejUslugi);
 
+    const wycenaUsluguSearch = document.getElementById("wycena-usluga-search");
+    if (wycenaUsluguSearch) {
+        wycenaUsluguSearch.addEventListener("input", renderujPodpowiedziUslug);
+        wycenaUsluguSearch.addEventListener("focus", renderujPodpowiedziUslug);
+    }
+
+    document.addEventListener("click", (e) => {
+        const searchInput = document.getElementById("wycena-usluga-search");
+        const suggestionsBox = document.getElementById("wycena-usluga-suggestions");
+        if (!suggestionsBox) return;
+        
+        if (e.target !== searchInput && !suggestionsBox.contains(e.target)) {
+            suggestionsBox.classList.remove("visible");
+        }
+    });
+
     const btnDodajPozycje = document.getElementById("btn-dodaj-pozycje");
     if (btnDodajPozycje) btnDodajPozycje.addEventListener("click", dodajPozycjeDoWyceny);
 
     const btnWyczyscWycene = document.getElementById("btn-wyczysc-wycene");
     if (btnWyczyscWycene) btnWyczyscWycene.addEventListener("click", wyczyscWycene);
+
+    const btnAnulujEdycjiKosztorysu = document.getElementById("btn-anuluj-edycje-kosztorysu");
+    if (btnAnulujEdycjiKosztorysu) btnAnulujEdycjiKosztorysu.addEventListener("click", anulujTrybEdycjiKosztorysu);
+
+    const btnPodgladDrukujKosztorys = document.getElementById("btn-podglad-drukuj-kosztorys");
+    if (btnPodgladDrukujKosztorys) btnPodgladDrukujKosztorys.addEventListener("click", () => {
+        const options = pobierzOpcjeDrukuKosztorysu();
+        if (!options) return;
+        if (aktualnyDrukowanyKosztorysId) {
+            drukujKosztorysDoOkna(aktualnyDrukowanyKosztorysId, options);
+        }
+    });
+
+    const btnZamknijDrukujKosztorys = document.getElementById("btn-zamknij-drukuj-kosztorys");
+    if (btnZamknijDrukujKosztorys) btnZamknijDrukujKosztorys.addEventListener("click", zamknijModalDrukuKosztorysu);
 
     const korekta = document.getElementById("wycena-korekta");
     if (korekta) korekta.addEventListener("input", przeliczWycene);
@@ -233,6 +272,48 @@ function podepnijZdarzenia() {
 
     const kosztData = document.getElementById("koszt-data");
     if (kosztData) kosztData.value = dzisiaj;
+
+    const btnZapiszMagazyn = document.getElementById("btn-zapisz-magazyn");
+    if (btnZapiszMagazyn) btnZapiszMagazyn.addEventListener("click", zapiszMagazyn);
+
+    const btnRefreshMagazyn = document.getElementById("btn-refresh-magazyn");
+    if (btnRefreshMagazyn) btnRefreshMagazyn.addEventListener("click", async () => {
+        await pobierzMagazyn();
+        renderujMagazyn();
+    });
+
+    const magSearch = document.getElementById('magazyn-search');
+    if (magSearch) magSearch.addEventListener('input', renderujMagazyn);
+
+    const magSort = document.getElementById('magazyn-sort');
+    if (magSort) magSort.addEventListener('change', renderujMagazyn);
+
+    const btnDodajTermin = document.getElementById('btn-dodaj-termin');
+    if (btnDodajTermin) btnDodajTermin.addEventListener('click', dodajTermin);
+
+    const btnAnulujTermin = document.getElementById('btn-anuluj-termin');
+    if (btnAnulujTermin) btnAnulujTermin.addEventListener('click', anulujEdycjeTerminu);
+
+    const terminSearch = document.getElementById('terminarz-search');
+    if (terminSearch) terminSearch.addEventListener('input', renderujTerminarz);
+
+    const terminDateFilter = document.getElementById('terminarz-date-filter');
+    if (terminDateFilter) terminDateFilter.addEventListener('change', renderujTerminarz);
+
+    const terminSort = document.getElementById('terminarz-sort');
+    if (terminSort) terminSort.addEventListener('change', renderujTerminarz);
+
+    const btnCalendarPrev = document.getElementById('calendar-prev');
+    if (btnCalendarPrev) btnCalendarPrev.addEventListener('click', () => {
+        calendarDate.setMonth(calendarDate.getMonth() - 1);
+        renderujKalendarzTerminarza();
+    });
+
+    const btnCalendarNext = document.getElementById('calendar-next');
+    if (btnCalendarNext) btnCalendarNext.addEventListener('click', () => {
+        calendarDate.setMonth(calendarDate.getMonth() + 1);
+        renderujKalendarzTerminarza();
+    });
 }
 
 // ==========================================
@@ -356,6 +437,8 @@ function aktualizujWidokPoRoli() {
 // ==========================================
 
 function pokazSekcje(nazwa) {
+    const previousSection = document.querySelector('.app-section.active-section')?.id;
+
     document.querySelectorAll(".app-section").forEach(sec => {
         sec.classList.remove("active-section");
     });
@@ -366,6 +449,14 @@ function pokazSekcje(nazwa) {
     document.querySelectorAll(".nav-link").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.section === nazwa);
     });
+
+    if (previousSection === "section-wycena" && nazwa !== "wycena") {
+        wyczyscWycene();
+    }
+
+    if (nazwa === "wycena" && !trybEdycjiKosztorysu) {
+        wyczyscWycene();
+    }
 
     if (nazwa === "administrator") {
         pokazAdminTab("podsumowanie");
@@ -383,7 +474,9 @@ async function odswiezDane() {
         pobierzInwestycje(),
         pobierzInwestycjeZaliczki(),
         pobierzInwestycjeKoszty(),
-        pobierzLogi()
+        pobierzLogi(),
+        pobierzMagazyn(),
+        pobierzTerminarz()
     ]);
 
     renderujWszystko();
@@ -484,6 +577,556 @@ async function pobierzInwestycjeKoszty() {
     }
 }
 
+// MAGAZYN
+async function pobierzMagazyn() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/magazyn?select=*&order=data_zakupu.desc`, {
+            headers: headers()
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            obsluzBladAutoryzacji(errorText);
+            throw new Error(errorText);
+        }
+
+        magazyn = await res.json();
+    } catch (err) {
+        console.error("Błąd pobierania magazynu:", err);
+        magazyn = [];
+    }
+}
+
+async function pobierzTerminarz() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?select=*&order=data_start.asc`, {
+            headers: headers()
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            obsluzBladAutoryzacji(errorText);
+            throw new Error(errorText);
+        }
+
+        terminarz = await res.json();
+    } catch (err) {
+        console.error("Błąd pobierania terminarza:", err);
+        terminarz = [];
+    }
+}
+
+async function dodajTermin() {
+    if (rolaUsera === 'guest') {
+        alert('Musisz być zalogowany, aby dodać termin.');
+        return;
+    }
+
+    const dataStart = document.getElementById('terminarz-data-start')?.value;
+    const dataKoniec = document.getElementById('terminarz-data-koniec')?.value;
+    const klient = document.getElementById('terminarz-klient')?.value.trim();
+    const adres = document.getElementById('terminarz-adres')?.value.trim();
+    const telefon = document.getElementById('terminarz-telefon')?.value.trim();
+    const opis = document.getElementById('terminarz-opis')?.value.trim();
+    const status = document.getElementById('terminarz-status')?.value || 'zaplanowane';
+
+    if (!dataStart || !dataKoniec) {
+        alert('Podaj datę rozpoczęcia i zakończenia.');
+        return;
+    }
+
+    const nowyStart = new Date(dataStart);
+    const nowyKoniec = new Date(dataKoniec);
+
+    if (nowyKoniec < nowyStart) {
+        alert('Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.');
+        return;
+    }
+
+    const zachowaj = terminarz.some(item => {
+        if (edytowanyTerminId && String(item.id) === String(edytowanyTerminId)) {
+            return false;
+        }
+        const istniejącyStart = item.data_start ? new Date(item.data_start) : null;
+        const istniejącyKoniec = item.data_koniec ? new Date(item.data_koniec) : null;
+        if (!istniejącyStart || !istniejącyKoniec) return false;
+        return nowyStart <= istniejącyKoniec && nowyKoniec >= istniejącyStart;
+    });
+
+    if (zachowaj) {
+        const potwierdzenie = confirm('Ten termin nakłada się na inną zaplanowaną pracę. Czy mimo to zapisać?');
+        if (!potwierdzenie) return;
+    }
+
+    const payload = {
+        data_start: dataStart,
+        data_koniec: dataKoniec,
+        klient: klient,
+        adres: adres,
+        telefon: telefon,
+        opis: opis,
+        status: status,
+        user_id: zalogowanyUser?.id || null
+    };
+
+    try {
+        let res;
+        let logAkcja = 'Dodano termin';
+        if (edytowanyTerminId) {
+            res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${encodeURIComponent(edytowanyTerminId)}`, {
+                method: 'PATCH',
+                headers: headers(),
+                body: JSON.stringify(payload)
+            });
+            logAkcja = 'Edytowano termin';
+        } else {
+            res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz`, {
+                method: 'POST',
+                headers: headers(),
+                body: JSON.stringify(payload)
+            });
+        }
+
+        if (!res.ok) {
+            throw new Error(await res.text());
+        }
+
+        await pobierzTerminarz();
+        renderujTerminarz();
+        renderujKalendarzTerminarza();
+        zapiszLog('Terminarz', logAkcja, `${klient} ${dataStart}–${dataKoniec}`);
+
+        edytowanyTerminId = null;
+        const btnDodajTermin = document.getElementById('btn-dodaj-termin');
+        if (btnDodajTermin) btnDodajTermin.textContent = 'Dodaj termin';
+        const btnAnulujTermin = document.getElementById('btn-anuluj-termin');
+        if (btnAnulujTermin) btnAnulujTermin.classList.add('hidden');
+
+        document.getElementById('terminarz-data-start').value = '';
+        document.getElementById('terminarz-data-koniec').value = '';
+        document.getElementById('terminarz-klient').value = '';
+        document.getElementById('terminarz-adres').value = '';
+        document.getElementById('terminarz-telefon').value = '';
+        document.getElementById('terminarz-opis').value = '';
+        document.getElementById('terminarz-status').value = 'zaplanowane';
+    } catch (err) {
+        console.error('Błąd zapisu terminarza:', err);
+        const msg = err?.message || String(err);
+        alert('Nie udało się zapisać terminu:\n\n' + msg);
+    }
+}
+
+window.edytujTermin = function(id) {
+    if (rolaUsera === 'guest') {
+        alert('Tylko zalogowany użytkownik może edytować termin.');
+        return;
+    }
+
+    const termin = terminarz.find(item => String(item.id) === String(id));
+    if (!termin) return;
+
+    edytowanyTerminId = String(id);
+    document.getElementById('terminarz-data-start').value = termin.data_start || '';
+    document.getElementById('terminarz-data-koniec').value = termin.data_koniec || '';
+    document.getElementById('terminarz-klient').value = termin.klient || '';
+    document.getElementById('terminarz-adres').value = termin.adres || '';
+    document.getElementById('terminarz-telefon').value = termin.telefon || '';
+    document.getElementById('terminarz-opis').value = termin.opis || '';
+    document.getElementById('terminarz-status').value = termin.status || 'zaplanowane';
+
+    const btnDodajTermin = document.getElementById('btn-dodaj-termin');
+    if (btnDodajTermin) btnDodajTermin.textContent = 'Zapisz zmiany';
+    const btnAnulujTermin = document.getElementById('btn-anuluj-termin');
+    if (btnAnulujTermin) btnAnulujTermin.classList.remove('hidden');
+};
+
+function anulujEdycjeTerminu() {
+    edytowanyTerminId = null;
+    document.getElementById('terminarz-data-start').value = '';
+    document.getElementById('terminarz-data-koniec').value = '';
+    document.getElementById('terminarz-klient').value = '';
+    document.getElementById('terminarz-adres').value = '';
+    document.getElementById('terminarz-telefon').value = '';
+    document.getElementById('terminarz-opis').value = '';
+    document.getElementById('terminarz-status').value = 'zaplanowane';
+
+    const btnDodajTermin = document.getElementById('btn-dodaj-termin');
+    if (btnDodajTermin) btnDodajTermin.textContent = 'Dodaj termin';
+    const btnAnulujTermin = document.getElementById('btn-anuluj-termin');
+    if (btnAnulujTermin) btnAnulujTermin.classList.add('hidden');
+}
+
+window.usunTermin = async function(id) {
+    if (rolaUsera !== 'admin') {
+        alert('Tylko administrator może usuwać terminy.');
+        return;
+    }
+
+    if (!confirm('Usunąć termin?')) return;
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${id}`, {
+            method: 'DELETE',
+            headers: headers()
+        });
+
+        if (!res.ok) {
+            throw new Error(await res.text());
+        }
+
+        await pobierzTerminarz();
+        renderujTerminarz();
+        renderujKalendarzTerminarza();
+        zapiszLog('Terminarz', 'Usunięto termin', id);
+    } catch (err) {
+        console.error('Błąd usuwania terminarza:', err);
+        alert('Nie udało się usunąć terminu.');
+    }
+};
+
+function renderujTerminarz() {
+    const tbody = document.getElementById('tabela-terminarz');
+    if (!tbody) return;
+
+    const search = document.getElementById('terminarz-search')?.value.toLowerCase().trim() || '';
+    const dateFilter = document.getElementById('terminarz-date-filter')?.value;
+    const sort = document.getElementById('terminarz-sort')?.value || 'start-asc';
+
+    let lista = [...terminarz];
+
+    if (search) {
+        lista = lista.filter(item => {
+            const text = [item.klient, item.adres, item.opis].map(v => String(v || '').toLowerCase()).join(' ');
+            return text.includes(search);
+        });
+    }
+
+    if (dateFilter) {
+        const filtrowanaData = new Date(dateFilter);
+        lista = lista.filter(item => {
+            const start = item.data_start ? new Date(item.data_start) : null;
+            const end = item.data_koniec ? new Date(item.data_koniec) : null;
+            if (!start || !end) return false;
+            return filtrowanaData >= start && filtrowanaData <= end;
+        });
+    }
+
+    function statusOrder(item) {
+        const order = ['zaplanowane', 'w trakcie', 'zakończone', 'przesunięte', 'odwołane'];
+        return order.indexOf((item.status || '').toLowerCase());
+    }
+
+    lista.sort((a, b) => {
+        if (sort === 'start-asc') {
+            return new Date(a.data_start || 0) - new Date(b.data_start || 0);
+        }
+        if (sort === 'start-desc') {
+            return new Date(b.data_start || 0) - new Date(a.data_start || 0);
+        }
+        if (sort === 'end-asc') {
+            return new Date(a.data_koniec || 0) - new Date(b.data_koniec || 0);
+        }
+        if (sort === 'client-az') {
+            return String(a.klient || '').localeCompare(String(b.klient || ''), 'pl');
+        }
+        if (sort === 'status') {
+            return statusOrder(a) - statusOrder(b);
+        }
+        return 0;
+    });
+
+    if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-row">Brak terminów w terminarzu.</td></tr>`;
+        return;
+    }
+
+    const today = new Date();
+    tbody.innerHTML = lista.map(item => {
+        const start = item.data_start ? new Date(item.data_start) : null;
+        const end = item.data_koniec ? new Date(item.data_koniec) : null;
+        const startStr = start ? start.toLocaleDateString('pl-PL') : '-';
+        const endStr = end ? end.toLocaleDateString('pl-PL') : '-';
+        const days = start && end ? Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1) : '-';
+        const status = String(item.status || '').toLowerCase();
+        const statusLabel = `<span class="status-tag status-${status.replace(/\s/g, '-')}">${esc(status || '-')}</span>`;
+        const canEdit = rolaUsera !== 'guest';
+        const editButton = canEdit
+            ? `<button class="btn btn-secondary small-btn" onclick="edytujTermin('${esc(item.id)}')">Edytuj</button>`
+            : '';
+        const deleteButton = rolaUsera === 'admin'
+            ? `<button class="btn btn-danger small-btn" onclick="usunTermin('${esc(item.id)}')">Usuń</button>`
+            : '';
+        const akcje = [editButton, deleteButton].filter(Boolean).join(' ');
+
+        return `
+            <tr>
+                <td>${esc(startStr)} – ${esc(endStr)}</td>
+                <td>${esc(item.klient || '')}</td>
+                <td>${esc(item.adres || '')}</td>
+                <td>${esc(item.telefon || '')}</td>
+                <td>${statusLabel}</td>
+                <td>${esc(item.opis || '')}</td>
+                <td>${esc(days)}</td>
+                <td>${akcje}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function renderujKalendarzTerminarza() {
+    const container = document.getElementById('terminarz-calendar');
+    const title = document.getElementById('calendar-title');
+    if (!container || !title) return;
+
+    const month = calendarDate.getMonth();
+    const year = calendarDate.getFullYear();
+    const monthLabel = calendarDate.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+    title.textContent = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
+
+    const firstDay = new Date(year, month, 1);
+    const startOffset = (firstDay.getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const weekdays = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'];
+
+    const cells = weekdays.map(d => `<div class="calendar-weekday">${d}</div>`);
+
+    for (let i = 0; i < startOffset; i++) {
+        cells.push('<div class="calendar-day empty"></div>');
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const currentDate = new Date(year, month, day);
+        const isoDate = currentDate.toISOString().slice(0, 10);
+        const status = getKalendarzStatus(currentDate);
+        const isToday = isSameDay(currentDate, new Date());
+        const className = `calendar-day ${status} ${isToday ? 'today' : ''}`.trim();
+        cells.push(`
+            <div class="${className}" data-date="${isoDate}">
+                <span>${day}</span>
+            </div>
+        `);
+    }
+
+    container.innerHTML = cells.join('');
+
+    container.querySelectorAll('.calendar-day[data-date]').forEach(dayEl => {
+        dayEl.addEventListener('click', () => {
+            const selected = dayEl.dataset.date;
+            const dateFilter = document.getElementById('terminarz-date-filter');
+            if (dateFilter) {
+                dateFilter.value = selected;
+            }
+            renderujTerminarz();
+        });
+    });
+}
+
+function getKalendarzStatus(date) {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    let foundReserved = false;
+    let foundBusy = false;
+
+    (terminarz || []).forEach(item => {
+        const start = item.data_start ? new Date(item.data_start) : null;
+        const end = item.data_koniec ? new Date(item.data_koniec) : null;
+        if (!start || !end) return;
+        start.setHours(0, 0, 0, 0);
+        end.setHours(0, 0, 0, 0);
+        if (normalized >= start && normalized <= end) {
+            const status = String(item.status || '').toLowerCase();
+            if (status === 'rezerwacja') {
+                foundReserved = true;
+            } else if (['zaplanowane', 'w trakcie', 'zakończone', 'przesunięte'].includes(status)) {
+                foundBusy = true;
+            }
+        }
+    });
+
+    if (foundBusy) return 'busy';
+    if (foundReserved) return 'reserved';
+    return 'free';
+}
+
+function isSameDay(a, b) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function nazwaStatusu(status) {
+    return String(status || '').toLowerCase();
+}
+
+function statusClass(status) {
+    return `status-${String(status || '').toLowerCase().replace(/\s/g, '-')}`;
+}
+
+function formatDateOnly(data) {
+    return data ? new Date(data).toLocaleDateString('pl-PL') : '-';
+}
+
+function renderujMagazyn() {
+    const tbody = document.getElementById("tabela-magazyn");
+    if (!tbody) return;
+    const search = document.getElementById('magazyn-search')?.value.toLowerCase().trim() || '';
+    const sort = document.getElementById('magazyn-sort')?.value || 'newest';
+
+    let lista = [...magazyn];
+
+    // filter by search (name or uwagi)
+    if (search) {
+        lista = lista.filter(item => {
+            const text = ((item.nazwa || '') + ' ' + (item.uwagi || '')).toLowerCase();
+            return text.includes(search);
+        });
+    }
+
+    const teraz = new Date();
+
+    function remainingDays(item) {
+        const dataZakupu = item.data_zakupu ? new Date(item.data_zakupu) : null;
+        const gwar = Number(item.okres_gwarancji_miesiace || item.gwarancja_miesiace || 0);
+        if (!dataZakupu || !gwar) return Infinity;
+        const koniec = new Date(dataZakupu);
+        koniec.setMonth(koniec.getMonth() + gwar);
+        return Math.ceil((koniec - new Date()) / (1000 * 60 * 60 * 24));
+    }
+
+    // sort
+    lista.sort((a, b) => {
+        if (sort === 'newest') {
+            return new Date(b.created_at || b.data_zakupu || 0) - new Date(a.created_at || a.data_zakupu || 0);
+        }
+        if (sort === 'oldest') {
+            return new Date(a.created_at || a.data_zakupu || 0) - new Date(b.created_at || b.data_zakupu || 0);
+        }
+        if (sort === 'name-az') return String(a.nazwa || '').localeCompare(String(b.nazwa || ''), 'pl');
+        if (sort === 'name-za') return String(b.nazwa || '').localeCompare(String(a.nazwa || ''), 'pl');
+        if (sort === 'price-desc') return Number(b.kwota || 0) - Number(a.kwota || 0);
+        if (sort === 'price-asc') return Number(a.kwota || 0) - Number(b.kwota || 0);
+        if (sort === 'warranty-soon') return remainingDays(a) - remainingDays(b);
+        return 0;
+    });
+
+    if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Brak pasujących wpisów.</td></tr>`;
+        return;
+    }
+
+    lista = lista.slice(0, 10);
+
+    tbody.innerHTML = lista.map(item => {
+        const dataZakupu = item.data_zakupu ? new Date(item.data_zakupu) : null;
+        const dataZakupuStr = dataZakupu ? dataZakupu.toLocaleDateString('pl-PL') : '-';
+        const kwota = Number(item.kwota || 0).toFixed(2);
+        const gwar = Number(item.okres_gwarancji_miesiace || item.gwarancja_miesiace || 0);
+
+        let warn = false;
+        if (dataZakupu && gwar > 0) {
+            const koniec = new Date(dataZakupu);
+            koniec.setMonth(koniec.getMonth() + gwar);
+            const diffDays = Math.ceil((koniec - teraz) / (1000 * 60 * 60 * 24));
+            if (diffDays <= 30) warn = true;
+        }
+
+        const akcje = rolaUsera === 'admin'
+            ? `<button class="btn btn-danger small-btn" onclick="usunMagazyn('${esc(item.id)}')">Usuń</button>`
+            : '';
+
+        return `
+            <tr ${warn ? 'class="warning-row"' : ''}>
+                <td>${esc(item.nazwa || '')}</td>
+                <td>${esc(dataZakupuStr)}</td>
+                <td>${kwota} PLN</td>
+                <td>${gwar}</td>
+                <td>${esc(item.uwagi || '')}</td>
+                <td>${akcje}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function zapiszMagazyn() {
+    if (rolaUsera !== 'admin') {
+        alert('Tylko administrator może dodawać sprzęt do magazynu.');
+        return;
+    }
+
+    const nazwa = document.getElementById('magazyn-nazwa')?.value.trim();
+    const dataVal = document.getElementById('magazyn-data')?.value;
+    const data = dataVal && dataVal.trim() ? dataVal : null;
+    const kwotaVal = document.getElementById('magazyn-kwota')?.value;
+    const kwota = kwotaVal && kwotaVal.trim() ? Number(kwotaVal) : 0;
+    const gwarVal = document.getElementById('magazyn-gwarancja')?.value;
+    const gwarancja = (gwarVal === undefined || gwarVal === null || String(gwarVal).trim() === '') ? 24 : Number(gwarVal);
+    const uwagi = document.getElementById('magazyn-uwagi')?.value.trim() || '';
+
+    if (!nazwa) {
+        alert('Wpisz nazwę sprzętu.');
+        return;
+    }
+
+    const payload = {
+        nazwa: nazwa,
+        data_zakupu: data,
+        kwota: kwota,
+        okres_gwarancji_miesiace: gwarancja,
+        uwagi: uwagi,
+        user_id: zalogowanyUser?.id || null
+    };
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/magazyn`, {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+
+        alert('Sprzęt dodany do magazynu.');
+        zapiszLog('Magazyn', 'Dodano wpis', nazwa);
+        await pobierzMagazyn();
+        renderujMagazyn();
+
+        // Clear form
+        document.getElementById('magazyn-nazwa').value = '';
+        document.getElementById('magazyn-data').value = '';
+        document.getElementById('magazyn-kwota').value = '';
+        document.getElementById('magazyn-gwarancja').value = '';
+        document.getElementById('magazyn-uwagi').value = '';
+    } catch (err) {
+        console.error("Błąd zapisu magazynu:", err);
+        const msg = err && err.message ? err.message : String(err);
+        alert("Nie udało się zapisać wpisu w magazynie:\n\n" + msg);
+    }
+}
+
+window.usunMagazyn = async function(id) {
+    if (rolaUsera !== 'admin') {
+        alert('Tylko administrator może usuwać wpisy magazynu.');
+        return;
+    }
+
+    if (!confirm('Usunąć wpis z magazynu?')) return;
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/magazyn?id=eq.${id}`, {
+            method: 'DELETE',
+            headers: headers()
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+
+        await pobierzMagazyn();
+        renderujMagazyn();
+        zapiszLog('Magazyn', 'Usunięto wpis', id);
+    } catch (err) {
+        console.error(err);
+        alert('Nie udało się usunąć wpisu z magazynu.');
+    }
+};
+
 // ==========================================
 // RENDER
 // ==========================================
@@ -495,7 +1138,10 @@ function renderujWszystko() {
     renderujKosztorysy();
     renderujUslugi();
     renderujInwestycje();
+    renderujKalendarzTerminarza();
+    renderujTerminarz();
     renderujAdministrator();
+    renderujMagazyn();
 }
 
 function renderujAdministrator() {
@@ -571,6 +1217,33 @@ function generujOstrzezenia() {
             alerts.push({ type: 'warning', msg: `Inwestycja "${i.nazwa || i.id}" nie ma adresu.` });
         }
     });
+
+    (terminarz || []).forEach(t => {
+        if (!t.klient) {
+            alerts.push({ type: 'warning', msg: `Termin "${t.opis || t.id}" nie ma przypisanego klienta.` });
+        }
+        if (!t.adres) {
+            alerts.push({ type: 'warning', msg: `Termin "${t.opis || t.id}" nie ma przypisanego adresu.` });
+        }
+    });
+
+    for (let i = 0; i < (terminarz || []).length; i++) {
+        const a = terminarz[i];
+        const aStart = a.data_start ? new Date(a.data_start) : null;
+        const aEnd = a.data_koniec ? new Date(a.data_koniec) : null;
+        if (!aStart || !aEnd) continue;
+
+        for (let j = i + 1; j < (terminarz || []).length; j++) {
+            const b = terminarz[j];
+            const bStart = b.data_start ? new Date(b.data_start) : null;
+            const bEnd = b.data_koniec ? new Date(b.data_koniec) : null;
+            if (!bStart || !bEnd) continue;
+
+            if (aStart <= bEnd && aEnd >= bStart) {
+                alerts.push({ type: 'warning', msg: `Terminy "${a.klient || a.id}" i "${b.klient || b.id}" się nakładają.` });
+            }
+        }
+    }
 
     return alerts;
 }
@@ -954,6 +1627,85 @@ function ustawCeneWybranejUslugi() {
     document.getElementById("wycena-jednostka").value = jednostkaUslugi(u);
 }
 
+function renderujPodpowiedziUslug() {
+    const searchInput = document.getElementById("wycena-usluga-search");
+    const suggestionsBox = document.getElementById("wycena-usluga-suggestions");
+    if (!searchInput || !suggestionsBox) return;
+
+    const query = searchInput.value.toLowerCase().trim();
+
+    const wszystkieUslugi = [...uslugi].sort((a, b) => String(a.nazwa || "").localeCompare(String(b.nazwa || ""), "pl"));
+    let filtered = [];
+
+    if (!query) {
+        filtered = wszystkieUslugi.slice(0, 10);
+    } else {
+        const startsWith = [];
+        const wordStartsWith = [];
+        const contains = [];
+
+        wszystkieUslugi.forEach(u => {
+            const nazwa = String(u.nazwa || "").toLowerCase();
+            if (nazwa.startsWith(query)) {
+                startsWith.push(u);
+                return;
+            }
+
+            const words = nazwa.split(/\s+/).filter(Boolean);
+            const wordMatch = words.some(word => word.startsWith(query));
+            if (wordMatch) {
+                wordStartsWith.push(u);
+                return;
+            }
+
+            if (query.length > 1 && nazwa.includes(query)) {
+                contains.push(u);
+            }
+        });
+
+        filtered = startsWith.concat(wordStartsWith);
+        if (query.length > 1) {
+            filtered = filtered.concat(contains);
+        }
+        filtered = filtered.slice(0, 10);
+    }
+
+    if (!filtered.length) {
+        suggestionsBox.innerHTML = `<div class="autocomplete-empty">Brak pasujących usług</div>`;
+        suggestionsBox.classList.add("visible");
+        return;
+    }
+
+    suggestionsBox.innerHTML = filtered.map(u => `
+        <div class="autocomplete-item" onclick="wybierzUslugeZWyszukiwarki('${esc(u.id)}')">
+            <span class="autocomplete-title">${esc(u.nazwa)}</span>
+            <div class="autocomplete-meta">
+                <span>${esc(jednostkaUslugi(u))}</span>
+                <span>${cenaUslugi(u).toFixed(2)} PLN</span>
+            </div>
+        </div>
+    `).join("");
+
+    suggestionsBox.classList.add("visible");
+}
+
+function wybierzUslugeZWyszukiwarki(id) {
+    const select = document.getElementById("wycena-usluga");
+    const searchInput = document.getElementById("wycena-usluga-search");
+    const suggestionsBox = document.getElementById("wycena-usluga-suggestions");
+    
+    if (!select || !searchInput || !suggestionsBox) return;
+
+    const u = uslugi.find(x => String(x.id) === String(id));
+    if (!u) return;
+
+    select.value = id;
+    searchInput.value = u.nazwa;
+    suggestionsBox.classList.remove("visible");
+    
+    ustawCeneWybranejUslugi();
+}
+
 function dodajPozycjeDoWyceny() {
     if (rolaUsera === "guest") {
         alert("Gość nie może modyfikować wyceny.");
@@ -1088,9 +1840,36 @@ function przeliczWycene() {
 
 function wyczyscWycene() {
     wycenaPozycje = [];
+    edytowanyKosztorysId = null;
+    trybEdycjiKosztorysu = false;
     document.getElementById("kosztorys-nazwa").value = "";
     document.getElementById("wycena-korekta").value = 0;
+    aktualizujTrybEdycjiKosztorysuWidok();
     renderujWycene();
+}
+
+function anulujTrybEdycjiKosztorysu() {
+    edytowanyKosztorysId = null;
+    trybEdycjiKosztorysu = false;
+    document.getElementById("kosztorys-nazwa").value = "";
+    document.getElementById("wycena-korekta").value = 0;
+    wycenaPozycje = [];
+    aktualizujTrybEdycjiKosztorysuWidok();
+    renderujWycene();
+}
+
+function aktualizujTrybEdycjiKosztorysuWidok() {
+    const editPanel = document.getElementById("wycena-edit-panel");
+    const editName = document.getElementById("wycena-edytowany-nazwa");
+
+    if (!editPanel || !editName) return;
+
+    editPanel.classList.toggle("hidden", !trybEdycjiKosztorysu);
+    if (trybEdycjiKosztorysu) {
+        editName.textContent = document.getElementById("kosztorys-nazwa").value || "-";
+    } else {
+        editName.textContent = "";
+    }
 }
 
 async function zapiszKosztorys() {
@@ -1138,22 +1917,27 @@ async function zapiszKosztorys() {
         user_id: zalogowanyUser?.id
     };
 
+    const endpoint = edytowanyKosztorysId
+        ? `${SUPABASE_URL}/rest/v1/kosztorysy?id=eq.${edytowanyKosztorysId}`
+        : `${SUPABASE_URL}/rest/v1/kosztorysy`;
+
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/kosztorysy`, {
-            method: "POST",
+        const res = await fetch(endpoint, {
+            method: edytowanyKosztorysId ? "PATCH" : "POST",
             headers: headers(),
             body: JSON.stringify(payload)
         });
 
         if (!res.ok) throw new Error(await res.text());
 
-        alert("Kosztorys zapisany.");
-        wyczyscWycene();
+        alert(edytowanyKosztorysId ? "Kosztorys zaktualizowany." : "Kosztorys zapisany.");
+        const nazwaLogu = edytowanyKosztorysId ? "Zaktualizowano kosztorys" : "Zapisano kosztorys";
         await pobierzKosztorysy();
         renderujKosztorysy();
         renderujPulpit();
+        anulujTrybEdycjiKosztorysu();
         pokazSekcje("kosztorysy");
-        zapiszLog("Kosztorysy", "Zapisano kosztorys", nazwa);
+        zapiszLog("Kosztorysy", nazwaLogu, nazwa);
     } catch (err) {
         console.error(err);
         alert("Nie udało się zapisać kosztorysu. Sprawdź tabelę kosztorysy i RLS.");
@@ -1222,6 +2006,52 @@ window.drukujKosztorys = function(id) {
         return;
     }
 
+    aktualnyDrukowanyKosztorysId = id;
+    const modal = document.getElementById("drukuj-kosztorys-modal");
+    if (!modal) {
+        console.error("Brak panelu wyboru kolumn do druku.");
+        return;
+    }
+
+    modal.querySelectorAll("input[type=checkbox]").forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    modal.classList.remove("hidden");
+};
+
+function pobierzOpcjeDrukuKosztorysu() {
+    const options = {
+        jednostka: document.getElementById("drukuj-kolumna-jednostka")?.checked,
+        ilosc: document.getElementById("drukuj-kolumna-ilosc")?.checked,
+        cenaNetto: document.getElementById("drukuj-kolumna-cenaNetto")?.checked,
+        wartoscNetto: document.getElementById("drukuj-kolumna-wartoscNetto")?.checked,
+        vat: document.getElementById("drukuj-kolumna-vat")?.checked,
+        brutto: document.getElementById("drukuj-kolumna-brutto")?.checked
+    };
+
+    if (!Object.values(options).some(Boolean)) {
+        alert("Wybierz przynajmniej jedną kolumnę.");
+        return null;
+    }
+
+    return options;
+}
+
+function zamknijModalDrukuKosztorysu() {
+    const modal = document.getElementById("drukuj-kosztorys-modal");
+    if (modal) modal.classList.add("hidden");
+    aktualnyDrukowanyKosztorysId = null;
+}
+
+function drukujKosztorysDoOkna(id, options) {
+    zamknijModalDrukuKosztorysu();
+
+    const kosztorys = kosztorysy.find(x => String(x.id) === String(id));
+    if (!kosztorys) {
+        console.error("Nie znaleziono kosztorysu do druku.");
+        return;
+    }
+
     let pozycje = kosztorys.pozycje;
     if (typeof pozycje === "string") {
         try {
@@ -1236,6 +2066,18 @@ window.drukujKosztorys = function(id) {
         console.error("Niepoprawny format pozycji kosztorysu.");
         return;
     }
+
+    const columns = [
+        { key: "nazwa", label: "Nazwa", visible: true },
+        { key: "jednostka", label: "Jednostka", visible: options.jednostka },
+        { key: "ilosc", label: "Ilość", visible: options.ilosc },
+        { key: "cenaNetto", label: "Cena netto", visible: options.cenaNetto },
+        { key: "wartoscNetto", label: "Wartość netto", visible: options.wartoscNetto },
+        { key: "vat", label: "VAT", visible: options.vat },
+        { key: "brutto", label: "Brutto", visible: options.brutto }
+    ];
+
+    const headers = columns.filter(c => c.visible).map(c => `<th>${c.label}</th>`).join("");
 
     let sumaNetto = 0;
     let sumaVAT = 0;
@@ -1252,17 +2094,17 @@ window.drukujKosztorys = function(id) {
         sumaVAT += vat;
         sumaBrutto += brutto;
 
-        return `
-            <tr>
-                <td>${esc(p.nazwa || "")}</td>
-                <td>${esc(p.jednostka || "")}</td>
-                <td>${Number(p.ilosc || 0).toFixed(2)}</td>
-                <td>${Number(p.cenaNetto || 0).toFixed(2)} PLN</td>
-                <td>${netto.toFixed(2)} PLN</td>
-                <td>${vatPerc}%</td>
-                <td>${brutto.toFixed(2)} PLN</td>
-            </tr>
-        `;
+        const rowCells = [
+            `<td>${esc(p.nazwa || "")}</td>`,
+            options.jednostka ? `<td>${esc(p.jednostka || "")}</td>` : "",
+            options.ilosc ? `<td>${Number(p.ilosc || 0).toFixed(2)}</td>` : "",
+            options.cenaNetto ? `<td>${Number(p.cenaNetto || 0).toFixed(2)} PLN</td>` : "",
+            options.wartoscNetto ? `<td>${netto.toFixed(2)} PLN</td>` : "",
+            options.vat ? `<td>${vatPerc}%</td>` : "",
+            options.brutto ? `<td>${brutto.toFixed(2)} PLN</td>` : ""
+        ];
+
+        return `<tr>${rowCells.join("")}</tr>`;
     }).join("");
 
     const vatPodsumowanie = Number.isFinite(Number(kosztorys.vat)) ? Number(kosztorys.vat) : sumaVAT;
@@ -1280,7 +2122,7 @@ window.drukujKosztorys = function(id) {
         <html lang="pl">
         <head>
             <meta charset="UTF-8">
-            <title>Drukuj kosztorys</title>
+            <title>Kosztorys</title>
             <style>
                 body { font-family: Arial, sans-serif; margin: 20px; }
                 h1, h2, h3 { margin: 0 0 10px; }
@@ -1294,20 +2136,12 @@ window.drukujKosztorys = function(id) {
             </style>
         </head>
         <body>
-            <h1>EL-Net</h1>
-            <h2>${esc(kosztorys.nazwa || "Kosztorys")}</h2>
+            <h1>Kosztorys</h1>
+            <h2>${esc(kosztorys.nazwa || "")}</h2>
             <p>Data: ${esc(kosztorys.data || "-")}</p>
             <table>
                 <thead>
-                    <tr>
-                        <th>Nazwa</th>
-                        <th>Jedn.</th>
-                        <th>Ilość</th>
-                        <th>Cena netto</th>
-                        <th>Wartość netto</th>
-                        <th>VAT</th>
-                        <th>Brutto</th>
-                    </tr>
+                    <tr>${headers}</tr>
                 </thead>
                 <tbody>
                     ${rows}
@@ -1481,6 +2315,9 @@ window.wczytajKosztorys = function(id) {
 
     document.getElementById("kosztorys-nazwa").value = k.nazwa || "";
     document.getElementById("wycena-korekta").value = k.korekta || 0;
+    edytowanyKosztorysId = k.id;
+    trybEdycjiKosztorysu = true;
+    aktualizujTrybEdycjiKosztorysuWidok();
 
     renderujWycene();
     pokazSekcje("wycena");

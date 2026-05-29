@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EL-Net - Panel</title>
-    <link rel="stylesheet" href="styles.css?v=20260529-10">
+    <link rel="stylesheet" href="styles.css?v=20260529-24">
 </head>
 
 <body>
@@ -52,6 +52,7 @@
                 <button class="nav-link" data-section="kosztorysy">Kosztorysy</button>
                 <button class="nav-link" data-section="uslugi">Usługi</button>
                 <button class="nav-link" data-section="inwestycje">Inwestycje</button>
+                <button class="nav-link" data-section="terminarz">Terminarz</button>
                 <button id="nav-administrator" class="nav-link hidden" data-section="administrator">Administrator</button>
             </nav>
 
@@ -157,8 +158,12 @@
                         <h2>Dodaj pozycję</h2>
 
                         <div class="form-group">
-                            <label for="wycena-usluga">Rodzaj usługi</label>
-                            <select id="wycena-usluga">
+                            <label for="wycena-usluga-search">Rodzaj usługi</label>
+                            <div style="position: relative;">
+                                <input type="text" id="wycena-usluga-search" placeholder="Zacznij pisać nazwę usługi...">
+                                <div id="wycena-usluga-suggestions" class="autocomplete-box"></div>
+                            </div>
+                            <select id="wycena-usluga" style="display: none;">
                                 <option value="">Brak usług w bazie</option>
                             </select>
                         </div>
@@ -253,6 +258,10 @@
                         <hr>
 
                         <div id="card-kosztorys-save">
+                            <div id="wycena-edit-panel" class="edit-panel hidden">
+                                <p>Edytujesz kosztorys: <strong id="wycena-edytowany-nazwa"></strong></p>
+                                <button id="btn-anuluj-edycje-kosztorysu" class="btn btn-danger small-btn">Anuluj edycję</button>
+                            </div>
                             <h2>Zapisz kosztorys</h2>
                             <div class="save-row">
                                 <input type="text" id="kosztorys-nazwa" placeholder="np. Jan Kowalski - domek pod lasem">
@@ -579,6 +588,117 @@
     </div>
 </section>
 
+            <section id="section-terminarz" class="app-section">
+                <div class="hero-card">
+                    <span class="badge">TERMINARZ</span>
+                    <h1>Planowanie prac</h1>
+                    <p>Dodaj, przeglądaj i sortuj zaplanowane prace w terminarzu.</p>
+                </div>
+
+                <div class="layout-two">
+                    <div class="card" id="card-terminarz-form">
+                        <h2>Nowa praca</h2>
+
+                        <div class="form-group">
+                            <label for="terminarz-data-start">Data rozpoczęcia</label>
+                            <input type="date" id="terminarz-data-start">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="terminarz-data-koniec">Data zakończenia</label>
+                            <input type="date" id="terminarz-data-koniec">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="terminarz-klient">Klient / nazwisko</label>
+                            <input type="text" id="terminarz-klient" placeholder="np. Jan Kowalski">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="terminarz-adres">Adres</label>
+                            <input type="text" id="terminarz-adres" placeholder="np. ul. Piękna 1, Kraków">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="terminarz-telefon">Telefon</label>
+                            <input type="text" id="terminarz-telefon" placeholder="np. 600 000 000">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="terminarz-opis">Opis prac</label>
+                            <textarea id="terminarz-opis" placeholder="Krótki opis prac"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="terminarz-status">Status</label>
+                            <select id="terminarz-status">
+                                <option value="zaplanowane">zaplanowane</option>
+                                <option value="w trakcie">w trakcie</option>
+                                <option value="zakończone">zakończone</option>
+                                <option value="przesunięte">przesunięte</option>
+                                <option value="rezerwacja">rezerwacja</option>
+                                <option value="odwołane">odwołane</option>
+                            </select>
+                        </div>
+
+                        <button id="btn-dodaj-termin" class="btn btn-main">Dodaj termin</button>
+                        <button id="btn-anuluj-termin" class="btn btn-secondary small-btn hidden">Anuluj edycję</button>
+                    </div>
+
+                    <div class="card calendar-card">
+                        <div class="calendar-header">
+                            <button id="calendar-prev" class="btn btn-secondary small-btn">Poprzedni</button>
+                            <div id="calendar-title" class="calendar-title"></div>
+                            <button id="calendar-next" class="btn btn-secondary small-btn">Następny</button>
+                        </div>
+                        <div class="calendar-legend">
+                            <span><span class="calendar-chip free"></span> Wolne</span>
+                            <span><span class="calendar-chip busy"></span> Zajęte</span>
+                            <span><span class="calendar-chip reserved"></span> Rezerwacja</span>
+                        </div>
+                        <div id="terminarz-calendar" class="calendar-grid"></div>
+                    </div>
+
+                    <div class="card">
+                        <h2>Lista terminów</h2>
+
+                        <div class="terminarz-toolbar">
+                            <input id="terminarz-search" type="text" placeholder="Szukaj po kliencie, adresie, opisie...">
+                            <input id="terminarz-date-filter" type="date">
+                            <select id="terminarz-sort">
+                                <option value="start-asc">Najbliższe rozpoczęcie</option>
+                                <option value="start-desc">Najpóźniejsze rozpoczęcie</option>
+                                <option value="end-asc">Najbliższe zakończenie</option>
+                                <option value="client-az">Klient A-Z</option>
+                                <option value="status">Status</option>
+                            </select>
+                        </div>
+
+                        <div class="table-wrapper terminarz-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Data od–do</th>
+                                        <th>Klient</th>
+                                        <th>Adres</th>
+                                        <th>Telefon</th>
+                                        <th>Status</th>
+                                        <th>Opis</th>
+                                        <th>Dni</th>
+                                        <th>Akcje</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabela-terminarz">
+                                    <tr>
+                                        <td colspan="8" class="empty-row">Brak terminów w terminarzu.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section id="section-administrator" class="app-section">
                 <div class="hero-card">
                     <span class="badge">ADMINISTRATOR</span>
@@ -591,6 +711,7 @@
                     <button type="button" class="admin-tab-btn" data-admin-tab="ostrzezenia">Ostrzeżenia</button>
                     <button type="button" class="admin-tab-btn" data-admin-tab="logi">Logi</button>
                     <button type="button" class="admin-tab-btn" data-admin-tab="diagnostyka">Diagnostyka</button>
+                    <button type="button" class="admin-tab-btn" data-admin-tab="magazyn">Magazyn</button>
                 </div>
 
                 <div id="admin-tab-podsumowanie" class="admin-tab-content active">
@@ -671,10 +792,103 @@
                         </div>
                     </div>
                 </div>
+
+                <div id="admin-tab-magazyn" class="admin-tab-content">
+                    <div class="card">
+                        <h2>Magazyn sprzętu</h2>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="magazyn-nazwa">Nazwa</label>
+                                <input type="text" id="magazyn-nazwa" placeholder="np. Wiertarka XYZ">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="magazyn-data">Data zakupu</label>
+                                <input type="date" id="magazyn-data">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="magazyn-kwota">Kwota</label>
+                                <input type="number" id="magazyn-kwota" step="0.01" min="0" placeholder="0.00">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="magazyn-gwarancja">Okres gwarancji (miesiące)</label>
+                                <input type="number" id="magazyn-gwarancja" step="1" min="0" placeholder="np. 24">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="magazyn-uwagi">Uwagi</label>
+                            <input type="text" id="magazyn-uwagi" placeholder="opcjonalne uwagi">
+                        </div>
+
+                        <div class="btn-row">
+                            <button id="btn-zapisz-magazyn" class="btn btn-main">Zapisz sprzęt</button>
+                            <button id="btn-refresh-magazyn" class="btn btn-secondary">Odśwież listę</button>
+                        </div>
+
+                        <div class="magazyn-toolbar" style="margin-top:16px;">
+                            <input id="magazyn-search" type="text" placeholder="Szukaj sprzętu..." style="width:60%; padding:8px;">
+                            <select id="magazyn-sort" style="width:36%; padding:8px; margin-left:4%;">
+                                <option value="newest">Najnowsze dodane</option>
+                                <option value="oldest">Najstarsze dodane</option>
+                                <option value="name-az">Nazwa A-Z</option>
+                                <option value="name-za">Nazwa Z-A</option>
+                                <option value="price-desc">Kwota od najwyższej</option>
+                                <option value="price-asc">Kwota od najniższej</option>
+                                <option value="warranty-soon">Gwarancja kończy się najpierw</option>
+                            </select>
+                        </div>
+
+                        <hr>
+
+                        <div class="table-wrapper magazyn-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Nazwa</th>
+                                        <th>Data zakupu</th>
+                                        <th>Kwota</th>
+                                        <th>Gwarancja (mies.)</th>
+                                        <th>Uwagi</th>
+                                        <th>Akcja</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabela-magazyn">
+                                    <tr>
+                                        <td colspan="6" class="empty-row">Brak sprzętu w magazynie.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </section>
         </main>
     </div>
 
-    <script src="script.js?v=20260529-10"></script>
+    <div id="drukuj-kosztorys-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <h2>Wybierz kolumny do wydruku</h2>
+            <div class="checkbox-grid">
+                <label><input type="checkbox" id="drukuj-kolumna-jednostka" data-field="jednostka" checked> Jednostka</label>
+                <label><input type="checkbox" id="drukuj-kolumna-ilosc" data-field="ilosc" checked> Ilość</label>
+                <label><input type="checkbox" id="drukuj-kolumna-cenaNetto" data-field="cenaNetto" checked> Cena netto</label>
+                <label><input type="checkbox" id="drukuj-kolumna-wartoscNetto" data-field="wartoscNetto" checked> Wartość netto</label>
+                <label><input type="checkbox" id="drukuj-kolumna-vat" data-field="vat" checked> VAT</label>
+                <label><input type="checkbox" id="drukuj-kolumna-brutto" data-field="brutto" checked> Brutto</label>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-zamknij-drukuj-kosztorys" class="btn btn-secondary small-btn">Anuluj</button>
+                <button id="btn-podglad-drukuj-kosztorys" class="btn btn-main">Drukuj</button>
+            </div>
+        </div>
+    </div>
+    <script src="script.js?v=20260529-24"></script>
 </body>
 </html>
