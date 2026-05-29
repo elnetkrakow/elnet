@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.05.29-05";
+const APP_VERSION = "2026.05.29-10";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -15,6 +15,7 @@ let kosztorysy = [];
 let inwestycje = [];
 let inwestycjeZaliczki = [];
 let inwestycjeKoszty = [];
+let logi = [];
 let aktywnaInwestycjaId = null;
 
 let wycenaPozycje = [];
@@ -28,6 +29,84 @@ function headers() {
         "Content-Type": "application/json",
         "Prefer": "return=representation"
     };
+}
+
+async function zapiszLog(modul, akcja, opis = "", szczegoly = {}) {
+    try {
+        const payload = {
+            user_id: zalogowanyUser?.id || null,
+            email: zalogowanyUser?.email || "",
+            rola: rolaUsera || "guest",
+            modul,
+            akcja,
+            opis,
+            szczegoly
+        };
+
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/logi`, {
+            method: "POST",
+            headers: headers(),
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const warningText = await res.text();
+            console.warn("Nie udało się zapisać logu:", warningText);
+            return;
+        }
+    } catch (err) {
+        console.warn("Nie udało się zapisać logu:", err);
+    }
+}
+
+async function pobierzLogi() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/logi?select=*&order=created_at.desc&limit=50`, {
+            headers: headers()
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            obsluzBladAutoryzacji(errorText);
+            throw new Error(errorText);
+        }
+
+        logi = await res.json();
+    } catch (err) {
+        console.error("Błąd logów:", err);
+        logi = [];
+    }
+}
+
+function obsluzBladAutoryzacji(errorText) {
+    if (!errorText || typeof errorText !== 'string') return;
+
+    const lower = errorText.toLowerCase();
+
+    const expired = lower.includes('jwt expired') || lower.includes('pgrst301') || lower.includes('401');
+    if (!expired) return;
+
+    // Clear session and reset state
+    try { localStorage.clear(); sessionStorage.clear(); } catch (e) { /* ignore */ }
+    accessToken = null;
+    zalogowanyUser = null;
+    rolaUsera = 'guest';
+
+    alert('Sesja wygasła. Zaloguj się ponownie.');
+
+    // Show login screen (or reload as fallback)
+    try {
+        const login = document.getElementById('login-screen');
+        const app = document.getElementById('app-screen');
+        if (login && app) {
+            app.classList.add('hidden');
+            login.classList.remove('hidden');
+        } else {
+            location.reload();
+        }
+    } catch (e) {
+        location.reload();
+    }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -137,6 +216,16 @@ function podepnijZdarzenia() {
         location.reload();
     });
 
+    document.querySelectorAll(".admin-tab-btn").forEach(btn => {
+        btn.addEventListener("click", () => pokazAdminTab(btn.dataset.adminTab));
+    });
+
+    const adminLogSearch = document.getElementById("admin-log-search");
+    if (adminLogSearch) adminLogSearch.addEventListener("input", renderujLogi);
+
+    const adminLogSort = document.getElementById("admin-log-sort");
+    if (adminLogSort) adminLogSort.addEventListener("change", renderujLogi);
+
     const dzisiaj = new Date().toISOString().slice(0, 10);
 
     const zaliczkaData = document.getElementById("zaliczka-data");
@@ -199,6 +288,7 @@ async function zaloguj() {
 
         pokazAplikacje();
         await odswiezDane();
+        zapiszLog("Logowanie", "Zalogowano");
     } catch (err) {
         console.error(err);
         if (error) error.style.display = "block";
@@ -206,6 +296,7 @@ async function zaloguj() {
 }
 
 function wyloguj() {
+    zapiszLog("Logowanie", "Wylogowano");
     localStorage.removeItem("elnet_token");
     localStorage.removeItem("elnet_user");
     accessToken = null;
@@ -275,6 +366,10 @@ function pokazSekcje(nazwa) {
     document.querySelectorAll(".nav-link").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.section === nazwa);
     });
+
+    if (nazwa === "administrator") {
+        pokazAdminTab("podsumowanie");
+    }
 }
 
 // ==========================================
@@ -287,7 +382,8 @@ async function odswiezDane() {
         pobierzKosztorysy(),
         pobierzInwestycje(),
         pobierzInwestycjeZaliczki(),
-        pobierzInwestycjeKoszty()
+        pobierzInwestycjeKoszty(),
+        pobierzLogi()
     ]);
 
     renderujWszystko();
@@ -299,7 +395,12 @@ async function pobierzUslugi() {
             headers: headers()
         });
 
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+            const errorText = await res.text();
+            obsluzBladAutoryzacji(errorText);
+            throw new Error(errorText);
+        }
+
         uslugi = await res.json();
     } catch (err) {
         console.error("Błąd usług:", err);
@@ -313,7 +414,12 @@ async function pobierzKosztorysy() {
             headers: headers()
         });
 
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+            const errorText = await res.text();
+            obsluzBladAutoryzacji(errorText);
+            throw new Error(errorText);
+        }
+
         kosztorysy = await res.json();
     } catch (err) {
         console.error("Błąd kosztorysów:", err);
@@ -327,7 +433,12 @@ async function pobierzInwestycje() {
             headers: headers()
         });
 
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+            const errorText = await res.text();
+            obsluzBladAutoryzacji(errorText);
+            throw new Error(errorText);
+        }
+
         inwestycje = await res.json();
     } catch (err) {
         console.error("Błąd inwestycji:", err);
@@ -341,7 +452,12 @@ async function pobierzInwestycjeZaliczki() {
             headers: headers()
         });
 
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+            const errorText = await res.text();
+            obsluzBladAutoryzacji(errorText);
+            throw new Error(errorText);
+        }
+
         inwestycjeZaliczki = await res.json();
     } catch (err) {
         console.error("Błąd zaliczek:", err);
@@ -355,7 +471,12 @@ async function pobierzInwestycjeKoszty() {
             headers: headers()
         });
 
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+            const errorText = await res.text();
+            obsluzBladAutoryzacji(errorText);
+            throw new Error(errorText);
+        }
+
         inwestycjeKoszty = await res.json();
     } catch (err) {
         console.error("Błąd kosztów:", err);
@@ -384,13 +505,159 @@ function renderujAdministrator() {
     const elUslugi = document.getElementById("admin-uslugi-count");
     const elKosztorysy = document.getElementById("admin-kosztorysy-count");
     const elInwestycje = document.getElementById("admin-inwestycje-count");
+    const elDiagnosticsVersion = document.getElementById("admin-diagnostics-version");
 
     if (elVersion) elVersion.textContent = APP_VERSION;
+    if (elDiagnosticsVersion) elDiagnosticsVersion.textContent = APP_VERSION;
     if (elEmail) elEmail.textContent = zalogowanyUser?.email || "-";
     if (elRola) elRola.textContent = rolaUsera || "-";
     if (elUslugi) elUslugi.textContent = uslugi.length;
     if (elKosztorysy) elKosztorysy.textContent = kosztorysy.length;
     if (elInwestycje) elInwestycje.textContent = inwestycje.length;
+    // render alerts for admin panel and update admin nav with count (only for admin)
+    renderujOstrzezenia();
+    renderujLogi();
+}
+
+function pokazAdminTab(nazwa) {
+    document.querySelectorAll(".admin-tab-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.adminTab === nazwa);
+    });
+
+    document.querySelectorAll(".admin-tab-content").forEach(content => {
+        content.classList.toggle("active", content.id === `admin-tab-${nazwa}`);
+    });
+}
+
+// ==========================================
+// OSTRZEŻENIA (ALERTS)
+// ==========================================
+
+function generujOstrzezenia() {
+    const alerts = [];
+
+    // Usługi z ceną 0 lub brak ceny
+    (uslugi || []).forEach(u => {
+        if (cenaUslugi(u) === 0) {
+            alerts.push({ type: 'warning', msg: `Usługa "${u.nazwa || u.id}" ma cenę 0 lub brak ceny.` });
+        }
+    });
+
+    // Kosztorysy z brutto 0
+    (kosztorysy || []).forEach(k => {
+        if (Number(k.brutto || 0) === 0) {
+            alerts.push({ type: 'warning', msg: `Kosztorys "${k.nazwa || k.id}" ma wartość brutto 0.` });
+        }
+    });
+
+    // Inwestycje - różne warunki
+    (inwestycje || []).forEach(i => {
+        const zal = sumaZaliczekDlaInwestycji(i.id);
+        const kos = sumaKosztowDlaInwestycji(i.id);
+
+        if (kos > zal && zal > 0) {
+            alerts.push({ type: 'danger', msg: `Inwestycja "${i.nazwa || i.id}" - koszty (${kos.toFixed(2)}) większe niż zaliczki (${zal.toFixed(2)}).` });
+        }
+
+        if (kos > 0 && zal === 0) {
+            alerts.push({ type: 'danger', msg: `Inwestycja "${i.nazwa || i.id}" ma koszty (${kos.toFixed(2)}) ale brak zaliczek.` });
+        }
+
+        if (!i.klient) {
+            alerts.push({ type: 'warning', msg: `Inwestycja "${i.nazwa || i.id}" nie ma przypisanego klienta.` });
+        }
+
+        if (!i.adres) {
+            alerts.push({ type: 'warning', msg: `Inwestycja "${i.nazwa || i.id}" nie ma adresu.` });
+        }
+    });
+
+    return alerts;
+}
+
+function renderujOstrzezenia() {
+    const el = document.getElementById('admin-alerts-list');
+    if (!el) return;
+
+    const alerts = generujOstrzezenia();
+
+    if (!alerts.length) {
+        el.innerHTML = `<div class="admin-alert success">Brak ostrzeżeń. Wszystko wygląda dobrze.</div>`;
+    } else {
+        el.innerHTML = alerts.map(a => {
+            const cls = a.type === 'danger' ? 'danger' : 'warning';
+            return `<div class="admin-alert ${cls}">${esc(a.msg)}</div>`;
+        }).join('');
+    }
+
+    // Aktualizuj etykietę w menu (tylko dla admina pokazuj liczbę)
+    const navAdmin = document.getElementById('nav-administrator');
+    if (navAdmin) {
+        if (rolaUsera === 'admin') {
+            navAdmin.textContent = `Administrator (${alerts.length})`;
+        } else {
+            navAdmin.textContent = 'Administrator';
+        }
+    }
+}
+
+function formatujDatePL(data) {
+    return new Date(data).toLocaleString("pl-PL", {
+        timeZone: "Europe/Warsaw",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+    });
+}
+
+function renderujLogi() {
+    const el = document.getElementById('admin-logs-list');
+    if (!el) return;
+
+    let lista = [...(logi || [])];
+    const search = document.getElementById('admin-log-search')?.value.toLowerCase().trim() || "";
+    const sort = document.getElementById('admin-log-sort')?.value || 'newest';
+
+    if (search) {
+        lista = lista.filter(log => {
+            const value = [log.email, log.rola, log.modul, log.akcja, log.opis]
+                .map(v => String(v || '').toLowerCase())
+                .join(' ');
+            return value.includes(search);
+        });
+    }
+
+    if (sort === 'newest') {
+        lista.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    } else if (sort === 'oldest') {
+        lista.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    } else if (sort === 'module') {
+        lista.sort((a, b) => String(a.modul || '').localeCompare(String(b.modul || ''), 'pl'));
+    } else if (sort === 'user') {
+        lista.sort((a, b) => String(a.email || '').localeCompare(String(b.email || ''), 'pl'));
+    }
+
+    if (!lista.length) {
+        el.innerHTML = `<div class="admin-alert success">Brak logów.</div>`;
+        return;
+    }
+
+    el.innerHTML = `
+        <div class="admin-logs-scroll">
+            <div class="admin-log-list">
+                ${lista.map(log => `
+                    <div class="admin-log-row">
+                        <div class="admin-log-date">${esc(formatujDatePL(log.created_at) || '-')}</div>
+                        <div class="admin-log-meta">${esc(log.email || '-')}, ${esc(log.rola || '-')}, ${esc(log.modul || '')}, ${esc(log.akcja || '-')}</div>
+                        <div>${esc(log.opis || '')}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
 }
 
 function cenaUslugi(u) {
@@ -608,6 +875,7 @@ async function zapiszUsluge() {
         renderujSelectUslug();
         renderujUslugi();
         renderujPulpit();
+        zapiszLog("Usługi", "Zapisano usługę", nazwa);
     } catch (err) {
         console.error(err);
         alert("Nie udało się zapisać usługi. Sprawdź kolumny tabeli uslugi i RLS.");
@@ -664,6 +932,7 @@ window.usunUsluge = async function(id) {
         renderujSelectUslug();
         renderujUslugi();
         renderujPulpit();
+        zapiszLog("Usługi", "Usunięto usługę", id);
     } catch (err) {
         console.error(err);
         alert("Nie udało się usunąć usługi.");
@@ -884,6 +1153,7 @@ async function zapiszKosztorys() {
         renderujKosztorysy();
         renderujPulpit();
         pokazSekcje("kosztorysy");
+        zapiszLog("Kosztorysy", "Zapisano kosztorys", nazwa);
     } catch (err) {
         console.error(err);
         alert("Nie udało się zapisać kosztorysu. Sprawdź tabelę kosztorysy i RLS.");
@@ -1065,6 +1335,7 @@ window.drukujKosztorys = function(id) {
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
+    zapiszLog("Kosztorysy", "Druk kosztorysu", kosztorys.nazwa);
 };
 
 window.drukujInwestycje = function() {
@@ -1190,6 +1461,7 @@ window.drukujInwestycje = function() {
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
+    zapiszLog("Inwestycje", "Druk rozliczenia", inwestycja.nazwa);
 };
 
 window.wczytajKosztorys = function(id) {
@@ -1233,6 +1505,7 @@ window.usunKosztorys = async function(id) {
         await pobierzKosztorysy();
         renderujKosztorysy();
         renderujPulpit();
+        zapiszLog("Kosztorysy", "Usunięto kosztorys", id);
     } catch (err) {
         console.error(err);
         alert("Nie udało się usunąć kosztorysu.");
@@ -1323,6 +1596,8 @@ async function dodajInwestycje() {
         user_id: zalogowanyUser?.id
     };
 
+    const akcjaInwestycji = edytowanaInwestycjaId ? "Edytowano inwestycję" : "Dodano inwestycję";
+
     try {
         let res;
 
@@ -1357,6 +1632,7 @@ async function dodajInwestycje() {
         await pobierzInwestycje();
         renderujInwestycje();
         renderujPulpit();
+        zapiszLog("Inwestycje", akcjaInwestycji, nazwa);
     } catch (err) {
         console.error(err);
         alert("Nie udało się zapisać inwestycji. Sprawdź tabelę inwestycje i RLS.");
@@ -1440,6 +1716,7 @@ window.usunInwestycje = async function(id) {
         await pobierzInwestycjeKoszty();
         renderujInwestycje();
         renderujPulpit();
+        zapiszLog("Inwestycje", "Usunięto inwestycję", id);
 
         if (String(aktywnaInwestycjaId) === String(id)) {
             zamknijPanelInwestycji();
@@ -1580,6 +1857,7 @@ async function dodajZaliczke() {
         await pobierzInwestycjeZaliczki();
         renderujInwestycje();
         renderujPanelInwestycji();
+        zapiszLog("Inwestycje", "Dodano zaliczkę", opis);
     } catch (err) {
         console.error(err);
         alert("Nie udało się zapisać zaliczki.");
@@ -1636,6 +1914,7 @@ async function dodajKoszt() {
         await pobierzInwestycjeKoszty();
         renderujInwestycje();
         renderujPanelInwestycji();
+        zapiszLog("Inwestycje", "Dodano koszt", opis);
     } catch (err) {
         console.error(err);
         alert("Nie udało się zapisać kosztu.");
@@ -1660,6 +1939,7 @@ window.usunZaliczke = async function(id) {
         await pobierzInwestycje();
         renderujInwestycje();
         renderujPanelInwestycji();
+        zapiszLog("Inwestycje", "Usunięto zaliczkę", id);
     } catch (err) {
         console.error(err);
         alert("Nie udało się usunąć zaliczki.");
@@ -1684,6 +1964,7 @@ window.usunKoszt = async function(id) {
         await pobierzInwestycje();
         renderujInwestycje();
         renderujPanelInwestycji();
+        zapiszLog("Inwestycje", "Usunięto koszt", id);
     } catch (err) {
         console.error(err);
         alert("Nie udało się usunąć koszt.");

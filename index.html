@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EL-Net - Panel</title>
-    <link rel="stylesheet" href="styles.css?v=20260529-05">
+    <link rel="stylesheet" href="styles.css?v=20260529-10">
 </head>
 
 <body>
@@ -586,48 +586,95 @@
                     <p>Informacje o aplikacji i szybkie działania administracyjne.</p>
                 </div>
 
-                <div class="card">
-                    <h2>Informacje o systemie</h2>
+                <div class="admin-tabs">
+                    <button type="button" class="admin-tab-btn active" data-admin-tab="podsumowanie">Podsumowanie</button>
+                    <button type="button" class="admin-tab-btn" data-admin-tab="ostrzezenia">Ostrzeżenia</button>
+                    <button type="button" class="admin-tab-btn" data-admin-tab="logi">Logi</button>
+                    <button type="button" class="admin-tab-btn" data-admin-tab="diagnostyka">Diagnostyka</button>
+                </div>
 
-                    <div class="form-group">
-                        <label>Wersja aplikacji</label>
-                        <div id="admin-version">-</div>
+                <div id="admin-tab-podsumowanie" class="admin-tab-content active">
+                    <div class="card">
+                        <h2>Informacje o systemie</h2>
+
+                        <div class="form-group">
+                            <label>Wersja aplikacji</label>
+                            <div id="admin-version">-</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>E-mail użytkownika</label>
+                            <div id="admin-email">-</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Rola użytkownika</label>
+                            <div id="admin-role">-</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Liczba usług</label>
+                            <div id="admin-uslugi-count">0</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Liczba kosztorysów</label>
+                            <div id="admin-kosztorysy-count">0</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Liczba inwestycji</label>
+                            <div id="admin-inwestycje-count">0</div>
+                        </div>
+
+                        <div class="button-row">
+                            <button id="btn-admin-refresh" class="btn btn-secondary">Odśwież dane</button>
+                            <button id="btn-admin-clear" class="btn btn-danger">Wyczyść pamięć i wyloguj</button>
+                        </div>
                     </div>
+                </div>
 
-                    <div class="form-group">
-                        <label>E-mail użytkownika</label>
-                        <div id="admin-email">-</div>
+                <div id="admin-tab-ostrzezenia" class="admin-tab-content">
+                    <div class="card">
+                        <h2>Ostrzeżenia systemowe</h2>
+                        <div id="admin-alerts-list">
+                            <p class="empty-row">Ładowanie ostrzeżeń...</p>
+                        </div>
                     </div>
+                </div>
 
-                    <div class="form-group">
-                        <label>Rola użytkownika</label>
-                        <div id="admin-role">-</div>
+                <div id="admin-tab-logi" class="admin-tab-content">
+                    <div class="card">
+                        <h2>Logi systemowe</h2>
+                        <div class="admin-logs-toolbar">
+                            <input id="admin-log-search" type="text" placeholder="Szukaj w logach...">
+                            <select id="admin-log-sort">
+                                <option value="newest">Najnowsze</option>
+                                <option value="oldest">Najstarsze</option>
+                                <option value="module">Moduł A-Z</option>
+                                <option value="user">Użytkownik A-Z</option>
+                            </select>
+                        </div>
+                        <div id="admin-logs-list" class="admin-logs-scroll">
+                            <p class="empty-row">Ładowanie logów...</p>
+                        </div>
                     </div>
+                </div>
 
-                    <div class="form-group">
-                        <label>Liczba usług</label>
-                        <div id="admin-uslugi-count">0</div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Liczba kosztorysów</label>
-                        <div id="admin-kosztorysy-count">0</div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Liczba inwestycji</label>
-                        <div id="admin-inwestycje-count">0</div>
-                    </div>
-
-                    <div class="button-row">
-                        <button id="btn-admin-refresh" class="btn btn-secondary">Odśwież dane</button>
-                        <button id="btn-admin-clear" class="btn btn-danger">Wyczyść pamięć i wyloguj</button>
+                <div id="admin-tab-diagnostyka" class="admin-tab-content">
+                    <div class="card">
+                        <h2>Diagnostyka</h2>
+                        <p>Diagnostyka systemu — do rozbudowy</p>
+                        <div class="form-group">
+                            <label>Wersja aplikacji</label>
+                            <div id="admin-diagnostics-version">-</div>
+                        </div>
                     </div>
                 </div>
             </section>
         </main>
     </div>
 
-    <script src="script.js?v=20260529-05"></script>
+    <script src="script.js?v=20260529-10"></script>
 </body>
 </html>
