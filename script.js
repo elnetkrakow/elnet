@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.05.29-33";
+const APP_VERSION = "2026.05.29-38";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -453,7 +453,10 @@ function aktualizujWidokPoRoli() {
     const cardKosztForm = document.getElementById("card-koszt-form");
     const btnWyczyscWycene = document.getElementById("btn-wyczysc-wycene");
 
-    if (cardUslugiForm) cardUslugiForm.classList.toggle("hidden", rolaUsera !== "admin");
+    // Formularz usług widoczny dla zalogowanych ról (admin, staff, user)
+    // oraz dla konkretnego konta n.norbud@gmail.com niezależnie od roli
+    const allowUslugiForm = (rolaUsera && rolaUsera !== 'guest') || (zalogowanyUser && String(zalogowanyUser.email || '').toLowerCase() === 'n.norbud@gmail.com');
+    if (cardUslugiForm) cardUslugiForm.classList.toggle("hidden", !allowUslugiForm);
     if (cardWycenaForm) cardWycenaForm.classList.toggle("hidden", rolaUsera === "guest");
     if (cardKosztorysSave) cardKosztorysSave.classList.toggle("hidden", rolaUsera === "guest");
     if (cardInwestycjeForm) cardInwestycjeForm.classList.toggle("hidden", rolaUsera === "guest");
@@ -1399,11 +1402,17 @@ function esc(v) {
 // ==========================================
 
 function renderujPulpit() {
-    const sumaBrutto = kosztorysy.reduce((s, k) => s + Number(k.brutto || 0), 0);
     const aktywne = inwestycje.filter(i => i.status === "aktywna").length;
     const sumaZaliczek = inwestycjeZaliczki.reduce((s, z) => s + Number(z.kwota || 0), 0);
     const sumaKosztow = inwestycjeKoszty.reduce((s, k) => s + Number(k.kwota || 0), 0);
-    const roznica = sumaZaliczek - sumaKosztow;
+
+    // Zaplanowane terminy - liczenie przyszłych terminów
+    const dzisiaj = new Date();
+    dzisiaj.setHours(0, 0, 0, 0);
+    const planowaneTerminy = (terminarz || []).filter(t => {
+        const dataStart = t.data_start ? parseDateLocal(t.data_start) : null;
+        return dataStart && dataStart >= dzisiaj;
+    }).length;
 
     const ostatnieKosztorysy = [...kosztorysy]
         .sort((a, b) => new Date(b.data) - new Date(a.data))
@@ -1413,13 +1422,10 @@ function renderujPulpit() {
         .slice(-5)
         .reverse();
 
-    document.getElementById("stat-kosztorysy").textContent = kosztorysy.length;
-    document.getElementById("stat-suma-brutto").textContent = `${sumaBrutto.toFixed(2)} PLN`;
-    document.getElementById("stat-uslugi").textContent = uslugi.length;
     document.getElementById("stat-inwestycje").textContent = aktywne;
     document.getElementById("stat-zaliczek").textContent = `${sumaZaliczek.toFixed(2)} PLN`;
     document.getElementById("stat-kosztow").textContent = `${sumaKosztow.toFixed(2)} PLN`;
-    document.getElementById("stat-roznica").textContent = `${roznica.toFixed(2)} PLN`;
+    document.getElementById("stat-terminy").textContent = planowaneTerminy;
 
     const ostatnieKosztorysyEl = document.getElementById("ostatnie-kosztorysy");
     if (ostatnieKosztorysyEl) {
@@ -1480,7 +1486,73 @@ function renderujPulpit() {
             `;
         }
     }
+
+    renderCalendarWidget();
 }
+
+// Render mini calendar widget for dashboard
+function renderCalendarWidget() {
+    const container = document.getElementById("pulpit-calendar-widget");
+    if (!container) return;
+
+    const today = new Date();
+    const month = today.getMonth();
+    const year = today.getFullYear();
+    const monthLabel = today.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+
+    const firstDay = new Date(year, month, 1);
+    const startOffset = (firstDay.getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const weekdays = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'];
+
+    let html = `
+        <div class="pulpit-calendar-header">
+            <div class="pulpit-calendar-title">${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</div>
+        </div>
+        <div class="pulpit-calendar-grid">
+    `;
+
+    // Weekday headers
+    weekdays.forEach(day => {
+        html += `<div class="pulpit-calendar-weekday">${day}</div>`;
+    });
+
+    // Empty days before month starts
+    for (let i = 0; i < startOffset; i++) {
+        html += `<div class="pulpit-calendar-day empty"></div>`;
+    }
+
+    // Days of month
+    for (let day = 1; day <= daysInMonth; day++) {
+        const currentDate = new Date(year, month, day);
+        const status = getKalendarzStatus(currentDate);
+        const isToday = isSameDay(currentDate, today);
+        const dateStr = formatDateLocal(currentDate);
+        const classNames = `pulpit-calendar-day ${status} ${isToday ? 'today' : ''}`.trim();
+
+        html += `
+            <div class="${classNames}" onclick="switchToPulpitTerminarz('${dateStr}')" title="Kliknij aby filtrować terminy">
+                ${day}
+            </div>
+        `;
+    }
+
+    html += `</div>`;
+    container.innerHTML = html;
+}
+
+window.switchToPulpitTerminarz = function(dateStr) {
+    // Switch to Terminarz tab
+    pokazSekcje('terminarz');
+
+    // Set date filter
+    const dateFilter = document.getElementById('terminarz-date-filter');
+    if (dateFilter) {
+        dateFilter.value = dateStr;
+        renderujTerminarz();
+    }
+};
 
 // ==========================================
 // USŁUGI
@@ -1526,14 +1598,15 @@ function renderujUslugi() {
     }
 
     tbody.innerHTML = lista.map(u => {
-        const akcje = rolaUsera === "admin"
-            ? `
-                <div class="table-actions">
-                    <button class="btn btn-secondary" onclick="edytujUsluge('${esc(u.id)}')">Edytuj</button>
-                    <button class="btn btn-danger" onclick="usunUsluge('${esc(u.id)}')">Usuń</button>
-                </div>
-            `
-            : "";
+        const canEdit = (rolaUsera && rolaUsera !== 'guest') || (zalogowanyUser && String(zalogowanyUser.email || '').toLowerCase() === 'n.norbud@gmail.com');
+        const canDelete = rolaUsera === 'admin';
+
+        const editButton = canEdit ? `<button class="btn btn-secondary" onclick="edytujUsluge('${esc(u.id)}')">Edytuj</button>` : '';
+        const deleteButton = canDelete ? `<button class="btn btn-danger" onclick="usunUsluge('${esc(u.id)}')">Usuń</button>` : '';
+
+        const akcje = (editButton || deleteButton)
+            ? `<div class="table-actions">${editButton} ${deleteButton}</div>`
+            : '';
 
         return `
             <tr>
@@ -1547,8 +1620,10 @@ function renderujUslugi() {
 }
 
 async function zapiszUsluge() {
-    if (rolaUsera !== "admin") {
-        alert("Tylko administrator może zapisywać usługi.");
+    // Allow saving service for roles admin, staff, user and for specific email
+    const allowSave = (rolaUsera && rolaUsera !== 'guest') || (zalogowanyUser && String(zalogowanyUser.email || '').toLowerCase() === 'n.norbud@gmail.com');
+    if (!allowSave) {
+        alert("Brak uprawnień do zapisu usługi.");
         return;
     }
 
@@ -1600,8 +1675,10 @@ async function zapiszUsluge() {
 }
 
 window.edytujUsluge = function(id) {
-    if (rolaUsera !== "admin") {
-        alert("Tylko administrator może edytować usługi.");
+    // Allow editing for non-guest roles and specific account
+    const allowEdit = (rolaUsera && rolaUsera !== 'guest') || (zalogowanyUser && String(zalogowanyUser.email || '').toLowerCase() === 'n.norbud@gmail.com');
+    if (!allowEdit) {
+        alert("Brak uprawnień do edycji usługi.");
         return;
     }
 

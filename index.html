@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EL-Net - Panel</title>
-    <link rel="stylesheet" href="styles.css?v=20260529-33">
+    <link rel="stylesheet" href="styles.css?v=20260529-38">
 </head>
 
 <body>
@@ -73,21 +73,6 @@
 
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <span>Kosztorysy</span>
-                        <strong id="stat-kosztorysy">0</strong>
-                    </div>
-
-                    <div class="stat-card">
-                        <span>Suma brutto kosztorysów</span>
-                        <strong id="stat-suma-brutto">0.00 PLN</strong>
-                    </div>
-
-                    <div class="stat-card">
-                        <span>Usługi w bazie</span>
-                        <strong id="stat-uslugi">0</strong>
-                    </div>
-
-                    <div class="stat-card">
                         <span>Inwestycje aktywne</span>
                         <strong id="stat-inwestycje">0</strong>
                     </div>
@@ -103,8 +88,8 @@
                     </div>
 
                     <div class="stat-card">
-                        <span>Różnica inwestycji</span>
-                        <strong id="stat-roznica">0.00 PLN</strong>
+                        <span>Zaplanowane terminy</span>
+                        <strong id="stat-terminy">0</strong>
                     </div>
                 </div>
 
@@ -128,7 +113,7 @@
                     </div>
                 </div>
 
-                <div class="layout-two">
+                <div class="layout-two pulpit-cards">
                     <div class="card">
                         <h2>Ostatnie kosztorysy</h2>
                         <div id="ostatnie-kosztorysy">
@@ -140,6 +125,13 @@
                         <h2>Ostatnie inwestycje</h2>
                         <div id="ostatnie-inwestycje">
                             <p>Brak danych.</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>📅 Kalendarz</h2>
+                        <div id="pulpit-calendar-widget">
+                            <p>Ładowanie kalendarza...</p>
                         </div>
                     </div>
                 </div>
@@ -901,6 +893,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260529-33"></script>
+    <script src="script.js?v=20260529-38"></script>
 </body>
 </html>

@@ -330,13 +330,44 @@ hr {
 }
 
 #section-uslugi .uslugi-layout {
-    grid-template-columns: minmax(360px, 420px) 1fr;
+    display: grid;
+    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
 }
 
-@media (max-width: 1040px) {
+@media (max-width: 1700px) {
     #section-uslugi .uslugi-layout {
         grid-template-columns: 1fr;
     }
+
+    #section-uslugi #card-uslugi-form {
+        max-width: 520px;
+    }
+
+    #section-uslugi .card {
+        width: 100%;
+    }
+}
+
+@media (max-width: 1400px) {
+    #section-uslugi .uslugi-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Jeśli formularz jest ukryty, wymuś jednokolumnowy układ i pełną szerokość listy */
+#section-uslugi .uslugi-layout:has(#card-uslugi-form[hidden]),
+#section-uslugi .uslugi-layout:has(#card-uslugi-form.hidden),
+#section-uslugi .uslugi-layout:has(#card-uslugi-form[style*="display: none"]) {
+    grid-template-columns: 1fr;
+}
+
+#section-uslugi .uslugi-layout:has(#card-uslugi-form[hidden]) .card,
+#section-uslugi .uslugi-layout:has(#card-uslugi-form.hidden) .card,
+#section-uslugi .uslugi-layout:has(#card-uslugi-form[style*="display: none"]) .card {
+    width: 100%;
+    max-width: 100%;
 }
 
 #section-wycena .layout-two {
@@ -1441,6 +1472,132 @@ td {
     .investment-summary-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* ========================= */
+/* PULPIT KALENDARZ */
+/* ========================= */
+
+.pulpit-cards {
+    grid-template-columns: repeat(3, minmax(250px, 1fr));
+}
+
+@media (max-width: 1200px) {
+    .pulpit-cards {
+        grid-template-columns: repeat(2, minmax(250px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .pulpit-cards {
+        grid-template-columns: 1fr;
+    }
+}
+
+#pulpit-calendar-widget {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pulpit-calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.pulpit-calendar-title {
+    font-weight: 700;
+    color: var(--text-main);
+    font-size: 14px;
+}
+
+.pulpit-calendar-nav {
+    display: flex;
+    gap: 6px;
+}
+
+.pulpit-calendar-nav button {
+    background: transparent;
+    border: 1px solid var(--border-soft);
+    color: var(--text-muted);
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: 0.2s;
+}
+
+.pulpit-calendar-nav button:hover {
+    background: var(--border-soft);
+    color: var(--text-main);
+}
+
+.pulpit-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.pulpit-calendar-weekday {
+    text-align: center;
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 6px 0;
+    text-transform: uppercase;
+}
+
+.pulpit-calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-soft);
+    cursor: pointer;
+    transition: transform 0.15s, background 0.15s;
+}
+
+.pulpit-calendar-day:hover {
+    transform: scale(1.05);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.pulpit-calendar-day.empty {
+    background: transparent;
+    cursor: default;
+    color: transparent;
+}
+
+.pulpit-calendar-day.empty:hover {
+    transform: none;
+    background: transparent;
+}
+
+.pulpit-calendar-day.free {
+    background: rgba(34, 197, 94, 0.20);
+    color: #22c55e;
+}
+
+.pulpit-calendar-day.busy {
+    background: rgba(239, 68, 68, 0.22);
+    color: #fca5a5;
+}
+
+.pulpit-calendar-day.reserved {
+    background: rgba(245, 158, 11, 0.20);
+    color: #fbbf24;
+}
+
+.pulpit-calendar-day.today {
+    border: 2px solid var(--accent);
 }
 
 /* ========================= */
