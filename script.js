@@ -4,11 +4,12 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.05.29-24";
+const APP_VERSION = "2026.05.29-25";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
 let rolaUsera = "guest";
+let authErrorHandled = false;
 
 let uslugi = [];
 let kosztorysy = [];
@@ -87,6 +88,9 @@ async function pobierzLogi() {
 }
 
 function obsluzBladAutoryzacji(errorText) {
+    // Zabezpieczenie: jeśli błąd autoryzacji już został obsłużony, wyjść
+    if (authErrorHandled === true) return;
+    
     if (!errorText || typeof errorText !== 'string') return;
 
     const lower = errorText.toLowerCase();
@@ -94,18 +98,35 @@ function obsluzBladAutoryzacji(errorText) {
     const expired = lower.includes('jwt expired') || lower.includes('pgrst301') || lower.includes('401');
     if (!expired) return;
 
+    // Sprawdzić czy jesteśmy na ekranie logowania
+    const login = document.getElementById('login-screen');
+    const app = document.getElementById('app-screen');
+    const isOnLoginScreen = login && !login.classList.contains('hidden');
+
+    if (isOnLoginScreen) {
+        // Jeśli już na ekranie logowania, tylko wyczyść storage
+        try { localStorage.clear(); sessionStorage.clear(); } catch (e) { /* ignore */ }
+        accessToken = null;
+        zalogowanyUser = null;
+        rolaUsera = 'guest';
+        authErrorHandled = true;
+        return;
+    }
+
+    // Ustaw flagę aby uniknąć wielu alertów
+    authErrorHandled = true;
+
     // Clear session and reset state
     try { localStorage.clear(); sessionStorage.clear(); } catch (e) { /* ignore */ }
     accessToken = null;
     zalogowanyUser = null;
     rolaUsera = 'guest';
 
+    // Pokaż alert maksymalnie raz
     alert('Sesja wygasła. Zaloguj się ponownie.');
 
     // Show login screen (or reload as fallback)
     try {
-        const login = document.getElementById('login-screen');
-        const app = document.getElementById('app-screen');
         if (login && app) {
             app.classList.add('hidden');
             login.classList.remove('hidden');
@@ -366,6 +387,9 @@ async function zaloguj() {
             user: zalogowanyUser,
             rola: rolaUsera
         }));
+
+        // Zresetuj flagę błędu autoryzacji po poprawnym logowaniu
+        authErrorHandled = false;
 
         pokazAplikacje();
         await odswiezDane();
