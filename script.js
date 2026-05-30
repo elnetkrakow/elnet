@@ -2695,13 +2695,17 @@ function drukujKosztorysDoOkna(id, options) {
             <meta charset="UTF-8">
             <title>Kosztorys</title>
             <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                h1, h2, h3 { margin: 0 0 10px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #000; padding: 6px 8px; text-align: left; }
+                @page { margin: 10mm; }
+                body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; color: #000; }
+                h1 { font-size: 22px; margin: 0 0 8px; }
+                h2 { font-size: 18px; margin: 0 0 6px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+                th, td { border: 1px solid #000; padding: 4px 6px; font-size: 11px; text-align: left; }
                 th { background: #f0f0f0; }
-                .summary { margin-top: 20px; width: 100%; }
-                .summary td { border: none; padding: 4px 8px; }
+                thead { display: table-header-group; }
+                tr { break-inside: avoid; page-break-inside: avoid; }
+                .summary { margin-top: 12px; width: 100%; }
+                .summary td { border: none; padding: 4px 6px; font-size: 11px; }
                 .summary .label { width: 80%; }
                 .summary .value { text-align: right; }
             </style>
