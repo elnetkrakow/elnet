@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EL-Net - Panel</title>
-    <link rel="stylesheet" href="styles.css?v=20260529-27">
+    <link rel="stylesheet" href="styles.css?v=20260529-33">
 </head>
 
 <body>
@@ -320,7 +320,7 @@
                     <p>Dodawaj i edytuj stawki używane później w kalkulatorze wycen.</p>
                 </div>
 
-                <div class="layout-two">
+                <div class="layout-two uslugi-layout">
 <div class="card" id="card-uslugi-form">
                         <h2 id="uslugi-form-title">Dodaj usługę</h2>
 
@@ -426,13 +426,25 @@
         <div class="card">
             <h2>Lista inwestycji</h2>
 
+            <div class="toolbar">
+                <input type="text" id="inwestycje-search" placeholder="Szukaj inwestycji...">
+                <select id="inwestycje-sort">
+                    <option value="newest">Najnowsze</option>
+                    <option value="oldest">Najstarsze</option>
+                    <option value="name-az">Nazwa A-Z</option>
+                    <option value="name-za">Nazwa Z-A</option>
+                    <option value="client-az">Klient A-Z</option>
+                    <option value="balance-desc">Różnica od najwyższej</option>
+                    <option value="balance-asc">Różnica od najniższej</option>
+                </select>
+            </div>
+
             <div class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
                             <th>Nazwa</th>
                             <th>Klient</th>
-                            <th>Status</th>
                             <th>Zaliczki</th>
                             <th>Koszty</th>
                             <th>Różnica</th>
@@ -441,7 +453,7 @@
                     </thead>
                     <tbody id="tabela-inwestycji">
                         <tr>
-                            <td colspan="7" class="empty-row">Brak inwestycji w bazie.</td>
+                            <td colspan="6" class="empty-row">Brak inwestycji w bazie.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -889,6 +901,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260529-27"></script>
+    <script src="script.js?v=20260529-33"></script>
 </body>
 </html>

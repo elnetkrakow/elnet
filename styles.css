@@ -329,6 +329,280 @@ hr {
     align-items: start;
 }
 
+#section-uslugi .uslugi-layout {
+    grid-template-columns: minmax(360px, 420px) 1fr;
+}
+
+@media (max-width: 1040px) {
+    #section-uslugi .uslugi-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+#section-wycena .layout-two {
+    grid-template-columns: minmax(320px, 420px) minmax(520px, 1fr);
+    align-items: start;
+}
+
+#section-wycena .layout-two > .card:first-child {
+    max-width: 420px;
+}
+
+#section-wycena .table-wrapper {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 520px;
+}
+
+#section-wycena .table-wrapper table {
+    min-width: 940px;
+    width: 100%;
+}
+
+#section-wycena .table-wrapper thead th,
+#section-wycena .table-wrapper td {
+    padding: 14px 16px;
+    line-height: 1.45;
+    white-space: nowrap;
+}
+
+#section-wycena .table-wrapper td {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+#section-wycena .table-wrapper th:last-child,
+#section-wycena .table-wrapper td:last-child {
+    width: 130px;
+    min-width: 130px;
+    text-align: right;
+}
+
+#section-wycena .table-wrapper td:last-child .btn {
+    min-width: 92px;
+}
+
+#section-wycena .table-wrapper td:first-child {
+    min-width: 240px;
+}
+
+#section-wycena .summary-panel {
+    display: grid;
+    gap: 18px;
+}
+
+#section-wycena .summary-boxes {
+    gap: 16px;
+}
+
+#section-wycena .summary-box {
+    min-width: 180px;
+    padding: 16px 18px;
+}
+
+#section-wycena .summary-box strong {
+    font-size: 18px;
+}
+
+#section-wycena .summary-box.total strong {
+    font-size: 20px;
+}
+
+#section-inwestycje .layout-two {
+    grid-template-columns: minmax(320px, 420px) minmax(560px, 1fr);
+    align-items: start;
+}
+
+#section-inwestycje .layout-two > .card:first-child {
+    max-width: 420px;
+}
+
+#section-inwestycje .table-wrapper {
+    max-height: 420px;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+#section-inwestycje .table-wrapper table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+#section-inwestycje .table-wrapper thead th,
+#section-inwestycje .table-wrapper td {
+    padding: 14px 16px;
+    line-height: 1.45;
+}
+
+#section-inwestycje .table-wrapper td {
+    white-space: normal;
+    overflow-wrap: break-word;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+#section-inwestycje .table-wrapper th:nth-child(1),
+#section-inwestycje .table-wrapper td:nth-child(1) {
+    width: 26%;
+}
+
+#section-inwestycje .table-wrapper th:nth-child(2),
+#section-inwestycje .table-wrapper td:nth-child(2) {
+    width: 18%;
+}
+
+#section-inwestycje .table-wrapper th:nth-child(3),
+#section-inwestycje .table-wrapper td:nth-child(3),
+#section-inwestycje .table-wrapper th:nth-child(4),
+#section-inwestycje .table-wrapper td:nth-child(4),
+#section-inwestycje .table-wrapper th:nth-child(5),
+#section-inwestycje .table-wrapper td:nth-child(5) {
+    width: 13%;
+    white-space: nowrap;
+}
+
+#section-inwestycje .table-wrapper th:nth-child(6),
+#section-inwestycje .table-wrapper td:nth-child(6) {
+    width: 17%;
+    min-width: 260px;
+    white-space: nowrap;
+    overflow: visible;
+}
+
+#section-inwestycje .table-wrapper td:first-child small {
+    display: block;
+    color: var(--text-muted);
+    font-size: 12px;
+    margin-top: 4px;
+    line-height: 1.3;
+}
+
+#section-inwestycje .table-wrapper th:last-child,
+#section-inwestycje .table-wrapper td:last-child {
+    text-align: right;
+}
+
+#section-inwestycje .table-wrapper td:first-child {
+    min-width: 180px;
+}
+
+#section-inwestycje .table-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+#section-inwestycje .table-actions::before,
+#section-inwestycje .table-actions::after {
+    display: none;
+    content: none;
+}
+
+#section-inwestycje .investycje-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    white-space: nowrap;
+}
+
+#section-inwestycje .table-actions .btn,
+#section-inwestycje .investycje-actions .btn {
+    outline: none;
+    box-shadow: none;
+}
+
+#section-inwestycje .table-actions .btn:focus,
+#section-inwestycje .investycje-actions .btn:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+#section-inwestycje .table-actions .btn {
+    min-width: 80px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+#section-inwestycje .table-wrapper td:last-child {
+    overflow: visible;
+    text-overflow: clip;
+}
+
+#section-inwestycje .table-wrapper tbody tr {
+    border-bottom: 1px solid var(--border-soft);
+}
+
+#section-inwestycje .table-wrapper td,
+#section-inwestycje .table-wrapper th {
+    color: var(--text-soft);
+}
+
+#section-inwestycje .table-wrapper td:first-child {
+    color: var(--text-main);
+    font-weight: 500;
+}
+
+.table-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+#section-uslugi td:last-child,
+#section-uslugi th:last-child {
+    width: 190px;
+    min-width: 190px;
+    white-space: nowrap;
+    text-align: right;
+}
+
+#section-uslugi .table-actions,
+#section-uslugi td:last-child .table-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+
+#section-uslugi td:last-child button,
+#section-uslugi .table-actions button {
+    min-width: 72px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+#section-uslugi table td,
+#section-uslugi table th {
+    padding: 12px 14px;
+    vertical-align: middle;
+}
+
+#section-uslugi .table-wrapper table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+#section-uslugi .table-wrapper thead th {
+    font-size: 13px;
+}
+
+#section-uslugi .table-wrapper td:first-child {
+    color: var(--text-main);
+    font-weight: 500;
+}
+
 /* ========================= */
 /* TABELE — OSTATNIE DANE */
 /* ========================= */
@@ -917,6 +1191,11 @@ td {
     font-size: 19px;
 }
 
+#section-wycena .save-row {
+    grid-template-columns: 1fr 170px;
+    gap: 12px;
+}
+
 .save-row {
     display: grid;
     grid-template-columns: 1fr 170px;
@@ -954,6 +1233,14 @@ td {
     gap: 10px;
     font-size: 14px;
     color: var(--text-main);
+    padding: 10px 14px;
+}
+
+.checkbox-grid label input[type="checkbox"] {
+    width: auto;
+    padding: 0;
+    margin: 0;
+    flex: none;
 }
 
 .modal {
@@ -1001,6 +1288,14 @@ td {
     .modal-content {
         width: 100%;
     }
+
+    .checkbox-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.modal-content {
+    width: min(560px, calc(100% - 32px));
 }
 /* ========================= */
 /* STATUSY */

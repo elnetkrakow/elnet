@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.05.29-27";
+const APP_VERSION = "2026.05.29-33";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -247,6 +247,12 @@ function podepnijZdarzenia() {
 
     const sortujKosztorys = document.getElementById("sortuj-kosztorys");
     if (sortujKosztorys) sortujKosztorys.addEventListener("change", renderujKosztorysy);
+
+    const inwestycjeSearch = document.getElementById("inwestycje-search");
+    if (inwestycjeSearch) inwestycjeSearch.addEventListener("input", renderujInwestycje);
+
+    const inwestycjeSort = document.getElementById("inwestycje-sort");
+    if (inwestycjeSort) inwestycjeSort.addEventListener("change", renderujInwestycje);
 
     const btnDodajInwestycje = document.getElementById("btn-dodaj-inwestycje");
     if (btnDodajInwestycje) btnDodajInwestycje.addEventListener("click", dodajInwestycje);
@@ -826,11 +832,11 @@ function renderujTerminarz() {
     }
 
     if (dateFilter) {
-        const filtrowanaData = new Date(dateFilter);
+        const filtrowanaData = parseDateLocal(dateFilter);
         lista = lista.filter(item => {
-            const start = item.data_start ? new Date(item.data_start) : null;
-            const end = item.data_koniec ? new Date(item.data_koniec) : null;
-            if (!start || !end) return false;
+            const start = item.data_start ? parseDateLocal(item.data_start) : null;
+            const end = item.data_koniec ? parseDateLocal(item.data_koniec) : null;
+            if (!start || !end || !filtrowanaData) return false;
             return filtrowanaData >= start && filtrowanaData <= end;
         });
     }
@@ -842,13 +848,13 @@ function renderujTerminarz() {
 
     lista.sort((a, b) => {
         if (sort === 'start-asc') {
-            return new Date(a.data_start || 0) - new Date(b.data_start || 0);
+            return (parseDateLocal(a.data_start) || 0) - (parseDateLocal(b.data_start) || 0);
         }
         if (sort === 'start-desc') {
-            return new Date(b.data_start || 0) - new Date(a.data_start || 0);
+            return (parseDateLocal(b.data_start) || 0) - (parseDateLocal(a.data_start) || 0);
         }
         if (sort === 'end-asc') {
-            return new Date(a.data_koniec || 0) - new Date(b.data_koniec || 0);
+            return (parseDateLocal(a.data_koniec) || 0) - (parseDateLocal(b.data_koniec) || 0);
         }
         if (sort === 'client-az') {
             return String(a.klient || '').localeCompare(String(b.klient || ''), 'pl');
@@ -866,8 +872,8 @@ function renderujTerminarz() {
 
     const today = new Date();
     tbody.innerHTML = lista.map(item => {
-        const start = item.data_start ? new Date(item.data_start) : null;
-        const end = item.data_koniec ? new Date(item.data_koniec) : null;
+        const start = item.data_start ? parseDateLocal(item.data_start) : null;
+        const end = item.data_koniec ? parseDateLocal(item.data_koniec) : null;
         const startStr = start ? start.toLocaleDateString('pl-PL') : '-';
         const endStr = end ? end.toLocaleDateString('pl-PL') : '-';
         const days = start && end ? Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1) : '-';
@@ -921,12 +927,12 @@ function renderujKalendarzTerminarza() {
 
     for (let day = 1; day <= daysInMonth; day++) {
         const currentDate = new Date(year, month, day);
-        const isoDate = currentDate.toISOString().slice(0, 10);
+        const localDate = formatDateLocal(currentDate);
         const status = getKalendarzStatus(currentDate);
         const isToday = isSameDay(currentDate, new Date());
         const className = `calendar-day ${status} ${isToday ? 'today' : ''}`.trim();
         cells.push(`
-            <div class="${className}" data-date="${isoDate}">
+            <div class="${className}" data-date="${localDate}">
                 <span>${day}</span>
             </div>
         `);
@@ -946,6 +952,20 @@ function renderujKalendarzTerminarza() {
     });
 }
 
+function formatDateLocal(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function parseDateLocal(value) {
+    if (!value) return null;
+    const [year, month, day] = String(value).split("-").map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day);
+}
+
 function getKalendarzStatus(date) {
     const normalized = new Date(date);
     normalized.setHours(0, 0, 0, 0);
@@ -953,8 +973,8 @@ function getKalendarzStatus(date) {
     let foundBusy = false;
 
     (terminarz || []).forEach(item => {
-        const start = item.data_start ? new Date(item.data_start) : null;
-        const end = item.data_koniec ? new Date(item.data_koniec) : null;
+        const start = item.data_start ? parseDateLocal(item.data_start) : null;
+        const end = item.data_koniec ? parseDateLocal(item.data_koniec) : null;
         if (!start || !end) return;
         start.setHours(0, 0, 0, 0);
         end.setHours(0, 0, 0, 0);
@@ -2393,36 +2413,66 @@ function renderujInwestycje() {
     const tbody = document.getElementById("tabela-inwestycji");
     if (!tbody) return;
 
-    if (!inwestycje.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Brak inwestycji w bazie.</td></tr>`;
+    let lista = [...(inwestycje || [])];
+    const searchValue = document.getElementById("inwestycje-search")?.value.toLowerCase().trim() || "";
+    const sortValue = document.getElementById("inwestycje-sort")?.value || "newest";
+
+    if (searchValue) {
+        lista = lista.filter(i => {
+            const combined = [i.nazwa, i.klient, i.adres, i.status]
+                .map(v => String(v || "").toLowerCase())
+                .join(" ");
+            return combined.includes(searchValue);
+        });
+    }
+
+    if (sortValue === "newest") {
+        lista.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    } else if (sortValue === "oldest") {
+        lista.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    } else if (sortValue === "name-az") {
+        lista.sort((a, b) => String(a.nazwa || "").localeCompare(String(b.nazwa || ""), 'pl'));
+    } else if (sortValue === "name-za") {
+        lista.sort((a, b) => String(b.nazwa || "").localeCompare(String(a.nazwa || ""), 'pl'));
+    } else if (sortValue === "client-az") {
+        lista.sort((a, b) => String(a.klient || "").localeCompare(String(b.klient || ""), 'pl'));
+    } else if (sortValue === "balance-desc") {
+        lista.sort((a, b) => {
+            const aBalance = sumaZaliczekDlaInwestycji(a.id) - sumaKosztowDlaInwestycji(a.id);
+            const bBalance = sumaZaliczekDlaInwestycji(b.id) - sumaKosztowDlaInwestycji(b.id);
+            return bBalance - aBalance;
+        });
+    } else if (sortValue === "balance-asc") {
+        lista.sort((a, b) => {
+            const aBalance = sumaZaliczekDlaInwestycji(a.id) - sumaKosztowDlaInwestycji(a.id);
+            const bBalance = sumaZaliczekDlaInwestycji(b.id) - sumaKosztowDlaInwestycji(b.id);
+            return aBalance - bBalance;
+        });
+    }
+
+    if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Brak inwestycji w bazie.</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = inwestycje.map(i => {
+    tbody.innerHTML = lista.map(i => {
         const statusClass = `status-${String(i.status || "aktywna").toLowerCase()}`;
         const zaliczki = sumaZaliczekDlaInwestycji(i.id);
         const koszty = sumaKosztowDlaInwestycji(i.id);
         const roznica = zaliczki - koszty;
 
         const akcje = rolaUsera === "admin"
-            ? `
-                <button class="btn btn-secondary small-btn" onclick="edytujInwestycje('${esc(i.id)}')">Edytuj</button>
-                <button class="btn btn-danger small-btn" onclick="usunInwestycje('${esc(i.id)}')">Usuń</button>
-            `
+            ? `<button class="btn btn-secondary small-btn" onclick="edytujInwestycje('${esc(i.id)}')">Edytuj</button><button class="btn btn-danger small-btn" onclick="usunInwestycje('${esc(i.id)}')">Usuń</button>`
             : "";
 
         return `
             <tr>
                 <td><strong>${esc(i.nazwa)}</strong><br><small>${esc(i.adres || "")}</small></td>
                 <td>${esc(i.klient || "-")}</td>
-                <td><span class="status-pill ${statusClass}">${esc(i.status || "aktywna")}</span></td>
-                <td>${zaliczki.toFixed(2)} PLN</td>
-                <td>${koszty.toFixed(2)} PLN</td>
-                <td><strong>${roznica.toFixed(2)} PLN</strong></td>
-                <td>
-                    <button class="btn btn-secondary small-btn" onclick="otworzInwestycje('${esc(i.id)}')">Otwórz</button>
-                    ${akcje}
-                </td>
+                <td class="nowrap-cell">${zaliczki.toFixed(2)} PLN</td>
+                <td class="nowrap-cell">${koszty.toFixed(2)} PLN</td>
+                <td class="nowrap-cell"><strong>${roznica.toFixed(2)} PLN</strong></td>
+                <td><div class="table-actions investycje-actions"><button class="btn btn-secondary small-btn" onclick="otworzInwestycje('${esc(i.id)}')">Otwórz</button>${akcje}</div></td>
             </tr>
         `;
     }).join("");
