@@ -2566,12 +2566,21 @@ function drukujInwestycjeDoOkna(options) {
             <meta charset="UTF-8">
             <title>Rozliczenie inwestycji</title>
             <style>
-                body{font-family:Arial, sans-serif;margin:20px;color:#111}
-                h1,h2{margin:0 0 10px}
-                table{width:100%;border-collapse:collapse;margin-top:8px}
-                th,td{border:1px solid #333;padding:8px 10px;text-align:left}
-                th{background:#f2f2f2}
-                .summary td{border:none;padding:6px 10px}
+                @page { margin: 10mm; }
+                body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 0; color: #111; }
+                h1 { font-size: 22px; margin: 0 0 8px 0; }
+                h2 { font-size: 16px; margin: 6px 0 4px 0; }
+                p { margin: 2px 0; font-size: 12px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 4px; margin-bottom: 4px; }
+                thead { display: table-header-group; }
+                tbody { display: table-row-group; }
+                tr { break-inside: avoid; page-break-inside: avoid; }
+                th, td { border: 1px solid #333; padding: 4px 6px; text-align: left; font-size: 11px; }
+                th { background: #f2f2f2; font-weight: bold; }
+                .section { margin-bottom: 6px; }
+                .summary { width: 100%; break-inside: avoid; page-break-inside: avoid; }
+                .summary td { border: none; padding: 3px 6px; font-size: 11px; }
+                .summary tr { break-inside: avoid; page-break-inside: avoid; }
             </style>
         </head>
         <body>
