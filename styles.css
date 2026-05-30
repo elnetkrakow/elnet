@@ -519,6 +519,40 @@ hr {
     min-width: 180px;
 }
 
+/* Make specific investment panel sections full-width and tables more readable */
+#section-inwestycje .full-row {
+    display: block;
+    margin-top: 18px;
+}
+
+#section-inwestycje .full-row .card.inner-card {
+    width: 100%;
+    max-width: none;
+}
+
+/* Allow horizontal scrolling inside each table card to avoid page layout shift */
+#section-inwestycje .table-wrapper {
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+#section-inwestycje .table-wrapper table {
+    width: 100%;
+    table-layout: auto;
+    min-width: 720px; /* ensures columns keep readable widths; table can scroll horizontally */
+}
+
+#section-inwestycje .table-wrapper thead th,
+#section-inwestycje .table-wrapper td {
+    padding: 12px 16px;
+    white-space: nowrap; /* prevent ugly wrapping that makes tables tall; allow horizontal scroll */
+}
+
+#section-inwestycje .table-wrapper td {
+    overflow: visible;
+    text-overflow: clip;
+}
+
 #section-inwestycje .table-actions {
     display: flex;
     flex-wrap: nowrap;
@@ -1053,6 +1087,30 @@ button:disabled {
      color: #b45309;
      border-color: rgba(245, 158, 11, 0.3);
  }
+
+.calendar-day.multiple {
+    background: rgba(139, 92, 246, 0.12); /* fioletowy */
+    color: #6b21a8;
+    border-color: rgba(139, 92, 246, 0.24);
+}
+
+/* Mini calendar on dashboard uses separate class names; keep colors consistent */
+.pulpit-calendar-day.free {
+    background: rgba(34, 197, 94, 0.12);
+    color: #16a34a;
+}
+.pulpit-calendar-day.busy {
+    background: rgba(239, 68, 68, 0.16);
+    color: #b91c1c;
+}
+.pulpit-calendar-day.reserved {
+    background: rgba(245, 158, 11, 0.16);
+    color: #b45309;
+}
+.pulpit-calendar-day.multiple {
+    background: rgba(139, 92, 246, 0.12);
+    color: #6b21a8;
+}
  
  .calendar-day.empty {
      background: transparent;
@@ -1092,6 +1150,25 @@ button:disabled {
  .calendar-chip.reserved {
      background: #b45309;
  }
+
+.calendar-chip.multiple {
+    background: #6b21a8;
+}
+
+.calendar-badge {
+    display: inline-flex;
+    min-width: 20px;
+    height: 20px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.15);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    margin-left: 8px;
+    padding: 0 6px;
+}
  
  .status-tag {
      display: inline-block;
@@ -1102,6 +1179,55 @@ button:disabled {
      text-transform: capitalize;
      border: 1px solid transparent;
  }
+
+.status-tag-success {
+    background: #22c55e;
+    color: #0f172a;
+    border-color: rgba(34, 197, 94, 0.4);
+}
+
+.status-tag-warning {
+    background: #fde047;
+    color: #1f2937;
+    border-color: rgba(253, 224, 71, 0.4);
+}
+/* Buttons for kosztorys status */
+.btn-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 130px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-transform: none;
+    white-space: nowrap;
+    cursor: default;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.btn-status:disabled {
+    opacity: 1;
+    cursor: default;
+}
+.btn-status-pending {
+    background: #f59e0b;
+    color: #07110c;
+    border: 1px solid #d97706;
+}
+.btn-status-pending:hover:not(:disabled) {
+    background: #d97706;
+    color: #ffffff;
+}
+.btn-status-accepted {
+    background: #22c55e;
+    color: #074214;
+    border: 1px solid #16a34a;
+}
+.btn-status-accepted:hover:not(:disabled) {
+    background: #16a34a;
+    color: #ffffff;
+}
  
  .status-zaplanowane {
      background: rgba(59, 130, 246, 0.15);

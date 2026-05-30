@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EL-Net - Panel</title>
-    <link rel="stylesheet" href="styles.css?v=20260529-38">
+    <link rel="stylesheet" href="styles.css?v=20260529-47">
 </head>
 
 <body>
@@ -291,12 +291,13 @@
                                     <th>Nazwa</th>
                                     <th>Netto</th>
                                     <th>Brutto</th>
+                                    <th>Status</th>
                                     <th>Akcje</th>
                                 </tr>
                             </thead>
                             <tbody id="tabela-kosztorysow">
                                 <tr>
-                                    <td colspan="5" class="empty-row">Brak zapisanych kosztorysów.</td>
+                                    <td colspan="6" class="empty-row">Brak zapisanych kosztorysów.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -477,7 +478,13 @@
                 <span>Różnica</span>
                 <strong id="inwestycja-roznica">0.00 PLN</strong>
             </div>
+            <div class="summary-box">
+                <span>Prace dodatkowe</span>
+                <strong id="inwestycja-prace-dodatkowe-suma">0.00 PLN</strong>
+            </div>
         </div>
+
+        <div id="powiazane-kosztorysy" class="card inner-card"></div>
 
         <div class="layout-two">
 <div class="card inner-card" id="card-zaliczka-form">
@@ -544,7 +551,51 @@
             </div>
         </div>
 
-        <div class="layout-two">
+        <div class="full-row">
+            <div class="card inner-card" id="card-prace-dodatkowe-form">
+                <h2>Prace dodatkowe — dodaj</h2>
+
+                <div class="form-group">
+                    <label for="praca-usluga">Wybierz usługę (opcjonalnie)</label>
+                    <select id="praca-usluga">
+                        <option value="">— Brak wyboru (wpisz ręcznie) —</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="praca-nazwa">Nazwa pracy</label>
+                    <input type="text" id="praca-nazwa" placeholder="np. dodatkowa instalacja" />
+                </div>
+
+                <div class="form-group">
+                    <label for="praca-opis">Opis / uwagi</label>
+                    <input type="text" id="praca-opis" placeholder="opcjonalne" />
+                </div>
+
+                <div class="form-group">
+                    <label for="praca-ilosc">Ilość</label>
+                    <input type="number" id="praca-ilosc" step="1" min="1" value="1" />
+                </div>
+
+                <div class="form-group">
+                    <label for="praca-cena-netto">Cena netto</label>
+                    <input type="number" id="praca-cena-netto" step="0.01" min="0" placeholder="0.00" />
+                </div>
+
+                <div class="form-group">
+                    <label for="praca-vat">VAT</label>
+                    <select id="praca-vat">
+                        <option value="0">0%</option>
+                        <option value="8">8%</option>
+                        <option value="23" selected>23%</option>
+                    </select>
+                </div>
+
+                <button id="btn-dodaj-praca-dodatkowa" class="btn btn-main">Dodaj pracę dodatkową</button>
+            </div>
+        </div>
+
+        <div class="full-row">
             <div class="card inner-card">
                 <h2>Zaliczki</h2>
 
@@ -583,6 +634,34 @@
                         <tbody id="tabela-kosztow">
                             <tr>
                                 <td colspan="4" class="empty-row">Brak kosztów.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="full-row">
+            <div class="card inner-card">
+                <h2>Prace dodatkowe</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nazwa</th>
+                                <th>Ilość</th>
+                                <th>Cena netto</th>
+                                <th>VAT</th>
+                                <th>Netto</th>
+                                <th>Brutto</th>
+                                <th>Opis</th>
+                                <th>Akcje</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-prace-dodatkowe">
+                            <tr>
+                                <td colspan="8" class="empty-row">Brak prac dodatkowych.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -659,6 +738,7 @@
                             <span><span class="calendar-chip free"></span> Wolne</span>
                             <span><span class="calendar-chip busy"></span> Zajęte</span>
                             <span><span class="calendar-chip reserved"></span> Rezerwacja</span>
+                            <span><span class="calendar-chip multiple"></span> Kilka terminów</span>
                         </div>
                         <div id="terminarz-calendar" class="calendar-grid"></div>
                     </div>
@@ -893,6 +973,26 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260529-38"></script>
+    
+    <div id="drukuj-inwestycje-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <h2>Wybierz elementy rozliczenia</h2>
+            <div class="checkbox-grid two-columns">
+                <label><input type="checkbox" id="drukuj-inw-dane" checked> Dane inwestycji</label>
+                <label><input type="checkbox" id="drukuj-inw-kosztorys" checked> Kosztorys robocizny</label>
+                <label><input type="checkbox" id="drukuj-inw-prace" checked> Prace dodatkowe</label>
+                <label><input type="checkbox" id="drukuj-inw-zaliczki" checked> Zaliczki</label>
+                <label><input type="checkbox" id="drukuj-inw-koszty" checked> Koszty materiałowe</label>
+                <label><input type="checkbox" id="drukuj-inw-podsumowanie" checked> Podsumowanie końcowe</label>
+                <label><input type="checkbox" id="drukuj-inw-uwagi" checked> Uwagi / opis</label>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-zamknij-drukuj-inwestycje" class="btn btn-secondary small-btn">Anuluj</button>
+                <button id="btn-podglad-drukuj-inwestycje" class="btn btn-main">Drukuj</button>
+            </div>
+        </div>
+    </div>
+    <script src="script.js?v=20260529-47"></script>
 </body>
 </html>

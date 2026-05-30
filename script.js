@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.05.29-38";
+const APP_VERSION = "2026.05.29-47";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -16,6 +16,7 @@ let kosztorysy = [];
 let inwestycje = [];
 let inwestycjeZaliczki = [];
 let inwestycjeKoszty = [];
+let inwestycjePraceDodatkowe = [];
 let logi = [];
 let aktywnaInwestycjaId = null;
 
@@ -261,13 +262,19 @@ function podepnijZdarzenia() {
     if (btnZamknijInwestycje) btnZamknijInwestycje.addEventListener("click", zamknijPanelInwestycji);
 
     const btnDrukujInwestycje = document.getElementById("btn-drukuj-inwestycje");
-    if (btnDrukujInwestycje) btnDrukujInwestycje.addEventListener("click", drukujInwestycje);
+    if (btnDrukujInwestycje) btnDrukujInwestycje.addEventListener("click", pokazModalDrukuInwestycji);
 
     const btnDodajZaliczke = document.getElementById("btn-dodaj-zaliczke");
     if (btnDodajZaliczke) btnDodajZaliczke.addEventListener("click", dodajZaliczke);
 
     const btnDodajKoszt = document.getElementById("btn-dodaj-koszt");
     if (btnDodajKoszt) btnDodajKoszt.addEventListener("click", dodajKoszt);
+
+    const btnDodajPracaDodatkowa = document.getElementById("btn-dodaj-praca-dodatkowa");
+    if (btnDodajPracaDodatkowa) btnDodajPracaDodatkowa.addEventListener("click", dodajPraceDodatkowa);
+
+    const pracaUslugaSelect = document.getElementById("praca-usluga");
+    if (pracaUslugaSelect) pracaUslugaSelect.addEventListener("change", ustawPraceDodatkoweZUslugi);
 
     const btnAnulujInwestycje = document.getElementById("btn-anuluj-inwestycje");
     if (btnAnulujInwestycje) btnAnulujInwestycje.addEventListener("click", anulujEdycjeInwestycji);
@@ -292,7 +299,7 @@ function podepnijZdarzenia() {
     const adminLogSort = document.getElementById("admin-log-sort");
     if (adminLogSort) adminLogSort.addEventListener("change", renderujLogi);
 
-    const dzisiaj = new Date().toISOString().slice(0, 10);
+    const dzisiaj = formatDateLocal(new Date());
 
     const zaliczkaData = document.getElementById("zaliczka-data");
     if (zaliczkaData) zaliczkaData.value = dzisiaj;
@@ -507,6 +514,7 @@ async function odswiezDane() {
         pobierzInwestycje(),
         pobierzInwestycjeZaliczki(),
         pobierzInwestycjeKoszty(),
+        pobierzInwestycjePraceDodatkowe(),
         pobierzLogi(),
         pobierzMagazyn(),
         pobierzTerminarz()
@@ -610,6 +618,25 @@ async function pobierzInwestycjeKoszty() {
     }
 }
 
+async function pobierzInwestycjePraceDodatkowe() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje_prace_dodatkowe?select=*&order=created_at.desc`, {
+            headers: headers()
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            obsluzBladAutoryzacji(errorText);
+            throw new Error(errorText);
+        }
+
+        inwestycjePraceDodatkowe = await res.json();
+    } catch (err) {
+        console.error("Błąd prac dodatkowych:", err);
+        inwestycjePraceDodatkowe = [];
+    }
+}
+
 // MAGAZYN
 async function pobierzMagazyn() {
     try {
@@ -676,20 +703,8 @@ async function dodajTermin() {
         return;
     }
 
-    const zachowaj = terminarz.some(item => {
-        if (edytowanyTerminId && String(item.id) === String(edytowanyTerminId)) {
-            return false;
-        }
-        const istniejącyStart = item.data_start ? new Date(item.data_start) : null;
-        const istniejącyKoniec = item.data_koniec ? new Date(item.data_koniec) : null;
-        if (!istniejącyStart || !istniejącyKoniec) return false;
-        return nowyStart <= istniejącyKoniec && nowyKoniec >= istniejącyStart;
-    });
-
-    if (zachowaj) {
-        const potwierdzenie = confirm('Ten termin nakłada się na inną zaplanowaną pracę. Czy mimo to zapisać?');
-        if (!potwierdzenie) return;
-    }
+    // Allow overlapping terms without blocking confirmation.
+    // We still compute overlaps for informational purposes elsewhere, but do not block saving here.
 
     const payload = {
         data_start: dataStart,
@@ -931,12 +946,15 @@ function renderujKalendarzTerminarza() {
     for (let day = 1; day <= daysInMonth; day++) {
         const currentDate = new Date(year, month, day);
         const localDate = formatDateLocal(currentDate);
-        const status = getKalendarzStatus(currentDate);
         const isToday = isSameDay(currentDate, new Date());
+        const count = getTerminyCountForDay(currentDate);
+        const status = getKalendarzStatus(currentDate, count);
         const className = `calendar-day ${status} ${isToday ? 'today' : ''}`.trim();
+        const badge = count >= 2 ? `<span class="calendar-badge">${count}</span>` : '';
         cells.push(`
             <div class="${className}" data-date="${localDate}">
                 <span>${day}</span>
+                ${badge}
             </div>
         `);
     }
@@ -969,9 +987,13 @@ function parseDateLocal(value) {
     return new Date(year, month - 1, day);
 }
 
-function getKalendarzStatus(date) {
+function getKalendarzStatus(date, precomputedCount) {
     const normalized = new Date(date);
     normalized.setHours(0, 0, 0, 0);
+    const count = typeof precomputedCount === 'number' ? precomputedCount : getTerminyCountForDay(normalized);
+
+    if (count >= 2) return 'multiple';
+
     let foundReserved = false;
     let foundBusy = false;
 
@@ -994,6 +1016,26 @@ function getKalendarzStatus(date) {
     if (foundBusy) return 'busy';
     if (foundReserved) return 'reserved';
     return 'free';
+}
+
+function getTerminyCountForDay(date) {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    let count = 0;
+    (terminarz || []).forEach(item => {
+        const start = item.data_start ? parseDateLocal(item.data_start) : null;
+        const end = item.data_koniec ? parseDateLocal(item.data_koniec) : null;
+        if (!start || !end) return;
+        start.setHours(0, 0, 0, 0);
+        end.setHours(0, 0, 0, 0);
+        if (normalized >= start && normalized <= end) {
+            // Ignore canceled entries
+            const status = String(item.status || '').toLowerCase();
+            if (status === 'odwołane' || status === 'odwolane') return;
+            count++;
+        }
+    });
+    return count;
 }
 
 function isSameDay(a, b) {
@@ -1526,14 +1568,16 @@ function renderCalendarWidget() {
     // Days of month
     for (let day = 1; day <= daysInMonth; day++) {
         const currentDate = new Date(year, month, day);
-        const status = getKalendarzStatus(currentDate);
         const isToday = isSameDay(currentDate, today);
         const dateStr = formatDateLocal(currentDate);
+        const count = getTerminyCountForDay(currentDate);
+        const status = getKalendarzStatus(currentDate, count);
         const classNames = `pulpit-calendar-day ${status} ${isToday ? 'today' : ''}`.trim();
+        const badge = count >= 2 ? `<span class="calendar-badge">${count}</span>` : '';
 
         html += `
             <div class="${classNames}" onclick="switchToPulpitTerminarz('${dateStr}')" title="Kliknij aby filtrować terminy">
-                ${day}
+                ${day}${badge}
             </div>
         `;
     }
@@ -2038,6 +2082,11 @@ async function zapiszKosztorys() {
         user_id: zalogowanyUser?.id
     };
 
+    // If creating new kosztorys, set default status to 'do_akceptacji'. When editing (PATCH), do not overwrite existing status.
+    if (!edytowanyKosztorysId) {
+        payload.status = 'do_akceptacji';
+    }
+
     const endpoint = edytowanyKosztorysId
         ? `${SUPABASE_URL}/rest/v1/kosztorysy?id=eq.${edytowanyKosztorysId}`
         : `${SUPABASE_URL}/rest/v1/kosztorysy`;
@@ -2090,7 +2139,7 @@ function renderujKosztorysy() {
     if (sort === "brutto-rosnaco") lista.sort((a, b) => Number(a.brutto || 0) - Number(b.brutto || 0));
 
     if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Brak zapisanych kosztorysów.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Brak zapisanych kosztorysów.</td></tr>`;
         return;
     }
 
@@ -2102,12 +2151,24 @@ function renderujKosztorysy() {
             ? `<button class="btn btn-danger" onclick="usunKosztorys('${esc(k.id)}')">Usuń</button>`
             : "";
 
+        // Status display
+        const status = String(k.status || 'do_akceptacji').toLowerCase();
+        let statusButton = '';
+        if (status === 'do_akceptacji' || status === 'do-akceptacji') {
+            statusButton = `<button class="btn btn-status btn-status-pending" onclick="akcjaKosztorysu('${esc(k.id)}')">Do akceptacji</button>`;
+        } else if (status === 'zaakceptowany' || status === 'akceptacja' || status === 'zaakceptowana') {
+            statusButton = `<button class="btn btn-status btn-status-accepted" onclick="akcjaKosztorysu('${esc(k.id)}')">Akceptacja</button>`;
+        } else {
+            statusButton = `<button class="btn btn-status" onclick="akcjaKosztorysu('${esc(k.id)}')">${esc(status)}</button>`;
+        }
+
         return `
             <tr>
                 <td>${esc(k.data)}</td>
                 <td><strong>${esc(k.nazwa)}</strong></td>
                 <td>${Number(k.netto || 0).toFixed(2)} PLN</td>
                 <td>${Number(k.brutto || 0).toFixed(2)} PLN</td>
+                <td>${statusButton}</td>
                 <td>
                     <div class="table-actions">
                         ${edytuj}
@@ -2140,6 +2201,155 @@ window.drukujKosztorys = function(id) {
     modal.classList.remove("hidden");
 };
 
+// Accept kosztorys (mark as zaakceptowany)
+window.zaakceptujKosztorys = async function(id, extraData = {}) {
+    // Ensure we have latest kosztorys to check zaakceptowany_at
+    let existing = kosztorysy.find(x => String(x.id) === String(id));
+    if (!existing) {
+        await pobierzKosztorysy();
+        existing = kosztorysy.find(x => String(x.id) === String(id));
+    }
+
+    const payload = { status: 'zaakceptowany', ...extraData };
+
+    // Set zaakceptowany_at only if not already present
+    if ((!existing || !existing.zaakceptowany_at) && extraData.zaakceptowany_at === undefined) {
+        payload.zaakceptowany_at = formatDateTimeLocal(new Date());
+    }
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/kosztorysy?id=eq.${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            headers: headers(),
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+
+        await pobierzKosztorysy();
+        renderujKosztorysy();
+        zapiszLog('Kosztorysy', 'Oznaczono jako zaakceptowany', id);
+    } catch (err) {
+        console.error('Błąd aktualizacji statusu kosztorysu:', err);
+        alert('Nie udało się zaktualizować statusu kosztorysu.');
+    }
+};
+
+window.akcjaKosztorysu = async function(id) {
+    const kosztorys = kosztorysy.find(x => String(x.id) === String(id));
+    if (!kosztorys) return;
+
+    const wybor = prompt(
+        'Wybierz opcję dla kosztorysu:\n1 - Tylko oznacz jako zaakceptowany\n2 - Utwórz nową inwestycję z kosztorysu\n3 - Połącz z istniejącą inwestycją',
+        '1'
+    );
+    if (!wybor) return;
+
+    const opcja = wybor.trim();
+    if (!['1', '2', '3'].includes(opcja)) {
+        alert('Wybierz 1, 2 lub 3.');
+        return;
+    }
+
+    if (opcja === '1') {
+        await zaakceptujKosztorys(id);
+        return;
+    }
+
+    if (opcja === '2') {
+        const inwestycja = await utworzNowaInwestycjaZKosztorysu(kosztorys);
+        if (inwestycja && inwestycja.id) {
+            await zaakceptujKosztorys(id, { inwestycja_id: inwestycja.id });
+            zapiszLog('Kosztorysy', 'Połączono kosztorys z nową inwestycją', id);
+        }
+        return;
+    }
+
+    if (opcja === '3') {
+        await polaczZIstniejacaInwestycja(kosztorys);
+        return;
+    }
+};
+
+function formatDateTimeLocal(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+async function utworzNowaInwestycjaZKosztorysu(kosztorys) {
+    await pobierzInwestycje();
+
+    const payload = {
+        nazwa: kosztorys.nazwa || 'Inwestycja z kosztorysu',
+        klient: kosztorys.klient || '',
+        adres: kosztorys.adres || '',
+        status: 'aktywna',
+        opis: `Utworzono z kosztorysu ${kosztorys.id}`,
+        user_id: zalogowanyUser?.id || null
+    };
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje`, {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+
+        const data = await res.json();
+        await pobierzInwestycje();
+        renderujInwestycje();
+        if (Array.isArray(data) && data.length) {
+            return data[0];
+        }
+        return data;
+    } catch (err) {
+        console.error('Błąd tworzenia inwestycji z kosztorysu:', err);
+        alert('Nie udało się utworzyć inwestycji z kosztorysu.');
+        return null;
+    }
+}
+
+async function polaczZIstniejacaInwestycja(kosztorys) {
+    await pobierzInwestycje();
+
+    if (!inwestycje.length) {
+        alert('Brak dostępnych inwestycji do połączenia.');
+        return;
+    }
+    // Show a numbered list to the user (number - nazwa - klient). User inputs number (1-based).
+    const lines = inwestycje.map((i, idx) => `${idx + 1} - ${i.nazwa || '-'} - ${i.klient || '-'}`);
+    const promptText = `Wybierz numer inwestycji, z którą chcesz połączyć kosztorys:\n${lines.join('\n')}`;
+    const wybor = prompt(promptText, '1');
+    if (!wybor) return;
+
+    const num = Number(wybor.trim());
+    if (!Number.isInteger(num) || num < 1 || num > inwestycje.length) {
+        alert('Nieprawidłowy wybór inwestycji.');
+        return;
+    }
+
+    const chosen = inwestycje[num - 1];
+    if (!chosen) {
+        alert('Nieprawidłowy wybór inwestycji.');
+        return;
+    }
+
+    // Prepare extra data: set inwestycja_id and ensure zaakceptowany_at if missing
+    const extra = { inwestycja_id: chosen.id };
+    if (!kosztorys.zaakceptowany_at) extra.zaakceptowany_at = formatDateTimeLocal(new Date());
+
+    await zaakceptujKosztorys(kosztorys.id, extra);
+    alert('Kosztorys połączony z inwestycją.');
+    zapiszLog('Kosztorysy', 'Połączono kosztorys z istniejącą inwestycją', kosztorys.id);
+}
+
 function pobierzOpcjeDrukuKosztorysu() {
     const options = {
         jednostka: document.getElementById("drukuj-kolumna-jednostka")?.checked,
@@ -2162,6 +2372,237 @@ function zamknijModalDrukuKosztorysu() {
     const modal = document.getElementById("drukuj-kosztorys-modal");
     if (modal) modal.classList.add("hidden");
     aktualnyDrukowanyKosztorysId = null;
+}
+
+function pokazModalDrukuInwestycji() {
+    const modal = document.getElementById("drukuj-inwestycje-modal");
+    if (!modal) return;
+    // default all checked
+    modal.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = true);
+    modal.classList.remove("hidden");
+
+    const btnPreview = document.getElementById("btn-podglad-drukuj-inwestycje");
+    if (btnPreview) btnPreview.onclick = () => {
+        const options = pobierzOpcjeDrukuInwestycji();
+        if (!options) return;
+        drukujInwestycjeDoOkna(options);
+    };
+
+    const btnClose = document.getElementById("btn-zamknij-drukuj-inwestycje");
+    if (btnClose) btnClose.onclick = zamknijModalDrukuInwestycji;
+}
+
+function zamknijModalDrukuInwestycji() {
+    const modal = document.getElementById("drukuj-inwestycje-modal");
+    if (modal) modal.classList.add("hidden");
+}
+
+function pobierzOpcjeDrukuInwestycji() {
+    const options = {
+        dane: document.getElementById("drukuj-inw-dane")?.checked,
+        kosztorys: document.getElementById("drukuj-inw-kosztorys")?.checked,
+        prace: document.getElementById("drukuj-inw-prace")?.checked,
+        zaliczki: document.getElementById("drukuj-inw-zaliczki")?.checked,
+        koszty: document.getElementById("drukuj-inw-koszty")?.checked,
+        podsumowanie: document.getElementById("drukuj-inw-podsumowanie")?.checked,
+        uwagi: document.getElementById("drukuj-inw-uwagi")?.checked
+    };
+
+    if (!Object.values(options).some(Boolean)) {
+        alert("Wybierz przynajmniej jedną pozycję do wydruku.");
+        return null;
+    }
+
+    return options;
+}
+
+function drukujInwestycjeDoOkna(options) {
+    zamknijModalDrukuInwestycji();
+    if (!aktywnaInwestycjaId) {
+        alert("Brak otwartej inwestycji do wydruku.");
+        return;
+    }
+
+    const inwestycja = inwestycje.find(i => String(i.id) === String(aktywnaInwestycjaId));
+    if (!inwestycja) {
+        alert("Nie znaleziono inwestycji do wydruku.");
+        return;
+    }
+
+    // collect data
+    const zaliczki = inwestycjeZaliczki.filter(z => String(z.inwestycja_id) === String(aktywnaInwestycjaId));
+    const koszty = inwestycjeKoszty.filter(k => String(k.inwestycja_id) === String(aktywnaInwestycjaId));
+    const prace = inwestycjePraceDodatkowe.filter(p => String(p.inwestycja_id) === String(aktywnaInwestycjaId));
+    const kosztorys = kosztorysy.find(k => String(k.inwestycja_id) === String(aktywnaInwestycjaId));
+
+    const sumaZaliczek = zaliczki.reduce((sum, z) => sum + Number(z.kwota || 0), 0);
+    const sumaKosztow = koszty.reduce((sum, k) => sum + Number(k.kwota || 0), 0);
+    const sumaPraceBrutto = prace.reduce((s, p) => s + Number(p.brutto || 0), 0);
+    // kosztorys is a single object (or undefined). Use its brutto directly.
+    const robociznaBrutto = kosztorys ? Number(kosztorys.brutto || 0) : 0;
+
+    const razemDoRozliczenia = robociznaBrutto + sumaPraceBrutto + sumaKosztow;
+    const pozostaloDoZaplaty = razemDoRozliczenia - sumaZaliczek;
+    const bilansGotowki = sumaZaliczek - sumaKosztow;
+
+    // Build HTML parts based on options
+    let kosztorysHtml = "";
+    if (options.kosztorys) {
+        if (!kosztorys) {
+            kosztorysHtml = `<p>Brak powiązanego kosztorysu robocizny.</p>`;
+        } else {
+            kosztorysHtml = `
+                <table>
+                    <thead><tr><th>Nazwa</th><th>Netto</th><th>Brutto</th><th>Status</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td>${esc(kosztorys.nazwa || "")}</td>
+                            <td>${Number(kosztorys.netto || 0).toFixed(2)} PLN</td>
+                            <td>${Number(kosztorys.brutto || 0).toFixed(2)} PLN</td>
+                            <td>${esc(kosztorys.status || "-")}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+        }
+    }
+
+    let praceHtml = "";
+    if (options.prace) {
+        if (!prace.length) {
+            praceHtml = `<p>Brak prac dodatkowych.</p>`;
+        } else {
+            const rows = prace.map(p => `
+                <tr>
+                    <td>${esc(p.nazwa || "")}</td>
+                    <td>${Number(p.ilosc || 0)}</td>
+                    <td>${Number(p.cena_netto || 0).toFixed(2)} PLN</td>
+                    <td>${Number(p.vat || 0)}%</td>
+                    <td>${Number(p.netto || 0).toFixed(2)} PLN</td>
+                    <td>${Number(p.brutto || 0).toFixed(2)} PLN</td>
+                    <td>${esc(p.opis || "")}</td>
+                </tr>
+            `).join("");
+
+            praceHtml = `
+                <table>
+                    <thead><tr><th>Nazwa</th><th>Ilość</th><th>Cena netto</th><th>VAT</th><th>Netto</th><th>Brutto</th><th>Opis</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        }
+    }
+
+    let zaliczkiHtml = "";
+    if (options.zaliczki) {
+        if (!zaliczki.length) zaliczkiHtml = `<p>Brak zaliczek.</p>`;
+        else {
+            const rows = zaliczki.map(z => `
+                <tr>
+                    <td>${esc(z.data)}</td>
+                    <td>${Number(z.kwota || 0).toFixed(2)} PLN</td>
+                    <td>${esc(z.sposob_platnosci || "-")}</td>
+                    <td>${esc(z.opis || "")}</td>
+                </tr>
+            `).join("");
+            zaliczkiHtml = `<table><thead><tr><th>Data</th><th>Kwota</th><th>Płatność</th><th>Opis</th></tr></thead><tbody>${rows}</tbody></table>`;
+        }
+    }
+
+    let kosztyHtml = "";
+    if (options.koszty) {
+        if (!koszty.length) kosztyHtml = `<p>Brak kosztów.</p>`;
+        else {
+            const rows = koszty.map(k => `
+                <tr>
+                    <td>${esc(k.data)}</td>
+                    <td>${Number(k.kwota || 0).toFixed(2)} PLN</td>
+                    <td>${esc(k.kategoria || "-")}</td>
+                    <td>${esc(k.opis || "")}</td>
+                </tr>
+            `).join("");
+            kosztyHtml = `<table><thead><tr><th>Data</th><th>Kwota</th><th>Kategoria</th><th>Opis</th></tr></thead><tbody>${rows}</tbody></table>`;
+        }
+    }
+
+    let podsumowanieHtml = "";
+    if (options.podsumowanie) {
+        podsumowanieHtml = `
+            <table class="summary">
+                <tr><td>Robocizna (kosztorys) brutto</td><td style="text-align:right">${Number(kosztorys?.brutto || 0).toFixed(2)} PLN</td></tr>
+                <tr><td>Prace dodatkowe brutto</td><td style="text-align:right">${sumaPraceBrutto.toFixed(2)} PLN</td></tr>
+                <tr><td>Koszty materiałowe</td><td style="text-align:right">${sumaKosztow.toFixed(2)} PLN</td></tr>
+                <tr><td><strong>Razem do rozliczenia</strong></td><td style="text-align:right"><strong>${razemDoRozliczenia.toFixed(2)} PLN</strong></td></tr>
+                <tr><td>Zaliczki</td><td style="text-align:right">${sumaZaliczek.toFixed(2)} PLN</td></tr>
+                <tr><td><strong>Pozostało do zapłaty</strong></td><td style="text-align:right"><strong>${pozostaloDoZaplaty.toFixed(2)} PLN</strong></td></tr>
+                <tr><td>Bilans gotówki (zaliczki - koszty materiałowe)</td><td style="text-align:right">${bilansGotowki.toFixed(2)} PLN</td></tr>
+            </table>
+        `;
+    }
+
+    // Prepare printed notes: remove technical creation IDs and replace with friendly sentence when appropriate
+    let printOpis = inwestycja.opis || "";
+    if (printOpis) {
+        // match pattern like: Utworzono z kosztorysu <id>
+        const match = printOpis.match(/Utworzono z kosztorysu\s+([A-Za-z0-9-]+)/);
+        if (match) {
+            // remove the technical phrase
+            printOpis = printOpis.replace(match[0], '').trim();
+            // only show friendly sentence if there is actually a linked kosztorys for this investment
+            if (kosztorys) {
+                const friendly = 'Rozliczenie utworzone na podstawie zaakceptowanego kosztorysu robocizny.';
+                // if other notes exist, append sentence; otherwise use only the sentence
+                printOpis = printOpis ? (printOpis + '\n' + friendly) : friendly;
+            }
+        }
+    }
+
+    const uwagiHtml = options.uwagi && printOpis ? `<div class="section"><h2>Uwagi</h2><p>${esc(printOpis)}</p></div>` : "";
+
+    const html = `
+        <!DOCTYPE html>
+        <html lang="pl">
+        <head>
+            <meta charset="UTF-8">
+            <title>Rozliczenie inwestycji</title>
+            <style>
+                body{font-family:Arial, sans-serif;margin:20px;color:#111}
+                h1,h2{margin:0 0 10px}
+                table{width:100%;border-collapse:collapse;margin-top:8px}
+                th,td{border:1px solid #333;padding:8px 10px;text-align:left}
+                th{background:#f2f2f2}
+                .summary td{border:none;padding:6px 10px}
+            </style>
+        </head>
+        <body>
+            <h1>EL-Net — Rozliczenie inwestycji</h1>
+            ${options.dane ? `
+            <div class="section">
+                <h2>Inwestycja</h2>
+                <p><strong>Nazwa:</strong> ${esc(inwestycja.nazwa || "-")}</p>
+                <p><strong>Klient:</strong> ${esc(inwestycja.klient || "-")}</p>
+                <p><strong>Adres:</strong> ${esc(inwestycja.adres || "-")}</p>
+                <p><strong>Status:</strong> ${esc(inwestycja.status || "-")}</p>
+            </div>
+            ` : ``}
+
+            ${options.kosztorys ? `<div class="section"><h2>Kosztorys robocizny</h2>${kosztorysHtml}</div>` : ''}
+            ${options.prace ? `<div class="section"><h2>Prace dodatkowe</h2>${praceHtml}</div>` : ''}
+            ${options.zaliczki ? `<div class="section"><h2>Zaliczki</h2>${zaliczkiHtml}</div>` : ''}
+            ${options.koszty ? `<div class="section"><h2>Koszty materiałowe</h2>${kosztyHtml}</div>` : ''}
+            ${options.podsumowanie ? `<div class="section"><h2>Podsumowanie końcowe</h2>${podsumowanieHtml}</div>` : ''}
+            ${uwagiHtml}
+        </body>
+        </html>
+    `;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) { alert("Nie udało się otworzyć okna drukowania."); return; }
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    zapiszLog("Inwestycje", "Druk rozliczenia (wybrane elementy)", inwestycja.nazwa);
 }
 
 function drukujKosztorysDoOkna(id, options) {
@@ -2737,6 +3178,85 @@ function renderujPanelInwestycji() {
 
     renderujTabeleZaliczek(zaliczkiLista);
     renderujTabeleKosztow(kosztyLista);
+    renderujPowiazaneKosztorysyInwestycji();
+    renderujPraceDodatkoweInwestycji();
+    renderujSelectPracDodatkowych();
+}
+
+function renderujPraceDodatkoweInwestycji() {
+    const containerSum = document.getElementById("inwestycja-prace-dodatkowe-suma");
+    const tbody = document.getElementById("tabela-prace-dodatkowe");
+    if (!containerSum || !tbody) return;
+
+    const related = inwestycjePraceDodatkowe.filter(p => String(p.inwestycja_id) === String(aktywnaInwestycjaId));
+    if (!related.length) {
+        containerSum.textContent = `0.00 PLN`;
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-row">Brak prac dodatkowych.</td></tr>`;
+        return;
+    }
+
+    const sumBrutto = related.reduce((s, p) => s + Number(p.brutto || 0), 0);
+    containerSum.textContent = `${sumBrutto.toFixed(2)} PLN`;
+
+    tbody.innerHTML = related.map(p => {
+        const akcja = rolaUsera === "admin"
+            ? `<button class="btn btn-danger small-btn" onclick="usunPraceDodatkowa('${esc(p.id)}')">Usuń</button>`
+            : "";
+
+        return `
+            <tr>
+                <td>${esc(p.nazwa || "")}</td>
+                <td>${Number(p.ilosc || 0)}</td>
+                <td>${Number(p.cena_netto || 0).toFixed(2)} PLN</td>
+                <td>${Number(p.vat || 0)}%</td>
+                <td>${Number(p.netto || 0).toFixed(2)} PLN</td>
+                <td>${Number(p.brutto || 0).toFixed(2)} PLN</td>
+                <td>${esc(p.opis || "")}</td>
+                <td>${akcja}</td>
+            </tr>
+        `;
+    }).join("");
+}
+
+function renderujPowiazaneKosztorysyInwestycji() {
+    const container = document.getElementById("powiazane-kosztorysy");
+    if (!container) return;
+
+    const related = kosztorysy.filter(k => String(k.inwestycja_id) === String(aktywnaInwestycjaId));
+    if (!related.length) {
+        container.innerHTML = `
+            <h2>Powiązany kosztorys robocizny</h2>
+            <p>Brak powiązanego kosztorysu robocizny dla tej inwestycji.</p>
+        `;
+        return;
+    }
+
+    const itemsHtml = related.map(k => {
+        const statusLabel = k.status === "zaakceptowany"
+            ? `<span class="status-tag status-tag-success">zaakceptowany</span>`
+            : k.status === "do_akceptacji"
+                ? `<span class="status-tag status-tag-warning">do akceptacji</span>`
+                : `<span class="status-tag">${esc(k.status || "nieznany")}</span>`;
+
+        const printButton = `<button class="btn btn-secondary small-btn" onclick="drukujKosztorys('${esc(k.id)}')">Drukuj</button>`;
+
+        return `
+            <div class="linked-item">
+                <h3>${esc(k.nazwa || "Kosztorys robocizny")}</h3>
+                <p><strong>Netto:</strong> ${Number(k.netto || 0).toFixed(2)} PLN</p>
+                <p><strong>Brutto:</strong> ${Number(k.brutto || 0).toFixed(2)} PLN</p>
+                <p><strong>Klient:</strong> ${esc(k.klient || "nie podano")}</p>
+                <p><strong>Status:</strong> ${statusLabel}</p>
+                <p><strong>Data utworzenia:</strong> ${esc(k.data || "-")}</p>
+                <div class="button-row">${printButton}</div>
+            </div>
+        `;
+    }).join("");
+
+    container.innerHTML = `
+        <h2>Powiązany kosztorys robocizny</h2>
+        ${itemsHtml}
+    `;
 }
 
 function renderujTabeleZaliczek(lista) {
@@ -2958,3 +3478,131 @@ window.usunKoszt = async function(id) {
         alert("Nie udało się usunąć koszt.");
     }
 };
+
+async function dodajPraceDodatkowa() {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może dodawać prac dodatkowych.");
+        return;
+    }
+
+    if (!aktywnaInwestycjaId) {
+        alert("Najpierw otwórz inwestycję.");
+        return;
+    }
+
+    const nazwa = document.getElementById("praca-nazwa").value.trim();
+    const opis = document.getElementById("praca-opis").value.trim();
+    const ilosc = Number(document.getElementById("praca-ilosc").value);
+    const cena_netto = Number(document.getElementById("praca-cena-netto").value);
+    const vat = Number(document.getElementById("praca-vat").value);
+
+    if (!nazwa) {
+        alert("Podaj nazwę pracy.");
+        return;
+    }
+    if (isNaN(ilosc) || ilosc <= 0) {
+        alert("Podaj poprawną ilość.");
+        return;
+    }
+    if (isNaN(cena_netto) || cena_netto < 0) {
+        alert("Podaj poprawną cenę netto.");
+        return;
+    }
+
+    const netto = ilosc * cena_netto;
+    const brutto = netto * (1 + (vat || 0) / 100);
+
+    const payload = {
+        inwestycja_id: aktywnaInwestycjaId,
+        nazwa,
+        opis,
+        ilosc,
+        cena_netto,
+        vat,
+        netto,
+        brutto,
+        user_id: zalogowanyUser?.id
+    };
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje_prace_dodatkowe`, {
+            method: "POST",
+            headers: headers(),
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+
+        document.getElementById("praca-nazwa").value = "";
+        document.getElementById("praca-opis").value = "";
+        document.getElementById("praca-ilosc").value = 1;
+        document.getElementById("praca-cena-netto").value = "";
+        document.getElementById("praca-vat").value = 23;
+
+        await pobierzInwestycjePraceDodatkowe();
+        renderujInwestycje();
+        renderujPanelInwestycji();
+        zapiszLog("Inwestycje", "Dodano pracę dodatkową", nazwa);
+    } catch (err) {
+        console.error(err);
+        alert("Nie udało się zapisać pracy dodatkowej.");
+    }
+}
+
+window.usunPraceDodatkowa = async function(id) {
+    if (rolaUsera !== "admin") {
+        alert("Tylko administrator może usuwać prace dodatkowe.");
+        return;
+    }
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje_prace_dodatkowe?id=eq.${id}`, {
+            method: "DELETE",
+            headers: headers()
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+
+        await pobierzInwestycjePraceDodatkowe();
+        await pobierzInwestycje();
+        renderujInwestycje();
+        renderujPanelInwestycji();
+        zapiszLog("Inwestycje", "Usunięto pracę dodatkową", id);
+    } catch (err) {
+        console.error(err);
+        alert("Nie udało się usunąć pracy dodatkowej.");
+    }
+};
+
+function renderujSelectPracDodatkowych() {
+    const select = document.getElementById("praca-usluga");
+    if (!select) return;
+
+    if (!uslugi.length) {
+        select.innerHTML = `<option value="">— Brak usług w bazie —</option>`;
+        return;
+    }
+
+    select.innerHTML = `<option value="">— Brak wyboru (wpisz ręcznie) —</option>
+${uslugi.map(u => `<option value="${esc(u.id)}">\r${esc(u.nazwa)} (${cenaUslugi(u).toFixed(2)} PLN)</option>`).join("\n")}`;
+}
+
+function ustawPraceDodatkoweZUslugi() {
+    const select = document.getElementById("praca-usluga");
+    if (!select) return;
+
+    const uslugaId = select.value;
+    if (!uslugaId) {
+        // Reset to empty
+        document.getElementById("praca-nazwa").value = "";
+        document.getElementById("praca-cena-netto").value = "";
+        return;
+    }
+
+    const usluga = uslugi.find(u => String(u.id) === String(uslugaId));
+    if (!usluga) return;
+
+    document.getElementById("praca-nazwa").value = usluga.nazwa || "";
+    document.getElementById("praca-cena-netto").value = cenaUslugi(usluga).toFixed(2);
+    // Keep ILość at 1 (default), opis empty unless user fills, VAT at 23%
+}
