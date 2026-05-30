@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.05.29-25";
+const APP_VERSION = "2026.05.29-27";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;

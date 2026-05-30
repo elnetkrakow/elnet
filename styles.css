@@ -324,9 +324,95 @@ hr {
 
 .layout-two {
     display: grid;
-    grid-template-columns: 390px 1fr;
-    gap: 24px;
+    grid-template-columns: repeat(3, minmax(230px, 1fr));
+    gap: 22px;
     align-items: start;
+}
+
+/* ========================= */
+/* TABELE — OSTATNIE DANE */
+/* ========================= */
+
+.table-wrapper {
+    max-height: 380px;
+    overflow-y: auto;
+    border-radius: 10px;
+    border: 1px solid var(--border-soft);
+}
+
+.table-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.table-wrapper thead {
+    position: sticky;
+    top: 0;
+    background: rgba(30, 41, 59, 0.98);
+    border-bottom: 2px solid var(--border);
+}
+
+.table-wrapper th {
+    padding: 13px 15px;
+    text-align: left;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+
+.table-wrapper tbody tr {
+    border-bottom: 1px solid var(--border-soft);
+    transition: background-color 0.2s;
+}
+
+.table-wrapper tbody tr:hover {
+    background: rgba(118, 200, 147, 0.06);
+}
+
+.table-wrapper td {
+    padding: 12px 15px;
+    color: var(--text-soft);
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.table-wrapper td:first-child {
+    color: var(--text-main);
+    font-weight: 500;
+}
+
+/* Wyrównaj kwoty do prawej */
+.table-wrapper th:last-child,
+.table-wrapper td:last-child {
+    text-align: right;
+    padding-right: 20px;
+}
+
+/* Ellipsis dla długich tekstów */
+.table-wrapper td {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.table-wrapper::-webkit-scrollbar {
+    width: 8px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+    background: var(--border-soft);
+    border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
 }
 
 /* ========================= */
