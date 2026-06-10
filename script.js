@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-23";
+const APP_VERSION = "2026.06.10-24";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -29,6 +29,7 @@ let wycenaPozycje = [];
 let szybkaWycenaPropozycje = [];
 let edytowanaUslugaId = null;
 let edytowanaPozycjaId = null;
+let edytowanaPozycjaIdPanel = null;
 let edytowanaInwestycjaId = null;
 let trybEdycjiKosztorysu = false;
 let edytowanyKosztorysId = null;
@@ -247,6 +248,12 @@ function podepnijZdarzenia() {
 
     const btnAnulujEdycjeWyceny = document.getElementById("btn-anuluj-edycje-wyceny");
     if (btnAnulujEdycjeWyceny) btnAnulujEdycjeWyceny.addEventListener("click", anulujEdycjePozycji);
+
+    const btnZapiszEdycje = document.getElementById("btn-zapisz-edycje");
+    if (btnZapiszEdycje) btnZapiszEdycje.addEventListener("click", zapiszPanelEdycjiPozycji);
+
+    const btnAnulujEdycjePanel = document.getElementById("btn-anuluj-edycje");
+    if (btnAnulujEdycjePanel) btnAnulujEdycjePanel.addEventListener("click", anulujPanelEdycjiPozycji);
 
     const btnZapiszUsluge = document.getElementById("btn-zapisz-usluge");
     if (btnZapiszUsluge) btnZapiszUsluge.addEventListener("click", zapiszUsluge);
@@ -2471,34 +2478,17 @@ function dodajPozycjeDoWyceny() {
         return;
     }
 
-    if (edytowanaPozycjaId) {
-        wycenaPozycje = wycenaPozycje.map(p => {
-            if (String(p.id) !== String(edytowanaPozycjaId)) return p;
-            return {
-                ...p,
-                nazwa,
-                jednostka,
-                ilosc,
-                cenaNetto: cena,
-                vatProcent
-            };
-        });
+    wycenaPozycje.push({
+        id: Date.now().toString(),
+        nazwa,
+        jednostka,
+        ilosc,
+        cenaNetto: cena,
+        vatProcent
+    });
 
-        // zakończ tryb edycji
-        anulujEdycjePozycji();
-    } else {
-        wycenaPozycje.push({
-            id: Date.now().toString(),
-            nazwa,
-            jednostka,
-            ilosc,
-            cenaNetto: cena,
-            vatProcent
-        });
-
-        // clear only ilość by default as before
-        document.getElementById("wycena-ilosc").value = "";
-    }
+    // clear only ilość by default as before
+    document.getElementById("wycena-ilosc").value = "";
 
     renderujWycene();
 }
@@ -2519,7 +2509,7 @@ function renderujWycene() {
         const vat = netto * (vatProcent / 100);
         const brutto = netto + vat;
         const akcja = rolaUsera !== "guest"
-            ? `<div class="wycena-actions"><button class="btn btn-secondary tiny-btn" onclick="edytujPozycjeWyceny('${p.id}')">Edytuj</button><button class="btn btn-danger tiny-btn" onclick="usunPozycjeWyceny('${p.id}')">Usuń</button></div>`
+            ? `<div class="wycena-actions"><button class="btn btn-secondary tiny-btn" onclick="pokazPanelEdycjiPozycji('${p.id}')">Edytuj</button><button class="btn btn-danger tiny-btn" onclick="usunPozycjeWyceny('${p.id}')">Usuń</button></div>`
             : "";
 
         return `
@@ -2539,6 +2529,93 @@ function renderujWycene() {
     przeliczWycene();
 }
 
+function pokazPanelEdycjiPozycji(id) {
+    if (rolaUsera === "guest") {
+        alert("Tylko zalogowany użytkownik może edytować pozycje.");
+        return;
+    }
+
+    const pozycja = wycenaPozycje.find(x => String(x.id) === String(id));
+    if (!pozycja) return;
+
+    edytowanaPozycjaIdPanel = String(id);
+    document.getElementById("edycja-nazwa").value = pozycja.nazwa || "";
+    document.getElementById("edycja-jednostka").value = pozycja.jednostka || "szt.";
+    document.getElementById("edycja-ilosc").value = pozycja.ilosc ?? "";
+    document.getElementById("edycja-cena").value = pozycja.cenaNetto ?? "";
+    document.getElementById("edycja-vat").value = pozycja.vatProcent ?? 23;
+    document.getElementById("edycja-uwagi").value = pozycja.uwaga || "";
+
+    const panel = document.getElementById("panel-edycji-pozycji");
+    if (panel) panel.classList.add("visible");
+}
+
+function zapiszPanelEdycjiPozycji() {
+    if (!edytowanaPozycjaIdPanel) return;
+
+    const nazwa = document.getElementById("edycja-nazwa").value.trim();
+    const jednostka = document.getElementById("edycja-jednostka").value;
+    const ilosc = Number(document.getElementById("edycja-ilosc").value);
+    const cena = Number(document.getElementById("edycja-cena").value);
+    const vatProcent = Number(document.getElementById("edycja-vat").value);
+    const uwagi = document.getElementById("edycja-uwagi").value.trim();
+
+    if (!nazwa) {
+        alert("Wpisz nazwę usługi.");
+        return;
+    }
+
+    if (isNaN(ilosc) || ilosc <= 0) {
+        alert("Wpisz poprawną ilość.");
+        return;
+    }
+
+    if (isNaN(cena) || cena < 0) {
+        alert("Wpisz poprawną cenę.");
+        return;
+    }
+
+    wycenaPozycje = wycenaPozycje.map(p => {
+        if (String(p.id) !== String(edytowanaPozycjaIdPanel)) return p;
+        return {
+            ...p,
+            nazwa,
+            jednostka,
+            ilosc,
+            cenaNetto: cena,
+            vatProcent,
+            uwaga: uwagi
+        };
+    });
+
+    renderujWycene();
+    przeliczWycene();
+    anulujPanelEdycjiPozycji();
+}
+
+function anulujPanelEdycjiPozycji() {
+    edytowanaPozycjaIdPanel = null;
+
+    [
+        "edycja-nazwa",
+        "edycja-ilosc",
+        "edycja-cena",
+        "edycja-uwagi"
+    ].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
+
+    const jednostka = document.getElementById("edycja-jednostka");
+    if (jednostka) jednostka.value = "szt.";
+
+    const selVat = document.getElementById("edycja-vat");
+    if (selVat) selVat.value = "23";
+
+    const panel = document.getElementById("panel-edycji-pozycji");
+    if (panel) panel.classList.remove("visible");
+}
+
 window.usunPozycjeWyceny = function(id) {
     if (rolaUsera === "guest") {
         alert("Gość nie może modyfikować wyceny.");
@@ -2550,34 +2627,8 @@ window.usunPozycjeWyceny = function(id) {
 };
 
 window.edytujPozycjeWyceny = function(id) {
-    if (rolaUsera === "guest") {
-        alert("Tylko zalogowany użytkownik może edytować pozycje.");
-        return;
-    }
-
-    const p = wycenaPozycje.find(x => String(x.id) === String(id));
-    if (!p) return;
-
-    edytowanaPozycjaId = String(id);
-    // wczytaj dane do istniejącego formularza 'Dodaj pozycję'
-    const search = document.getElementById("wycena-usluga-search");
-    const select = document.getElementById("wycena-usluga");
-    if (search) search.value = p.nazwa || "";
-    if (select) select.value = ""; // clear selected service to avoid accidental overwrite
-
-    document.getElementById("wycena-jednostka").value = p.jednostka || "szt.";
-    document.getElementById("wycena-ilosc").value = p.ilosc ?? "";
-    document.getElementById("wycena-cena").value = p.cenaNetto ?? "";
-    document.getElementById("wycena-vat").value = p.vatProcent ?? 23;
-
-    // zmień tekst przycisku na 'Zapisz zmiany' i pokaż przycisk Anuluj
-    const btn = document.getElementById("btn-dodaj-pozycje");
-    if (btn) btn.textContent = "Zapisz zmiany";
-    const btnAnuluj = document.getElementById("btn-anuluj-edycje-wyceny");
-    if (btnAnuluj) btnAnuluj.classList.remove("hidden");
+    pokazPanelEdycjiPozycji(id);
 };
-
-// zapiszEdycjePozycji removed — editing now uses existing 'Dodaj pozycję' form and dodajPozycjeDoWyceny()
 
 function anulujEdycjePozycji() {
     edytowanaPozycjaId = null;

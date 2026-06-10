@@ -222,7 +222,58 @@
                         </div>
 
                         <button id="btn-dodaj-pozycje" class="btn btn-main">Dodaj do wyceny</button>
-                        <button id="btn-anuluj-edycje-wyceny" class="btn btn-secondary small-btn hidden">Anuluj edycję</button>
+
+                    <!-- PANEL EDYCJI POZYCJI -->
+                    <div class="card" id="panel-edycji-pozycji">
+                        <h2>Edycja pozycji</h2>
+
+                        <div class="form-group">
+                            <label for="edycja-nazwa">Nazwa usługi</label>
+                            <input type="text" id="edycja-nazwa" placeholder="np. Montaż rozdzielnicy">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="edycja-jednostka">Jednostka</label>
+                                <select id="edycja-jednostka">
+                                    <option value="szt.">szt.</option>
+                                    <option value="m">m</option>
+                                    <option value="m²">m²</option>
+                                    <option value="roboczogodzina">roboczogodzina</option>
+                                    <option value="usługa">usługa</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="edycja-ilosc">Ilość</label>
+                                <input type="number" id="edycja-ilosc" min="0" step="0.01" placeholder="np. 10">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="edycja-cena">Cena netto PLN</label>
+                            <input type="number" id="edycja-cena" min="0" step="0.01" placeholder="0.00">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="edycja-vat">Stawka VAT</label>
+                            <select id="edycja-vat">
+                                <option value="23" selected>23 — VAT 23%</option>
+                                <option value="8">8 — VAT 8%</option>
+                                <option value="0">0 — VAT 0%</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="edycja-uwagi">Uwagi</label>
+                            <input type="text" id="edycja-uwagi" placeholder="opcjonalne">
+                        </div>
+
+                        <div class="btn-row">
+                            <button id="btn-zapisz-edycje" class="btn btn-main">Zapisz</button>
+                            <button id="btn-anuluj-edycje" class="btn btn-secondary">Anuluj</button>
+                        </div>
+                    </div>
                         </div>
 
                     <div class="card">

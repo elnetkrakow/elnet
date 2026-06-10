@@ -893,6 +893,19 @@ button:disabled {
 }
 
 /* ========================= */
+/* PANEL EDYCJI POZYCJI */
+/* ========================= */
+
+#panel-edycji-pozycji {
+    display: none;
+    margin-top: 18px;
+}
+
+#panel-edycji-pozycji.visible {
+    display: block;
+}
+
+/* ========================= */
 /* TOOLBARY */
 /* ========================= */
 
