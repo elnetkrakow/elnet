@@ -145,6 +145,35 @@
                     <p>Dodaj wykonane prace, ustaw ilość, cenę, rabat lub marżę.</p>
                 </div>
 
+
+                <div class="card quick-estimate-card">
+                    <div class="card-header quick-estimate-header">
+                        <div>
+                            <h2>Szybka wycena</h2>
+                            <p class="quick-estimate-subtitle">Opisz zlecenie, a program przygotuje szacunkowe pozycje do tabeli Wycena.</p>
+                        </div>
+                        <span class="quick-estimate-pill">Inteligentna wycena</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="szybka-wycena-opis">Opisz zlecenie</label>
+                        <textarea id="szybka-wycena-opis" rows="4" placeholder="Np. mieszkanie 60 m², instalacja od zera, 55 punktów, rozdzielnica, internet w 4 pokojach, domofon, pomiary."></textarea>
+                    </div>
+
+                    <div class="quick-estimate-actions">
+                        <button id="btn-szybka-wycena-mow" class="btn btn-secondary" type="button">🎙 Mów</button>
+                        <button id="btn-szybka-wycena-generuj" class="btn btn-main" type="button">Generuj</button>
+                        <button id="btn-szybka-wycena-dodaj" class="btn btn-secondary" type="button">Dodaj do wyceny</button>
+                        <button id="btn-szybka-wycena-wyczysc" class="btn btn-danger" type="button">Wyczyść</button>
+                    </div>
+
+                    <div id="szybka-wycena-info" class="quick-estimate-info">
+                        To jest wycena szacunkowa. Sprawdź ilości i ceny przed zapisaniem kosztorysu.
+                    </div>
+
+                    <div id="szybka-wycena-wynik" class="quick-estimate-result hidden"></div>
+                </div>
+
                 <div class="layout-two">
                     <div class="card" id="card-wycena-form">
                         <h2>Dodaj pozycję</h2>

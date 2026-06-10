@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.05.29-47";
+const APP_VERSION = "2026.06.10-06";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -26,6 +26,7 @@ let calendarDate = new Date();
 let edytowanyTerminId = null;
 
 let wycenaPozycje = [];
+let szybkaWycenaPropozycje = [];
 let edytowanaUslugaId = null;
 let edytowanaInwestycjaId = null;
 let trybEdycjiKosztorysu = false;
@@ -206,6 +207,18 @@ function podepnijZdarzenia() {
 
     const btnDodajPozycje = document.getElementById("btn-dodaj-pozycje");
     if (btnDodajPozycje) btnDodajPozycje.addEventListener("click", dodajPozycjeDoWyceny);
+
+    const btnSzybkaWycenaGeneruj = document.getElementById("btn-szybka-wycena-generuj");
+    if (btnSzybkaWycenaGeneruj) btnSzybkaWycenaGeneruj.addEventListener("click", generujSzybkaWycene);
+
+    const btnSzybkaWycenaDodaj = document.getElementById("btn-szybka-wycena-dodaj");
+    if (btnSzybkaWycenaDodaj) btnSzybkaWycenaDodaj.addEventListener("click", dodajSzybkaWyceneDoTabeli);
+
+    const btnSzybkaWycenaWyczysc = document.getElementById("btn-szybka-wycena-wyczysc");
+    if (btnSzybkaWycenaWyczysc) btnSzybkaWycenaWyczysc.addEventListener("click", wyczyscSzybkaWycene);
+
+    const btnSzybkaWycenaMow = document.getElementById("btn-szybka-wycena-mow");
+    if (btnSzybkaWycenaMow) btnSzybkaWycenaMow.addEventListener("click", uruchomSzybkaWyceneGlos);
 
     const btnWyczyscWycene = document.getElementById("btn-wyczysc-wycene");
     if (btnWyczyscWycene) btnWyczyscWycene.addEventListener("click", wyczyscWycene);
@@ -1871,6 +1884,519 @@ function wybierzUslugeZWyszukiwarki(id) {
     ustawCeneWybranejUslugi();
 }
 
+
+// ==========================================
+// SZYBKA / INTELIGENTNA WYCENA
+// ==========================================
+
+function normalizeText(value) {
+    return String(value || "")
+        .toLowerCase()
+        .replace(/[ąćęłńóśźż]/g, ch => ({
+            "ą": "a", "ć": "c", "ę": "e", "ł": "l", "ń": "n",
+            "ó": "o", "ś": "s", "ź": "z", "ż": "z"
+        }[ch] || ch));
+}
+
+function znajdzUslugeDoSzybkiejWyceny(slowka, unikaj = []) {
+    const wymagane = Array.isArray(slowka) ? slowka : [slowka];
+    const zakazane = Array.isArray(unikaj) ? unikaj : [unikaj];
+    const lista = uslugi || [];
+
+    let najlepsza = null;
+    let najlepszyWynik = 0;
+
+    lista.forEach(u => {
+        const nazwa = normalizeText(`${u.nazwa || ""} ${u.kategoria || ""}`);
+        let wynik = 0;
+
+        zakazane.forEach(s => {
+            const n = normalizeText(s);
+            if (n && nazwa.includes(n)) wynik -= 8;
+        });
+
+        wymagane.forEach(s => {
+            const n = normalizeText(s);
+            if (n && nazwa.includes(n)) wynik += 3;
+        });
+
+        if (wymagane.length > 1 && wymagane.some(s => nazwa.includes(normalizeText(s)))) wynik += 1;
+
+        if (wynik > najlepszyWynik) {
+            najlepszyWynik = wynik;
+            najlepsza = u;
+        }
+    });
+
+    return najlepszyWynik > 0 ? najlepsza : null;
+}
+
+function pobierzLiczbeZOpisu(opis, wzorce) {
+    for (const wzorzec of wzorce) {
+        const m = opis.match(wzorzec);
+        if (m && m[1]) return Number(String(m[1]).replace(",", "."));
+    }
+    return null;
+}
+
+function dodajPropozycje(lista, config) {
+    const usluga = znajdzUslugeDoSzybkiejWyceny(config.szukaj || config.nazwa, config.unikaj || []);
+    const nazwa = usluga?.nazwa || config.nazwa;
+    const jednostka = usluga ? jednostkaUslugi(usluga) : (config.jednostka || "szt.");
+    const cenaNetto = usluga ? cenaUslugi(usluga) : Number(config.cena || 0);
+
+    if (!nazwa || !config.ilosc || config.ilosc <= 0) return;
+
+    lista.push({
+        id: `szybka-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        nazwa,
+        jednostka,
+        ilosc: Number(config.ilosc),
+        cenaNetto: Number(cenaNetto || 0),
+        vatProcent: Number(config.vatProcent || document.getElementById("wycena-vat")?.value || 23),
+        uwaga: usluga ? (config.uwaga || "Dopasowano z cennika") : (config.uwaga || "Cena szacunkowa — sprawdź w cenniku")
+    });
+}
+
+function generujSzybkaWycene() {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może generować wyceny.");
+        return;
+    }
+
+    const pole = document.getElementById("szybka-wycena-opis");
+    const opisOryginalny = pole?.value?.trim() || "";
+    const opis = normalizeText(opisOryginalny);
+
+    if (!opis) {
+        alert("Opisz zlecenie, np. mieszkanie 60 m², instalacja od zera, 55 punktów, rozdzielnica.");
+        return;
+    }
+
+    const metraz = pobierzLiczbeZOpisu(opis, [
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów|metry|metra|m powierzchni)\b/,
+        /mieszkanie\s*(\d+(?:[.,]\d+)?)/,
+        /dom\s*(\d+(?:[.,]\d+)?)/
+    ]);
+
+    const pokoje = pobierzLiczbeZOpisu(opis, [
+        /(\d+)\s*(?:pokoi|pokoje|pokojach|pokój|pokoj)\b/
+    ]);
+
+    const punktyPodane = pobierzLiczbeZOpisu(opis, [
+        /(\d+)\s*(?:punktow|punktów|punkty|pkt|punkt)\b/
+    ]);
+
+    const gniazdaPodane = pobierzLiczbeZOpisu(opis, [
+        /(\d+)\s*(?:gniazd|gniazdek|gniazda|gniazdo)\b/,
+        /(?:gniazd|gniazdek|gniazda|gniazdo)[^\d]{0,20}(\d+)/
+    ]);
+
+    const lacznikiPodane = pobierzLiczbeZOpisu(opis, [
+        /(\d+)\s*(?:lacznikow|łączników|wlacznikow|włączników|laczniki|łączniki|wlaczniki|włączniki)\b/,
+        /(\d+)\s*(?:rocznikow|roczników|roczniki)\b/,
+        /(?:lacznikow|łączników|wlacznikow|włączników|rocznikow|roczników)[^\d]{0,20}(\d+)/
+    ]);
+
+    const lanPodane = pobierzLiczbeZOpisu(opis, [
+        /(?:internet|lan|sieci|siec|rj45)[^\d]{0,20}(\d+)/,
+        /(\d+)\s*(?:punktow|punktów|punkty|pkt)\s*(?:lan|internet|sieci|siec|rj45)/
+    ]);
+
+    const kameraPodane = pobierzLiczbeZOpisu(opis, [
+        /(\d+)\s*(?:kamer|kamery|kamera)\b/
+    ]);
+
+    const malowanieM2 = pobierzLiczbeZOpisu(opis, [
+        /(?:malowania|malowanie|pomalowac|pomalować)[^\d]{0,40}(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów)?/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²)\s*(?:malowania|malowanie)/
+    ]);
+
+    const sciankaM2 = pobierzLiczbeZOpisu(opis, [
+        /(?:scianka|ścianka|gk|karton gips|karton-gips|regips)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów)?/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²)\s*(?:scianka|ścianka|gk|karton gips|karton-gips|regips)/
+    ]);
+
+    const wykladzinaM2 = pobierzLiczbeZOpisu(opis, [
+        /(?:wykladzina|wykładzina|podloge|podłoge|podłogę|podloga|podłoga)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów)?/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²)\s*(?:wykladzina|wykładzina|podloga|podłoga)/
+    ]);
+
+    const odZera = /od zera|nowa instalacja|kompletna instalacja|stan deweloperski|generalny/.test(opis);
+    const remont = /remont|modernizacja|wymiana|przerobka|przeróbka/.test(opis);
+    const zakresElektryczny = /elektry|gniazd|gniazdek|gniazdo|lacznik|łącznik|wlacznik|włącznik|rocznik|punkt|rozdzielnica|bezpiecznik|kabel|przewod|przewód|oswietlen|oświetlen/.test(opis);
+
+    let punktyElektryczne = null;
+
+    if (punktyPodane) {
+        punktyElektryczne = punktyPodane;
+    } else if (!gniazdaPodane && !lacznikiPodane && zakresElektryczny && metraz && (odZera || /instalacja|elektryka|elektryczna/.test(opis))) {
+        const mnoznik = odZera ? 1.15 : remont ? 0.65 : 0.85;
+        punktyElektryczne = Math.max(10, Math.round(metraz * mnoznik));
+    }
+
+    const propozycje = [];
+
+    if (punktyElektryczne) {
+        dodajPropozycje(propozycje, {
+            nazwa: "Montaż punktu elektrycznego",
+            szukaj: ["punkt elektryczny", "montaż punktu", "montaz punktu", "punkt"],
+            unikaj: ["przemysł", "przemyslow", "siłowe", "silowe"],
+            jednostka: "pkt",
+            ilosc: punktyElektryczne,
+            cena: 120,
+            uwaga: punktyPodane ? "Ilość punktów z opisu" : "Ilość punktów elektrycznych oszacowana z metrażu"
+        });
+    }
+
+    if (gniazdaPodane) {
+        dodajPropozycje(propozycje, {
+            nazwa: "Wymiana gniazda elektrycznego",
+            szukaj: ["wymiana gniazda", "gniazdo elektryczne", "montaż gniazda", "montaz gniazda", "gniazdo"],
+            unikaj: ["przemysł", "przemyslow", "siłowe", "silowe", "230v przemyslowe", "400v"],
+            jednostka: "szt.",
+            ilosc: gniazdaPodane,
+            cena: 90,
+            uwaga: "Ilość gniazd z opisu"
+        });
+    }
+
+    if (lacznikiPodane) {
+        dodajPropozycje(propozycje, {
+            nazwa: "Wymiana łącznika / włącznika światła",
+            szukaj: ["łącznik", "lacznik", "włącznik", "wlacznik", "osprzęt", "osprzet"],
+            unikaj: ["przemysł", "przemyslow", "siłowe", "silowe"],
+            jednostka: "szt.",
+            ilosc: lacznikiPodane,
+            cena: 80,
+            uwaga: opis.includes("rocznik") ? "Rozpoznano z dyktowania jako „roczniki” — potraktowano jako łączniki" : "Ilość łączników z opisu"
+        });
+    }
+
+    if (/rozdzielnica|bezpieczniki|skrzynka/.test(opis) || (odZera && zakresElektryczny)) {
+        dodajPropozycje(propozycje, {
+            nazwa: "Montaż / podłączenie rozdzielnicy",
+            szukaj: ["rozdzielnica", "bezpiecznik", "skrzynka"],
+            jednostka: "szt.",
+            ilosc: 1,
+            cena: 900,
+            uwaga: "Wykryto rozdzielnicę albo instalację od zera"
+        });
+    }
+
+    if (/internet|lan|rj45|sieci|sieć/.test(opis)) {
+        dodajPropozycje(propozycje, {
+            nazwa: "Punkt internetowy LAN / RJ45",
+            szukaj: ["lan", "internet", "rj45", "sieć", "siec"],
+            jednostka: "pkt",
+            ilosc: lanPodane || pokoje || 4,
+            cena: 130,
+            uwaga: lanPodane ? "Ilość LAN z opisu" : "Ilość LAN oszacowana z liczby pokoi"
+        });
+    }
+
+    if (/domofon|wideodomofon|video domofon|videodomofon/.test(opis)) {
+        dodajPropozycje(propozycje, {
+            nazwa: "Montaż domofonu / wideodomofonu",
+            szukaj: ["domofon", "wideodomofon", "videodomofon"],
+            jednostka: "szt.",
+            ilosc: 1,
+            cena: 450,
+            uwaga: "Wykryto domofon"
+        });
+    }
+
+    if (/monitoring|kamera|kamery|cctv/.test(opis)) {
+        dodajPropozycje(propozycje, {
+            nazwa: "Montaż kamery / punkt monitoringu",
+            szukaj: ["monitoring", "kamera", "cctv"],
+            jednostka: "szt.",
+            ilosc: kameraPodane || 4,
+            cena: 250,
+            uwaga: kameraPodane ? "Ilość kamer z opisu" : "Ilość kamer oszacowana"
+        });
+    }
+
+    if (/alarm|czujki|czujnik ruchu|satel/.test(opis)) {
+        dodajPropozycje(propozycje, {
+            nazwa: "Instalacja alarmowa / punkt alarmowy",
+            szukaj: ["alarm", "czujka", "satel"],
+            jednostka: "pkt",
+            ilosc: pokoje ? Math.max(4, pokoje + 2) : 6,
+            cena: 140,
+            uwaga: "Wykryto alarm"
+        });
+    }
+
+    if (/bialy montaz|biały montaż|osprzet|osprzęt/.test(opis)) {
+        dodajPropozycje(propozycje, {
+            nazwa: "Biały montaż osprzętu",
+            szukaj: ["biały montaż", "bialy montaz", "osprzęt", "osprzet"],
+            jednostka: "szt.",
+            ilosc: punktyElektryczne || gniazdaPodane || lacznikiPodane || 30,
+            cena: 35,
+            uwaga: "Wykryto biały montaż"
+        });
+    }
+
+    if (/bruzd|kucie|peszel|peszle|przewody|okablowanie/.test(opis) || (odZera && zakresElektryczny)) {
+        dodajPropozycje(propozycje, {
+            nazwa: "Układanie przewodów / bruzdowanie",
+            szukaj: ["bruzdowanie", "przewod", "przewód", "okablowanie", "peszel"],
+            jednostka: "m",
+            ilosc: metraz ? Math.round(metraz * 2.2) : 120,
+            cena: 18,
+            uwaga: "Szacunek długości z metrażu"
+        });
+    }
+
+    if (/pomiary|pomiar|protokol|protokół|odbior/.test(opis) || (odZera && zakresElektryczny)) {
+        dodajPropozycje(propozycje, {
+            nazwa: "Pomiary elektryczne / uruchomienie",
+            szukaj: ["pomiary", "pomiar", "protokół", "protokol", "uruchomienie"],
+            jednostka: "usługa",
+            ilosc: 1,
+            cena: 500,
+            uwaga: "Wykryto pomiary albo pełną instalację"
+        });
+    }
+
+    if (/malowania|malowanie|pomalowac|pomalować|farba|bialy|biały|kolor|sciany|ściany|sufit/.test(opis)) {
+        let iloscMalowania = malowanieM2 || (metraz ? Math.round(metraz * 2.6) : 100);
+        dodajPropozycje(propozycje, {
+            nazwa: "Malowanie ścian i sufitu",
+            szukaj: ["malowanie", "malowania", "farba"],
+            jednostka: "m²",
+            ilosc: iloscMalowania,
+            cena: 28,
+            uwaga: malowanieM2 ? "Metraż malowania z opisu" : "Szacunek powierzchni malowania z metrażu mieszkania"
+        });
+    }
+
+    if (/scianka|ścianka|gk|karton gips|karton-gips|regips|dzialowa|działowa/.test(opis)) {
+        dodajPropozycje(propozycje, {
+            nazwa: "Ścianka działowa GK",
+            szukaj: ["ścianka", "scianka", "gk", "karton gips", "karton-gips", "regips"],
+            jednostka: "m²",
+            ilosc: sciankaM2 || 10,
+            cena: 180,
+            uwaga: sciankaM2 ? "Metraż ścianki z opisu" : "Metraż ścianki oszacowany"
+        });
+    }
+
+    if (/wykladzina|wykładzina|podloge|podłoge|podłogę|podloga|podłoga/.test(opis)) {
+        dodajPropozycje(propozycje, {
+            nazwa: "Ułożenie wykładziny",
+            szukaj: ["wykładzina", "wykladzina", "podłoga", "podloga"],
+            jednostka: "m²",
+            ilosc: wykladzinaM2 || metraz || 50,
+            cena: 45,
+            uwaga: wykladzinaM2 ? "Metraż wykładziny z opisu" : "Przyjęto metraż mieszkania jako powierzchnię podłogi"
+        });
+    }
+
+    if (!propozycje.length) {
+        if (metraz) {
+            dodajPropozycje(propozycje, {
+                nazwa: "Robocizna — wycena szacunkowa",
+                szukaj: ["robocizna", "instalacja", "prace"],
+                jednostka: "m²",
+                ilosc: metraz,
+                cena: 110,
+                uwaga: "Nie wykryto szczegółów — szacunek z metrażu"
+            });
+        } else {
+            alert("Nie udało się rozpoznać zakresu. Dopisz metraż albo słowa: gniazda, łączniki, malowanie, wykładzina, ścianka.");
+            return;
+        }
+    }
+
+    szybkaWycenaPropozycje = propozycje;
+    renderujSzybkaWyceneWynik({
+        metraz,
+        punkty: punktyElektryczne,
+        pokoje,
+        odZera,
+        remont,
+        gniazda: gniazdaPodane,
+        laczniki: lacznikiPodane
+    });
+}
+
+function renderujSzybkaWyceneWynik(meta = {}) {
+    const box = document.getElementById("szybka-wycena-wynik");
+    if (!box) return;
+
+    if (!szybkaWycenaPropozycje.length) {
+        box.classList.add("hidden");
+        box.innerHTML = "";
+        return;
+    }
+
+    const netto = szybkaWycenaPropozycje.reduce((sum, p) => sum + (Number(p.ilosc) * Number(p.cenaNetto)), 0);
+    const vat = szybkaWycenaPropozycje.reduce((sum, p) => sum + (Number(p.ilosc) * Number(p.cenaNetto) * (Number(p.vatProcent || 23) / 100)), 0);
+    const brutto = netto + vat;
+
+    const metaInfo = [
+        meta.metraz ? `Metraż: ${meta.metraz} m²` : "",
+        meta.gniazda ? `Gniazda: ${meta.gniazda}` : "",
+        meta.laczniki ? `Łączniki: ${meta.laczniki}` : "",
+        meta.punkty && !meta.gniazda && !meta.laczniki ? `Punkty elektryczne: ${meta.punkty}` : "",
+        meta.pokoje ? `Pokoje: ${meta.pokoje}` : "",
+        meta.odZera ? "Zakres: od zera" : "",
+        meta.remont ? "Zakres: remont / modernizacja" : ""
+    ].filter(Boolean).join(" • ");
+
+    box.classList.remove("hidden");
+    box.innerHTML = `
+        <div class="quick-estimate-summary">
+            <strong>Propozycja kosztorysu</strong>
+            <span>${esc(metaInfo || "Wycena szacunkowa")}</span>
+        </div>
+
+        <div class="quick-estimate-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pozycja</th>
+                        <th>Ilość</th>
+                        <th>Cena</th>
+                        <th>Netto</th>
+                        <th>Uwagi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${szybkaWycenaPropozycje.map(p => `
+                        <tr>
+                            <td>${esc(p.nazwa)}</td>
+                            <td>${Number(p.ilosc).toFixed(Number.isInteger(Number(p.ilosc)) ? 0 : 2)} ${esc(p.jednostka)}</td>
+                            <td>${Number(p.cenaNetto).toFixed(2)} PLN</td>
+                            <td>${(Number(p.ilosc) * Number(p.cenaNetto)).toFixed(2)} PLN</td>
+                            <td>${esc(p.uwaga || "")}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="quick-estimate-total">
+            <span>Netto: <strong>${netto.toFixed(2)} PLN</strong></span>
+            <span>VAT: <strong>${vat.toFixed(2)} PLN</strong></span>
+            <span>Brutto: <strong>${brutto.toFixed(2)} PLN</strong></span>
+        </div>
+    `;
+}
+
+function dodajSzybkaWyceneDoTabeli() {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może modyfikować wyceny.");
+        return;
+    }
+
+    if (!szybkaWycenaPropozycje.length) {
+        alert("Najpierw kliknij Generuj.");
+        return;
+    }
+
+    const prefix = Date.now().toString();
+
+    szybkaWycenaPropozycje.forEach((p, index) => {
+        wycenaPozycje.push({
+            id: `${prefix}-${index}`,
+            nazwa: p.nazwa,
+            jednostka: p.jednostka,
+            ilosc: Number(p.ilosc),
+            cenaNetto: Number(p.cenaNetto),
+            vatProcent: Number(p.vatProcent || 23)
+        });
+    });
+
+    renderujWycene();
+    zapiszLog("Wycena", "Szybka wycena", `Dodano ${szybkaWycenaPropozycje.length} pozycji z szybkiej wyceny`);
+}
+
+function wyczyscSzybkaWycene() {
+    szybkaWycenaPropozycje = [];
+    const opis = document.getElementById("szybka-wycena-opis");
+    if (opis) opis.value = "";
+    renderujSzybkaWyceneWynik();
+}
+
+function uruchomSzybkaWyceneGlos() {
+    const btn = document.getElementById("btn-szybka-wycena-mow");
+    const opis = document.getElementById("szybka-wycena-opis");
+
+    if (window.AndroidSpeech && typeof window.AndroidSpeech.startListening === "function") {
+        if (btn) btn.textContent = "🎙 Start...";
+        window.AndroidSpeech.startListening();
+        return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        alert("Ten telefon albo WebView nie obsługuje rozpoznawania mowy. Wpisz opis ręcznie.");
+        return;
+    }
+
+    try {
+        const recognition = new SpeechRecognition();
+        recognition.lang = "pl-PL";
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        if (btn) btn.textContent = "🎙 Słucham...";
+
+        recognition.onresult = (event) => {
+            const tekst = event.results?.[0]?.[0]?.transcript || "";
+            if (opis) {
+                opis.value = opis.value ? `${opis.value} ${tekst}` : tekst;
+                opis.focus();
+            }
+        };
+
+        recognition.onerror = () => {
+            alert("Nie udało się rozpoznać głosu. Spróbuj ponownie albo wpisz opis ręcznie.");
+        };
+
+        recognition.onend = () => {
+            if (btn) btn.textContent = "🎙 Mów";
+        };
+
+        recognition.start();
+    } catch (err) {
+        console.error(err);
+        if (btn) btn.textContent = "🎙 Mów";
+        alert("Mikrofon nie uruchomił się w APK. Wpisz opis ręcznie.");
+    }
+}
+
+window.onAndroidSpeechResult = function(tekst) {
+    const btn = document.getElementById("btn-szybka-wycena-mow");
+    const opis = document.getElementById("szybka-wycena-opis");
+
+    if (opis && tekst) {
+        opis.value = opis.value ? `${opis.value} ${tekst}` : tekst;
+        opis.focus();
+    }
+
+    if (btn) btn.textContent = "🎙 Mów";
+};
+
+window.onAndroidSpeechError = function(komunikat) {
+    const btn = document.getElementById("btn-szybka-wycena-mow");
+    if (btn) btn.textContent = "🎙 Mów";
+    alert(komunikat || "Nie udało się rozpoznać głosu. Wpisz opis ręcznie.");
+};
+
+window.onAndroidSpeechStatus = function(status) {
+    const btn = document.getElementById("btn-szybka-wycena-mow");
+    
+    if (btn && status) {
+        btn.textContent = status === "Mów" ? "🎙 Mów" : `🎙 ${status}`;
+    }
+};
+
 function dodajPozycjeDoWyceny() {
     if (rolaUsera === "guest") {
         alert("Gość nie może modyfikować wyceny.");
@@ -2605,6 +3131,7 @@ function drukujInwestycjeDoOkna(options) {
         </html>
     `;
 
+    if (window.AndroidPrint && window.AndroidPrint.printHtml) { window.AndroidPrint.printHtml(html); return; }
     const printWindow = window.open("", "_blank");
     if (!printWindow) { alert("Nie udało się otworzyć okna drukowania."); return; }
     printWindow.document.write(html);
@@ -2682,6 +3209,7 @@ function drukujKosztorysDoOkna(id, options) {
     const bruttoPodsumowanie = Number.isFinite(Number(kosztorys.brutto)) ? Number(kosztorys.brutto) : sumaNetto + vatPodsumowanie;
     const nettoPodsumowanie = Number.isFinite(Number(kosztorys.netto)) ? Number(kosztorys.netto) : sumaNetto;
 
+    if (window.AndroidPrint && window.AndroidPrint.printHtml) { window.AndroidPrint.printHtml(html); return; }
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
         console.error("Nie udało się otworzyć okna do druku.");
@@ -2860,6 +3388,7 @@ window.drukujInwestycje = function() {
         </html>
     `;
 
+    if (window.AndroidPrint && window.AndroidPrint.printHtml) { window.AndroidPrint.printHtml(html); return; }
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
         alert("Nie udało się otworzyć okna drukowania.");
