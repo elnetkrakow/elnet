@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-13";
+const APP_VERSION = "2026.06.10-14";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -4962,4 +4962,244 @@ window.wczytajKosztorys = function(id) {
     renderujWycene();
     pokazSekcje("wycena");
 };
+
+
+
+// ==========================================
+// WYCENA V14 — PANEL EDYCJA POD "DODAJ POZYCJĘ"
+// ==========================================
+
+let edytowanaPozycjaWycenyId = null;
+
+function znajdzKontenerDodajPozycjeV14() {
+    const selectors = [
+        "#wycena .form-card",
+        "#wycena .side-card",
+        ".wycena-form",
+        ".add-position-card",
+        ".card"
+    ];
+
+    for (const sel of selectors) {
+        const items = Array.from(document.querySelectorAll(sel));
+        const found = items.find(el => /Dodaj pozycj[eę]/i.test(el.textContent || ""));
+        if (found) return found;
+    }
+
+    const input = document.getElementById("wycena-usluga");
+    return input ? input.closest(".card, .form-card, section, div") : null;
+}
+
+function utworzPanelEdycjiPozycjiV14() {
+    if (document.getElementById("panel-edycja-pozycji")) return;
+
+    const panel = document.createElement("div");
+    panel.id = "panel-edycja-pozycji";
+    panel.className = "card edit-position-card";
+    panel.style.display = "none";
+    panel.innerHTML = `
+        <h2><span class="section-marker"></span>Edycja</h2>
+        <div class="form-grid">
+            <label>
+                Nazwa usługi
+                <input id="edit-pozycja-nazwa" type="text" placeholder="Nazwa pozycji">
+            </label>
+            <label>
+                Jednostka
+                <select id="edit-pozycja-jednostka">
+                    <option value="szt.">szt.</option>
+                    <option value="pkt">pkt</option>
+                    <option value="m²">m²</option>
+                    <option value="mb">mb</option>
+                    <option value="kpl.">kpl.</option>
+                    <option value="usługa">usługa</option>
+                    <option value="godz.">godz.</option>
+                </select>
+            </label>
+            <label>
+                Ilość
+                <input id="edit-pozycja-ilosc" type="number" step="0.01" min="0" placeholder="np. 10">
+            </label>
+            <label>
+                Cena netto PLN
+                <input id="edit-pozycja-cena" type="number" step="0.01" min="0" placeholder="np. 120">
+            </label>
+            <label>
+                Stawka VAT
+                <select id="edit-pozycja-vat">
+                    <option value="23">23 — VAT 23%</option>
+                    <option value="8">8 — VAT 8%</option>
+                    <option value="0">0 — VAT 0%</option>
+                </select>
+            </label>
+            <label>
+                Uwagi
+                <input id="edit-pozycja-uwaga" type="text" placeholder="Opcjonalnie">
+            </label>
+        </div>
+        <div class="form-actions edit-actions">
+            <button class="btn btn-primary" type="button" onclick="zapiszEdycjePozycjiV14()">Zapisz zmiany</button>
+            <button class="btn btn-secondary" type="button" onclick="anulujEdycjePozycjiV14()">Anuluj</button>
+        </div>
+    `;
+
+    const addCard = znajdzKontenerDodajPozycjeV14();
+    if (addCard && addCard.parentNode) {
+        addCard.insertAdjacentElement("afterend", panel);
+    } else {
+        const wycena = document.getElementById("wycena") || document.body;
+        wycena.appendChild(panel);
+    }
+}
+
+function pokazPanelEdycjiPozycjiV14(id) {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może edytować wyceny.");
+        return;
+    }
+
+    utworzPanelEdycjiPozycjiV14();
+
+    const p = wycenaPozycje.find(x => String(x.id) === String(id));
+    if (!p) {
+        alert("Nie znaleziono pozycji.");
+        return;
+    }
+
+    const panel = document.getElementById("panel-edycja-pozycji");
+    edytowanaPozycjaWycenyId = p.id;
+
+    document.getElementById("edit-pozycja-nazwa").value = p.nazwa || p.name || "";
+    document.getElementById("edit-pozycja-jednostka").value = p.jednostka || p.unit || "szt.";
+    document.getElementById("edit-pozycja-ilosc").value = Number(p.ilosc ?? p.quantity ?? 1);
+    document.getElementById("edit-pozycja-cena").value = Number(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0);
+    document.getElementById("edit-pozycja-vat").value = String(p.vatProcent ?? p.vat ?? p.vat_rate ?? 23);
+    document.getElementById("edit-pozycja-uwaga").value = p.uwaga || p.note || "";
+
+    panel.style.display = "block";
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function zapiszEdycjePozycjiV14() {
+    if (!edytowanaPozycjaWycenyId) {
+        alert("Nie wybrano pozycji do edycji.");
+        return;
+    }
+
+    const p = wycenaPozycje.find(x => String(x.id) === String(edytowanaPozycjaWycenyId));
+    if (!p) {
+        alert("Nie znaleziono pozycji.");
+        return;
+    }
+
+    const nazwa = document.getElementById("edit-pozycja-nazwa").value.trim();
+    const jednostka = document.getElementById("edit-pozycja-jednostka").value;
+    const ilosc = Number(String(document.getElementById("edit-pozycja-ilosc").value).replace(",", "."));
+    const cena = Number(String(document.getElementById("edit-pozycja-cena").value).replace(",", "."));
+    const vat = Number(document.getElementById("edit-pozycja-vat").value);
+    const uwaga = document.getElementById("edit-pozycja-uwaga").value.trim();
+
+    if (!nazwa) {
+        alert("Wpisz nazwę pozycji.");
+        return;
+    }
+
+    if (!Number.isFinite(ilosc) || ilosc <= 0) {
+        alert("Wpisz poprawną ilość.");
+        return;
+    }
+
+    if (!Number.isFinite(cena) || cena < 0) {
+        alert("Wpisz poprawną cenę netto.");
+        return;
+    }
+
+    p.nazwa = nazwa;
+    p.name = nazwa;
+    p.usluga = nazwa;
+
+    p.jednostka = jednostka;
+    p.unit = jednostka;
+
+    p.ilosc = ilosc;
+    p.quantity = ilosc;
+
+    p.cenaNetto = cena;
+    p.cena_netto = cena;
+    p.cena = cena;
+    p.price = cena;
+
+    p.vatProcent = vat;
+    p.vat = vat;
+    p.vat_rate = vat;
+
+    p.uwaga = uwaga;
+    p.note = uwaga;
+
+    renderujWycene();
+    anulujEdycjePozycjiV14();
+}
+
+function anulujEdycjePozycjiV14() {
+    edytowanaPozycjaWycenyId = null;
+    const panel = document.getElementById("panel-edycja-pozycji");
+    if (panel) panel.style.display = "none";
+}
+
+window.pokazPanelEdycjiPozycjiV14 = pokazPanelEdycjiPozycjiV14;
+window.zapiszEdycjePozycjiV14 = zapiszEdycjePozycjiV14;
+window.anulujEdycjePozycjiV14 = anulujEdycjePozycjiV14;
+
+// Nadpisujemy renderowanie tabeli: zamiast "Cena" jest "Edycja".
+function renderujWycene() {
+    utworzPanelEdycjiPozycjiV14();
+
+    const tbody = document.getElementById("tabela-wyceny");
+    if (!tbody) return;
+
+    wycenaPozycje = Array.isArray(wycenaPozycje)
+        ? wycenaPozycje.map(normalizujPozycjeWycenyV13)
+        : [];
+
+    if (!wycenaPozycje.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-row">Brak pozycji w wycenie.</td></tr>`;
+        przeliczWycene();
+        return;
+    }
+
+    tbody.innerHTML = wycenaPozycje.map(p => {
+        const netto = Number(p.ilosc || 0) * Number(p.cenaNetto || 0);
+        const vatProcent = Number(p.vatProcent || 23);
+        const vat = netto * (vatProcent / 100);
+        const brutto = netto + vat;
+
+        const akcje = rolaUsera !== "guest"
+            ? `
+                <div class="table-actions">
+                    <button class="btn btn-secondary small-btn" onclick="pokazPanelEdycjiPozycjiV14('${esc(p.id)}')">Edycja</button>
+                    <button class="btn btn-danger small-btn" onclick="usunPozycjeWyceny('${esc(p.id)}')">Usuń</button>
+                </div>
+            `
+            : "";
+
+        return `
+            <tr>
+                <td>${esc(p.nazwa)}</td>
+                <td>${esc(p.jednostka)}</td>
+                <td>${p.ilosc}</td>
+                <td><strong>${formatujKwoteV13(p.cenaNetto)}</strong></td>
+                <td>${formatujKwoteV13(netto)}</td>
+                <td>${vatProcent}%</td>
+                <td>${formatujKwoteV13(brutto)}</td>
+                <td>${akcje}</td>
+            </tr>
+        `;
+    }).join("");
+
+    przeliczWycene();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(utworzPanelEdycjiPozycjiV14, 400);
+});
 

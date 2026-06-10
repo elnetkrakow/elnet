@@ -2669,3 +2669,36 @@ svg {
     padding: 8px 10px;
   }
 }
+
+
+/* v14 — panel Edycja pod Dodaj pozycję */
+.edit-position-card {
+  margin-top: 16px;
+  border: 1px solid rgba(125, 211, 160, 0.34);
+}
+
+.edit-position-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.edit-position-card .section-marker {
+  width: 6px;
+  height: 34px;
+  border-radius: 999px;
+  background: #7dd3a0;
+  display: inline-block;
+}
+
+.edit-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 700px) {
+  .edit-actions {
+    grid-template-columns: 1fr;
+  }
+}
