@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-26";
+const APP_VERSION = "2026.06.10-27";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -266,6 +266,9 @@ function podepnijZdarzenia() {
 
     const szukajUslugi = document.getElementById("szukaj-uslugi");
     if (szukajUslugi) szukajUslugi.addEventListener("input", renderujUslugi);
+
+    const vatGlobal = document.getElementById("wycena-vat-global");
+    if (vatGlobal) vatGlobal.addEventListener("change", ustawVatDlaCalejWyceny);
 
     const sortujUslugi = document.getElementById("sortuj-uslugi");
     if (sortujUslugi) sortujUslugi.addEventListener("change", renderujUslugi);
@@ -2776,6 +2779,27 @@ function przeliczWycene() {
         vat: sumaVAT,
         brutto
     };
+}
+
+function ustawVatDlaCalejWyceny() {
+    const select = document.getElementById("wycena-vat-global");
+    if (!select) return;
+
+    const vat = Number(select.value);
+
+    if (!Array.isArray(wycenaPozycje) || wycenaPozycje.length === 0) {
+        return;
+    }
+
+    wycenaPozycje = wycenaPozycje.map(p => ({
+        ...p,
+        vatProcent: vat,
+        vat: vat,
+        vat_rate: vat
+    }));
+
+    try { renderujWycene(); } catch (e) { console.warn(e); }
+    try { przeliczWycene(); } catch (e) { console.warn(e); }
 }
 
 function wyczyscWycene() {
