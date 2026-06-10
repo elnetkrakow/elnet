@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-29";
+const APP_VERSION = "2026.06.10-23";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -207,15 +207,7 @@ function podepnijZdarzenia() {
     });
 
     const btnDodajPozycje = document.getElementById("btn-dodaj-pozycje");
-    if (btnDodajPozycje) {
-        btnDodajPozycje.addEventListener("click", (e) => {
-            // Prefer manual implementation (which supports edit mode) if preserved
-            if (typeof window.manualDodajPozycjeDoWyceny === 'function') {
-                return window.manualDodajPozycjeDoWyceny(e);
-            }
-            return dodajPozycjeDoWyceny(e);
-        });
-    }
+    if (btnDodajPozycje) btnDodajPozycje.addEventListener("click", dodajPozycjeDoWyceny);
 
     const btnSzybkaWycenaGeneruj = document.getElementById("btn-szybka-wycena-generuj");
     if (btnSzybkaWycenaGeneruj) btnSzybkaWycenaGeneruj.addEventListener("click", generujSzybkaWycene);
@@ -2510,10 +2502,6 @@ function dodajPozycjeDoWyceny() {
 
     renderujWycene();
 }
-
-// Preserve reference to the manual "Dodaj do wyceny" implementation
-// so it won't be overridden by other functions with the same name (szybka wycena).
-window.manualDodajPozycjeDoWyceny = dodajPozycjeDoWyceny;
 
 function renderujWycene() {
     const tbody = document.getElementById("tabela-wyceny");
