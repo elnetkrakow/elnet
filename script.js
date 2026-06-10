@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-08";
+const APP_VERSION = "2026.06.10-09";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -2330,6 +2330,7 @@ function uruchomSzybkaWyceneGlos() {
     const btn = document.getElementById("btn-szybka-wycena-mow");
 
     if (window.AndroidSpeech && typeof window.AndroidSpeech.startListening === "function") {
+        if (btn) btn.textContent = "🎙 Słucham...";
         window.AndroidSpeech.startListening();
         return;
     }
@@ -2343,112 +2344,63 @@ function uruchomSzybkaWyceneGlos() {
     }
 
     try {
-        if (window.__szybkaWycenaRecognition && window.__szybkaWycenaListening) {
-            window.__szybkaWycenaManualStop = true;
-            window.__szybkaWycenaRecognition.stop();
-            return;
-        }
-
         const recognition = new SpeechRecognition();
-        window.__szybkaWycenaRecognition = recognition;
-        window.__szybkaWycenaListening = true;
-        window.__szybkaWycenaManualStop = false;
-
         recognition.lang = "pl-PL";
-        recognition.interimResults = true;
-        recognition.continuous = true;
+        recognition.interimResults = false;
         recognition.maxAlternatives = 1;
 
-        let startedAt = Date.now();
-        let finalText = "";
-
-        if (btn) btn.textContent = "⏹ Stop";
-
-        const timeout = setTimeout(() => {
-            window.__szybkaWycenaManualStop = true;
-            try { recognition.stop(); } catch (e) {}
-        }, 60000);
+        if (btn) btn.textContent = "🎙 Słucham...";
 
         recognition.onresult = (event) => {
-            let interim = "";
-
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const txt = event.results[i][0].transcript || "";
-                if (event.results[i].isFinal) finalText += " " + txt;
-                else interim += " " + txt;
-            }
-
-            if (opis) {
-                const base = opis.dataset.beforeSpeech || "";
-                opis.value = `${base} ${finalText} ${interim}`.replace(/\s+/g, " ").trim();
-            }
+            const tekst = event.results?.[0]?.[0]?.transcript || "";
+            dopiszTekstDoSzybkiejWyceny(tekst);
         };
 
         recognition.onerror = () => {
-            if (!window.__szybkaWycenaManualStop && Date.now() - startedAt < 60000) {
-                try { recognition.start(); } catch (e) {}
-                return;
-            }
+            if (btn) btn.textContent = "🎙 Dopowiedz";
         };
 
         recognition.onend = () => {
-            clearTimeout(timeout);
-            window.__szybkaWycenaListening = false;
-            window.__szybkaWycenaRecognition = null;
-            if (btn) btn.textContent = "🎙 Mów";
-            if (opis) opis.removeAttribute("data-before-speech");
+            if (btn) btn.textContent = "🎙 Dopowiedz";
         };
 
-        if (opis) opis.dataset.beforeSpeech = opis.value || "";
         recognition.start();
     } catch (err) {
         console.error(err);
-        if (btn) btn.textContent = "🎙 Mów";
+        if (btn) btn.textContent = "🎙 Dopowiedz";
         alert("Mikrofon nie uruchomił się. Wpisz opis ręcznie.");
     }
 }
 
-window.onAndroidSpeechPartial = function(tekst) {
+function dopiszTekstDoSzybkiejWyceny(tekst) {
     const opis = document.getElementById("szybka-wycena-opis");
-    if (opis && tekst) {
-        const base = opis.dataset.beforeSpeech || "";
-        opis.value = `${base} ${tekst}`.replace(/\s+/g, " ").trim();
-    }
-};
+    if (!opis || !tekst) return;
+
+    const obecny = String(opis.value || "").trim();
+    const nowy = String(tekst || "").trim();
+
+    if (!nowy) return;
+
+    opis.value = obecny ? `${obecny} ${nowy}`.replace(/\s+/g, " ").trim() : nowy;
+    opis.focus();
+}
 
 window.onAndroidSpeechResult = function(tekst) {
     const btn = document.getElementById("btn-szybka-wycena-mow");
-    const opis = document.getElementById("szybka-wycena-opis");
-
-    if (opis && tekst) {
-        const base = opis.dataset.beforeSpeech || "";
-        opis.value = `${base} ${tekst}`.replace(/\s+/g, " ").trim();
-        opis.removeAttribute("data-before-speech");
-        opis.focus();
-    }
-
-    if (btn) btn.textContent = "🎙 Mów";
+    dopiszTekstDoSzybkiejWyceny(tekst);
+    if (btn) btn.textContent = "🎙 Dopowiedz";
 };
 
 window.onAndroidSpeechError = function(komunikat) {
     const btn = document.getElementById("btn-szybka-wycena-mow");
-    const opis = document.getElementById("szybka-wycena-opis");
-    if (btn) btn.textContent = "🎙 Mów";
-    if (opis) opis.removeAttribute("data-before-speech");
+    if (btn) btn.textContent = "🎙 Dopowiedz";
     alert(komunikat || "Nie udało się rozpoznać głosu. Wpisz opis ręcznie.");
 };
 
 window.onAndroidSpeechStatus = function(status) {
     const btn = document.getElementById("btn-szybka-wycena-mow");
-    const opis = document.getElementById("szybka-wycena-opis");
-
-    if (status === "Stop") {
-        if (opis && !opis.dataset.beforeSpeech) opis.dataset.beforeSpeech = opis.value || "";
-        if (btn) btn.textContent = "⏹ Stop";
-        return;
-    }
-
-    if (btn) btn.textContent = "🎙 Mów";
+    if (!btn) return;
+    btn.textContent = status === "Słucham..." ? "🎙 Słucham..." : "🎙 Dopowiedz";
 };
 
 function dodajPozycjeDoWyceny() {
