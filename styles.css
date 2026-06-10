@@ -2199,32 +2199,7 @@ svg {
     }
 
 /* Hide quick estimate card on desktop, keep visible on mobile */
-@media (min-width: 901px) {
-    .mobile-only {
-        display: none !important;
-    }
-}
-
-@media (max-width: 900px) {
-    .mobile-only {
-        display: block !important;
-    }
-}
-
-/* Strong rule to hide quick estimate on desktop while keeping it on mobile */
-@media (min-width: 901px) {
-    #section-wycena .quick-estimate-card,
-    .quick-estimate-card {
-        display: none !important;
-    }
-}
-
-@media (max-width: 900px) {
-    #section-wycena .quick-estimate-card,
-    .quick-estimate-card {
-        display: block !important;
-    }
-}
+/* (removed mobile-only / quick-estimate hide rules to restore original behavior) */
 
     #section-terminarz .calendar-title {
         text-align: center !important;
