@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-14";
+const APP_VERSION = "2026.06.10-15";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -5201,5 +5201,286 @@ function renderujWycene() {
 
 document.addEventListener("DOMContentLoaded", () => {
     setTimeout(utworzPanelEdycjiPozycjiV14, 400);
+});
+
+
+
+// ==========================================
+// WYCENA V15 — EDYCJA W PANELU + AKCJE W JEDNEJ LINII
+// ==========================================
+
+function znajdzKontenerDodajPozycjeV15() {
+    const cards = Array.from(document.querySelectorAll(".card, .form-card, .side-card, section, aside, div"));
+    const addCard = cards.find(el => {
+        const txt = (el.textContent || "").toLowerCase();
+        return txt.includes("dodaj pozycj") && txt.includes("rodzaj usługi");
+    });
+    return addCard || document.getElementById("wycena") || document.body;
+}
+
+function utworzPanelEdycjiPozycjiV15() {
+    let panel = document.getElementById("panel-edycja-pozycji");
+    if (panel) return panel;
+
+    panel = document.createElement("div");
+    panel.id = "panel-edycja-pozycji";
+    panel.className = "card edit-position-card";
+    panel.style.display = "none";
+    panel.innerHTML = `
+        <h2><span class="section-marker"></span>Edycja</h2>
+
+        <label>
+            Nazwa usługi
+            <input id="edit-pozycja-nazwa" type="text" placeholder="Nazwa pozycji">
+        </label>
+
+        <label>
+            Jednostka
+            <select id="edit-pozycja-jednostka">
+                <option value="szt.">szt.</option>
+                <option value="pkt">pkt</option>
+                <option value="m²">m²</option>
+                <option value="mb">mb</option>
+                <option value="kpl.">kpl.</option>
+                <option value="usługa">usługa</option>
+                <option value="godz.">godz.</option>
+            </select>
+        </label>
+
+        <label>
+            Ilość
+            <input id="edit-pozycja-ilosc" type="number" step="0.01" min="0" placeholder="np. 10">
+        </label>
+
+        <label>
+            Cena netto PLN
+            <input id="edit-pozycja-cena" type="number" step="0.01" min="0" placeholder="np. 120">
+        </label>
+
+        <label>
+            Stawka VAT
+            <select id="edit-pozycja-vat">
+                <option value="23">23 — VAT 23%</option>
+                <option value="8">8 — VAT 8%</option>
+                <option value="0">0 — VAT 0%</option>
+            </select>
+        </label>
+
+        <label>
+            Uwagi
+            <input id="edit-pozycja-uwaga" type="text" placeholder="Opcjonalnie">
+        </label>
+
+        <div class="edit-actions">
+            <button class="btn btn-primary" type="button" onclick="zapiszEdycjePozycjiV15()">Zapisz zmiany</button>
+            <button class="btn btn-secondary" type="button" onclick="anulujEdycjePozycjiV15()">Anuluj</button>
+        </div>
+    `;
+
+    const addCard = znajdzKontenerDodajPozycjeV15();
+    if (addCard && addCard.parentNode && addCard !== document.body) {
+        addCard.insertAdjacentElement("afterend", panel);
+    } else {
+        (document.getElementById("wycena") || document.body).appendChild(panel);
+    }
+
+    return panel;
+}
+
+function pobierzPozycjeWycenyV15() {
+    if (Array.isArray(window.wycenaPozycje)) return window.wycenaPozycje;
+    try {
+        if (typeof wycenaPozycje !== "undefined" && Array.isArray(wycenaPozycje)) return wycenaPozycje;
+    } catch {}
+    window.wycenaPozycje = [];
+    return window.wycenaPozycje;
+}
+
+let edytowanaPozycjaWycenyIdV15 = null;
+
+window.pokazPanelEdycjiPozycjiV15 = function(id) {
+    if (typeof rolaUsera !== "undefined" && rolaUsera === "guest") {
+        alert("Gość nie może edytować wyceny.");
+        return;
+    }
+
+    const lista = pobierzPozycjeWycenyV15();
+    const p = lista.find(x => String(x.id) === String(id));
+
+    if (!p) {
+        alert("Nie znaleziono pozycji do edycji.");
+        return;
+    }
+
+    const panel = utworzPanelEdycjiPozycjiV15();
+    edytowanaPozycjaWycenyIdV15 = p.id;
+
+    const cena = Number(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0);
+    const ilosc = Number(p.ilosc ?? p.quantity ?? 1);
+    const vat = Number(p.vatProcent ?? p.vat ?? p.vat_rate ?? 23);
+
+    document.getElementById("edit-pozycja-nazwa").value = p.nazwa || p.name || p.usluga || "";
+    document.getElementById("edit-pozycja-jednostka").value = p.jednostka || p.unit || "szt.";
+    document.getElementById("edit-pozycja-ilosc").value = Number.isFinite(ilosc) ? ilosc : 1;
+    document.getElementById("edit-pozycja-cena").value = Number.isFinite(cena) ? cena : 0;
+    document.getElementById("edit-pozycja-vat").value = String(Number.isFinite(vat) ? vat : 23);
+    document.getElementById("edit-pozycja-uwaga").value = p.uwaga || p.note || "";
+
+    panel.style.display = "block";
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+window.zapiszEdycjePozycjiV15 = function() {
+    const lista = pobierzPozycjeWycenyV15();
+    const p = lista.find(x => String(x.id) === String(edytowanaPozycjaWycenyIdV15));
+
+    if (!p) {
+        alert("Nie znaleziono pozycji.");
+        return;
+    }
+
+    const nazwa = document.getElementById("edit-pozycja-nazwa").value.trim();
+    const jednostka = document.getElementById("edit-pozycja-jednostka").value;
+    const ilosc = Number(String(document.getElementById("edit-pozycja-ilosc").value).replace(",", "."));
+    const cena = Number(String(document.getElementById("edit-pozycja-cena").value).replace(",", "."));
+    const vat = Number(document.getElementById("edit-pozycja-vat").value);
+    const uwaga = document.getElementById("edit-pozycja-uwaga").value.trim();
+
+    if (!nazwa) {
+        alert("Wpisz nazwę pozycji.");
+        return;
+    }
+
+    if (!Number.isFinite(ilosc) || ilosc <= 0) {
+        alert("Wpisz poprawną ilość.");
+        return;
+    }
+
+    if (!Number.isFinite(cena) || cena < 0) {
+        alert("Wpisz poprawną cenę netto.");
+        return;
+    }
+
+    p.nazwa = nazwa;
+    p.name = nazwa;
+    p.usluga = nazwa;
+
+    p.jednostka = jednostka;
+    p.unit = jednostka;
+
+    p.ilosc = ilosc;
+    p.quantity = ilosc;
+
+    p.cenaNetto = cena;
+    p.cena_netto = cena;
+    p.cena = cena;
+    p.price = cena;
+
+    p.vatProcent = vat;
+    p.vat = vat;
+    p.vat_rate = vat;
+
+    p.uwaga = uwaga;
+    p.note = uwaga;
+
+    if (typeof renderujWycene === "function") renderujWycene();
+    if (typeof przeliczWycene === "function") przeliczWycene();
+
+    anulujEdycjePozycjiV15();
+};
+
+window.anulujEdycjePozycjiV15 = function() {
+    edytowanaPozycjaWycenyIdV15 = null;
+    const panel = document.getElementById("panel-edycja-pozycji");
+    if (panel) panel.style.display = "none";
+};
+
+function dopilnujAkcjiWJednejLiniiV15() {
+    document.querySelectorAll("button").forEach(btn => {
+        const txt = (btn.textContent || "").trim().toLowerCase();
+
+        if (txt === "cena") {
+            btn.textContent = "Edycja";
+            const onclick = btn.getAttribute("onclick") || "";
+
+            // Zamiana starego onclick Cena na panel Edycja, jeśli jest możliwa.
+            if (onclick.includes("edytujCenePozycjiWyceny")) {
+                const match = onclick.match(/edytujCenePozycjiWyceny\(['"]([^'"]+)['"]\)/);
+                if (match) btn.setAttribute("onclick", `pokazPanelEdycjiPozycjiV15('${match[1]}')`);
+            }
+        }
+
+        if ((btn.textContent || "").trim().toLowerCase() === "edycja") {
+            btn.classList.add("btn-edit-inline");
+        }
+
+        if ((btn.textContent || "").trim().toLowerCase() === "usuń" || (btn.textContent || "").trim().toLowerCase() === "usun") {
+            btn.classList.add("btn-delete-inline");
+        }
+    });
+
+    document.querySelectorAll(".table-actions").forEach(el => {
+        el.classList.add("table-actions-inline");
+    });
+}
+
+// Ostateczne renderowanie tabeli z przyciskami Edycja/Usuń w jednej linii.
+function renderujWycene() {
+    utworzPanelEdycjiPozycjiV15();
+
+    const tbody = document.getElementById("tabela-wyceny");
+    if (!tbody) return;
+
+    let lista = pobierzPozycjeWycenyV15();
+
+    if (typeof normalizujPozycjeWycenyV13 === "function") {
+        lista = lista.map(normalizujPozycjeWycenyV13);
+        window.wycenaPozycje = lista;
+    }
+
+    if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-row">Brak pozycji w wycenie.</td></tr>`;
+        if (typeof przeliczWycene === "function") przeliczWycene();
+        return;
+    }
+
+    tbody.innerHTML = lista.map(p => {
+        const cena = Number(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0);
+        const ilosc = Number(p.ilosc ?? p.quantity ?? 1);
+        const vatProcent = Number(p.vatProcent ?? p.vat ?? p.vat_rate ?? 23);
+        const netto = ilosc * cena;
+        const brutto = netto + netto * vatProcent / 100;
+
+        return `
+            <tr>
+                <td>${esc(p.nazwa || p.name || p.usluga || "")}</td>
+                <td>${esc(p.jednostka || p.unit || "")}</td>
+                <td>${ilosc}</td>
+                <td><strong>${formatujKwoteV13 ? formatujKwoteV13(cena) : cena.toFixed(2) + " PLN"}</strong></td>
+                <td>${formatujKwoteV13 ? formatujKwoteV13(netto) : netto.toFixed(2) + " PLN"}</td>
+                <td>${vatProcent}%</td>
+                <td>${formatujKwoteV13 ? formatujKwoteV13(brutto) : brutto.toFixed(2) + " PLN"}</td>
+                <td>
+                    <div class="table-actions table-actions-inline">
+                        <button class="btn btn-secondary small-btn btn-edit-inline" onclick="pokazPanelEdycjiPozycjiV15('${esc(p.id)}')">Edycja</button>
+                        <button class="btn btn-danger small-btn btn-delete-inline" onclick="usunPozycjeWyceny('${esc(p.id)}')">Usuń</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
+
+    if (typeof przeliczWycene === "function") przeliczWycene();
+    setTimeout(dopilnujAkcjiWJednejLiniiV15, 20);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => {
+        utworzPanelEdycjiPozycjiV15();
+        dopilnujAkcjiWJednejLiniiV15();
+    }, 500);
+
+    const obs = new MutationObserver(() => dopilnujAkcjiWJednejLiniiV15());
+    obs.observe(document.body, { childList: true, subtree: true });
 });
 

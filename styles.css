@@ -2702,3 +2702,92 @@ svg {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* v15 — Akcje w jednej linii: Edycja | Usuń */
+.table-actions-inline,
+.table-actions {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 8px !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex-wrap: nowrap !important;
+}
+
+.table-actions-inline .btn,
+.table-actions .btn {
+  width: auto !important;
+  min-width: 78px !important;
+  max-width: 92px !important;
+  height: 34px !important;
+  padding: 7px 12px !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+}
+
+.btn-edit-inline {
+  background: rgba(31, 41, 55, 0.95) !important;
+  border: 1px solid rgba(255,255,255,0.65) !important;
+}
+
+.btn-delete-inline {
+  background: #ef4444 !important;
+}
+
+td:last-child,
+th:last-child {
+  min-width: 180px !important;
+  width: 180px !important;
+}
+
+.edit-position-card {
+  margin-top: 16px;
+  border: 1px solid rgba(125, 211, 160, 0.34);
+}
+
+.edit-position-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.edit-position-card .section-marker {
+  width: 6px;
+  height: 34px;
+  border-radius: 999px;
+  background: #7dd3a0;
+  display: inline-block;
+}
+
+.edit-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 700px) {
+  .table-actions-inline,
+  .table-actions {
+    flex-direction: row !important;
+    gap: 6px !important;
+    justify-content: flex-start !important;
+  }
+
+  .table-actions-inline .btn,
+  .table-actions .btn {
+    min-width: 72px !important;
+    max-width: 82px !important;
+    padding: 7px 9px !important;
+  }
+
+  td:last-child,
+  th:last-child {
+    min-width: 165px !important;
+    width: 165px !important;
+  }
+
+  .edit-actions {
+    grid-template-columns: 1fr;
+  }
+}
