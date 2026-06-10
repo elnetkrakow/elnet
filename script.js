@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-15";
+const APP_VERSION = "2026.06.10-16";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -5484,3 +5484,96 @@ document.addEventListener("DOMContentLoaded", () => {
     obs.observe(document.body, { childList: true, subtree: true });
 });
 
+
+
+// ==========================================
+// PATCH V16 — naprawa edycji kosztorysu i akcji tabel
+// ==========================================
+(function(){
+    function pobierzPozycjeWycenyV16() {
+        try {
+            if (typeof wycenaPozycje !== 'undefined' && Array.isArray(wycenaPozycje)) {
+                window.wycenaPozycje = wycenaPozycje;
+                return wycenaPozycje;
+            }
+        } catch (e) {}
+        if (Array.isArray(window.wycenaPozycje)) return window.wycenaPozycje;
+        window.wycenaPozycje = [];
+        return window.wycenaPozycje;
+    }
+
+    function syncPozycjeWycenyV16(lista) {
+        try { wycenaPozycje = lista; } catch (e) {}
+        window.wycenaPozycje = lista;
+        return lista;
+    }
+
+    window.usunPozycjeWyceny = function(id) {
+        if (typeof rolaUsera !== 'undefined' && rolaUsera === 'guest') {
+            alert('Gość nie może modyfikować wyceny.');
+            return;
+        }
+        let lista = pobierzPozycjeWycenyV16().filter(p => String(p.id) !== String(id));
+        syncPozycjeWycenyV16(lista);
+        renderujWycene();
+    };
+
+    // Nadpisanie renderu wyceny — używa właściwej listy pozycji podczas edycji kosztorysu.
+    renderujWycene = function() {
+        const tbody = document.getElementById('tabela-wyceny');
+        if (!tbody) return;
+
+        let lista = pobierzPozycjeWycenyV16();
+        if (typeof normalizujPozycjeWycenyV13 === 'function') {
+            lista = lista.map(normalizujPozycjeWycenyV13);
+            syncPozycjeWycenyV16(lista);
+        }
+
+        if (!lista.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="empty-row">Brak pozycji w wycenie.</td></tr>';
+            if (typeof przeliczWycene === 'function') przeliczWycene();
+            return;
+        }
+
+        tbody.innerHTML = lista.map(p => {
+            const cena = Number(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0);
+            const ilosc = Number(p.ilosc ?? p.quantity ?? 1);
+            const vatProcent = Number(p.vatProcent ?? p.vat ?? p.vat_rate ?? 23);
+            const netto = ilosc * cena;
+            const brutto = netto + netto * vatProcent / 100;
+            return `
+                <tr>
+                    <td>${esc(p.nazwa || p.name || p.usluga || '')}</td>
+                    <td>${esc(p.jednostka || p.unit || '')}</td>
+                    <td>${ilosc}</td>
+                    <td>${cena.toFixed(2)} PLN</td>
+                    <td>${netto.toFixed(2)} PLN</td>
+                    <td>${vatProcent}%</td>
+                    <td>${brutto.toFixed(2)} PLN</td>
+                    <td>
+                        <div class="table-actions table-actions-inline wycena-actions-inline">
+                            <button class="btn btn-secondary small-btn btn-edit-inline" onclick="pokazPanelEdycjiPozycjiV15('${esc(String(p.id))}')">Edycja</button>
+                            <button class="btn btn-danger small-btn btn-delete-inline" onclick="usunPozycjeWyceny('${esc(String(p.id))}')">Usuń</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        if (typeof przeliczWycene === 'function') przeliczWycene();
+    };
+
+    // Gdy wczytujemy kosztorys do edycji — zsynchronizuj obie listy i odśwież widok.
+    const _oldWczytaj = window.wczytajKosztorys;
+    if (typeof _oldWczytaj === 'function') {
+        window.wczytajKosztorys = function(id) {
+            _oldWczytaj(id);
+            try {
+                if (typeof wycenaPozycje !== 'undefined' && Array.isArray(wycenaPozycje)) {
+                    window.wycenaPozycje = wycenaPozycje;
+                }
+            } catch (e) {}
+            setTimeout(() => { try { renderujWycene(); } catch (e) {} }, 30);
+        };
+    }
+})();

@@ -2791,3 +2791,62 @@ th:last-child {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* PATCH V16 — scope actions per table */
+#section-wycena .table-actions-inline,
+#section-wycena .table-actions,
+.wycena-actions-inline {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 8px !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex-wrap: nowrap !important;
+}
+
+#section-wycena .table-actions-inline .btn,
+#section-wycena .table-actions .btn,
+.wycena-actions-inline .btn {
+  width: auto !important;
+  min-width: 78px !important;
+  max-width: 92px !important;
+  height: 34px !important;
+  padding: 7px 12px !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+}
+
+#section-wycena th:last-child,
+#section-wycena td:last-child {
+  min-width: 180px !important;
+  width: 180px !important;
+}
+
+/* kosztorysy — nie ścinaj przycisków */
+#section-kosztorysy .table-actions {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 8px !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex-wrap: nowrap !important;
+}
+
+#section-kosztorysy th:last-child,
+#section-kosztorysy td:last-child {
+  min-width: 260px !important;
+  width: 260px !important;
+}
+
+#section-kosztorysy .table-actions .btn {
+  min-width: 78px !important;
+  white-space: nowrap !important;
+}
+
+/* wycofanie globalnego zawężenia z v15 */
+td:last-child,
+th:last-child {
+  width: auto;
+  min-width: 0;
+}
