@@ -410,40 +410,44 @@ hr {
     width: 100%;
 }
 
-/* Ensure Action column in Zestawienie prac fits both buttons */
-#tabela-wyceny th:last-child,
-#tabela-wyceny td:last-child {
-    min-width: 170px;
-    width: 170px;
-    text-align: right;
-}
-
-.wycena-actions,
-.table-actions {
-    display: flex;
-    flex-direction: row;
-    gap: 8px;
-    justify-content: flex-end;
-    align-items: center;
-    flex-wrap: nowrap;
-}
-
-.wycena-actions .btn,
-.table-actions .btn {
-    min-width: 72px;
-    width: auto;
-    padding-left: 10px;
-    padding-right: 10px;
-    white-space: nowrap;
-}
-
-/* If table still needs horizontal space, allow scrolling and slightly increase min-width */
+/* Ensure Action column in Zestawienie prac fits both buttons (specific to section-wycena) */
 #section-wycena .table-wrapper {
     overflow-x: auto;
 }
 
 #section-wycena .table-wrapper table {
-    min-width: 980px;
+    min-width: 1080px;
+    width: 100%;
+}
+
+#section-wycena .table-wrapper thead th:last-child,
+#section-wycena .table-wrapper tbody#tabela-wyceny td:last-child {
+    width: 190px !important;
+    min-width: 190px !important;
+    max-width: 190px !important;
+    text-align: right;
+    padding-right: 16px !important;
+}
+
+#section-wycena .wycena-actions,
+#section-wycena .table-actions {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    width: 100%;
+}
+
+#section-wycena .wycena-actions button,
+#section-wycena .table-actions button {
+    min-width: 72px !important;
+    width: 72px !important;
+    height: 34px !important;
+    padding: 6px 8px !important;
+    font-size: 13px !important;
+    white-space: nowrap !important;
 }
 
 #section-wycena .table-wrapper thead th,
