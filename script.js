@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-16";
+const APP_VERSION = "2026.06.10-17";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -5577,3 +5577,337 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 })();
+
+
+// ==========================================
+// PATCH V17 — układ jak wcześniej + Edycja pod Dodaj pozycję
+// ==========================================
+(function(){
+    let edytowanaPozycjaIdV17 = null;
+
+    function asNumberV17(v, fallback = 0) {
+        if (typeof v === "number") return Number.isFinite(v) ? v : fallback;
+        if (v === null || v === undefined || v === "") return fallback;
+        const n = Number(String(v).replace(",", ".").replace(/[^\d.-]/g, ""));
+        return Number.isFinite(n) ? n : fallback;
+    }
+
+    function formatPLNV17(v) {
+        return `${asNumberV17(v, 0).toFixed(2)} PLN`;
+    }
+
+    function getWycenaPozycjeV17() {
+        try {
+            if (typeof wycenaPozycje !== "undefined" && Array.isArray(wycenaPozycje)) {
+                window.wycenaPozycje = wycenaPozycje;
+                return wycenaPozycje;
+            }
+        } catch(e) {}
+        if (!Array.isArray(window.wycenaPozycje)) window.wycenaPozycje = [];
+        return window.wycenaPozycje;
+    }
+
+    function setWycenaPozycjeV17(lista) {
+        try { wycenaPozycje = lista; } catch(e) {}
+        window.wycenaPozycje = lista;
+    }
+
+    function normalizePositionV17(p) {
+        const cena = asNumberV17(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price, 0);
+        const ilosc = asNumberV17(p.ilosc ?? p.quantity ?? p.qty, 1);
+        const vat = asNumberV17(p.vatProcent ?? p.vat ?? p.vat_rate, 23);
+        const nazwa = p.nazwa || p.name || p.usluga || "Pozycja";
+        const jednostka = p.jednostka || p.unit || "szt.";
+
+        return {
+            ...p,
+            id: p.id || ("poz-" + Date.now() + "-" + Math.random().toString(16).slice(2)),
+            nazwa,
+            name: nazwa,
+            usluga: nazwa,
+            jednostka,
+            unit: jednostka,
+            ilosc,
+            quantity: ilosc,
+            cenaNetto: cena,
+            cena_netto: cena,
+            cena: cena,
+            price: cena,
+            vatProcent: vat,
+            vat: vat,
+            vat_rate: vat,
+            uwaga: p.uwaga || p.note || "",
+            note: p.uwaga || p.note || ""
+        };
+    }
+
+    function findAddPositionCardV17() {
+        const section = document.getElementById("section-wycena") || document.getElementById("wycena") || document.body;
+
+        // Najpewniejsze: karta, w której jest pole rodzaju usługi.
+        const input =
+            document.getElementById("wycena-usluga") ||
+            document.querySelector("#section-wycena input[placeholder*='nazwę usługi']") ||
+            document.querySelector("#section-wycena input[placeholder*='nazwa usługi']") ||
+            document.querySelector("#section-wycena input[placeholder*='usługi']");
+
+        if (input) {
+            const card = input.closest(".card");
+            if (card) return card;
+        }
+
+        // Rezerwowo: karta z nagłówkiem Dodaj pozycję, ale NIE cała sekcja.
+        const cards = Array.from(section.querySelectorAll(".card"));
+        const card = cards.find(c => {
+            const header = c.querySelector("h2,h3");
+            return header && /dodaj pozycj/i.test(header.textContent || "");
+        });
+
+        return card || null;
+    }
+
+    function ensureEditPanelV17() {
+        let panel = document.getElementById("panel-edycja-pozycji");
+        if (!panel) {
+            panel = document.createElement("div");
+            panel.id = "panel-edycja-pozycji";
+            panel.className = "card edit-position-card edit-position-card-v17";
+            panel.style.display = "none";
+            panel.innerHTML = `
+                <h2><span class="section-marker"></span>Edycja</h2>
+
+                <label>
+                    Nazwa usługi
+                    <input id="edit-pozycja-nazwa" type="text" placeholder="Nazwa pozycji">
+                </label>
+
+                <label>
+                    Jednostka
+                    <select id="edit-pozycja-jednostka">
+                        <option value="szt.">szt.</option>
+                        <option value="pkt">pkt</option>
+                        <option value="m²">m²</option>
+                        <option value="mb">mb</option>
+                        <option value="kpl.">kpl.</option>
+                        <option value="usługa">usługa</option>
+                        <option value="godz.">godz.</option>
+                    </select>
+                </label>
+
+                <label>
+                    Ilość
+                    <input id="edit-pozycja-ilosc" type="number" step="0.01" min="0" placeholder="np. 10">
+                </label>
+
+                <label>
+                    Cena netto PLN
+                    <input id="edit-pozycja-cena" type="number" step="0.01" min="0" placeholder="np. 120">
+                </label>
+
+                <label>
+                    Stawka VAT
+                    <select id="edit-pozycja-vat">
+                        <option value="23">23 — VAT 23%</option>
+                        <option value="8">8 — VAT 8%</option>
+                        <option value="0">0 — VAT 0%</option>
+                    </select>
+                </label>
+
+                <label>
+                    Uwagi
+                    <input id="edit-pozycja-uwaga" type="text" placeholder="Opcjonalnie">
+                </label>
+
+                <div class="edit-actions edit-actions-v17">
+                    <button class="btn btn-primary" type="button" onclick="zapiszEdycjePozycjiV17()">Zapisz zmiany</button>
+                    <button class="btn btn-secondary" type="button" onclick="anulujEdycjePozycjiV17()">Anuluj</button>
+                </div>
+            `;
+        }
+
+        const addCard = findAddPositionCardV17();
+        if (addCard && addCard.parentNode && panel.previousElementSibling !== addCard) {
+            addCard.insertAdjacentElement("afterend", panel);
+        }
+
+        return panel;
+    }
+
+    window.pokazPanelEdycjiPozycjiV17 = function(id) {
+        if (typeof rolaUsera !== "undefined" && rolaUsera === "guest") {
+            alert("Gość nie może edytować wyceny.");
+            return;
+        }
+
+        let lista = getWycenaPozycjeV17().map(normalizePositionV17);
+        setWycenaPozycjeV17(lista);
+
+        const p = lista.find(x => String(x.id) === String(id));
+        if (!p) {
+            alert("Nie znaleziono pozycji do edycji.");
+            return;
+        }
+
+        const panel = ensureEditPanelV17();
+        edytowanaPozycjaIdV17 = p.id;
+
+        document.getElementById("edit-pozycja-nazwa").value = p.nazwa || "";
+        document.getElementById("edit-pozycja-jednostka").value = p.jednostka || "szt.";
+        document.getElementById("edit-pozycja-ilosc").value = p.ilosc;
+        document.getElementById("edit-pozycja-cena").value = p.cenaNetto;
+        document.getElementById("edit-pozycja-vat").value = String(p.vatProcent ?? 23);
+        document.getElementById("edit-pozycja-uwaga").value = p.uwaga || "";
+
+        panel.style.display = "block";
+        panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    };
+
+    window.zapiszEdycjePozycjiV17 = function() {
+        if (!edytowanaPozycjaIdV17) {
+            alert("Nie wybrano pozycji do edycji.");
+            return;
+        }
+
+        const lista = getWycenaPozycjeV17().map(normalizePositionV17);
+        const p = lista.find(x => String(x.id) === String(edytowanaPozycjaIdV17));
+
+        if (!p) {
+            alert("Nie znaleziono pozycji.");
+            return;
+        }
+
+        const nazwa = document.getElementById("edit-pozycja-nazwa").value.trim();
+        const jednostka = document.getElementById("edit-pozycja-jednostka").value;
+        const ilosc = asNumberV17(document.getElementById("edit-pozycja-ilosc").value, NaN);
+        const cena = asNumberV17(document.getElementById("edit-pozycja-cena").value, NaN);
+        const vat = asNumberV17(document.getElementById("edit-pozycja-vat").value, 23);
+        const uwaga = document.getElementById("edit-pozycja-uwaga").value.trim();
+
+        if (!nazwa) {
+            alert("Wpisz nazwę pozycji.");
+            return;
+        }
+        if (!Number.isFinite(ilosc) || ilosc <= 0) {
+            alert("Wpisz poprawną ilość.");
+            return;
+        }
+        if (!Number.isFinite(cena) || cena < 0) {
+            alert("Wpisz poprawną cenę netto.");
+            return;
+        }
+
+        p.nazwa = nazwa;
+        p.name = nazwa;
+        p.usluga = nazwa;
+
+        p.jednostka = jednostka;
+        p.unit = jednostka;
+
+        p.ilosc = ilosc;
+        p.quantity = ilosc;
+
+        p.cenaNetto = cena;
+        p.cena_netto = cena;
+        p.cena = cena;
+        p.price = cena;
+
+        p.vatProcent = vat;
+        p.vat = vat;
+        p.vat_rate = vat;
+
+        p.uwaga = uwaga;
+        p.note = uwaga;
+
+        setWycenaPozycjeV17(lista);
+        renderujWycene();
+        anulujEdycjePozycjiV17();
+    };
+
+    window.anulujEdycjePozycjiV17 = function() {
+        edytowanaPozycjaIdV17 = null;
+        const panel = document.getElementById("panel-edycja-pozycji");
+        if (panel) panel.style.display = "none";
+    };
+
+    // Zostawiamy starą nazwę, jeśli gdzieś już została użyta.
+    window.pokazPanelEdycjiPozycjiV15 = window.pokazPanelEdycjiPozycjiV17;
+    window.zapiszEdycjePozycjiV15 = window.zapiszEdycjePozycjiV17;
+    window.anulujEdycjePozycjiV15 = window.anulujEdycjePozycjiV17;
+
+    renderujWycene = function() {
+        const tbody = document.getElementById("tabela-wyceny");
+        if (!tbody) return;
+
+        ensureEditPanelV17();
+
+        let lista = getWycenaPozycjeV17().map(normalizePositionV17);
+        setWycenaPozycjeV17(lista);
+
+        if (!lista.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="empty-row">Brak pozycji w wycenie.</td></tr>`;
+            if (typeof przeliczWycene === "function") przeliczWycene();
+            return;
+        }
+
+        tbody.innerHTML = lista.map(p => {
+            const netto = p.ilosc * p.cenaNetto;
+            const vatProcent = Number(p.vatProcent ?? 23);
+            const brutto = netto + netto * vatProcent / 100;
+
+            return `
+                <tr>
+                    <td>${esc(p.nazwa)}</td>
+                    <td>${esc(p.jednostka)}</td>
+                    <td>${p.ilosc}</td>
+                    <td>${formatPLNV17(p.cenaNetto)}</td>
+                    <td>${formatPLNV17(netto)}</td>
+                    <td>${vatProcent}%</td>
+                    <td>${formatPLNV17(brutto)}</td>
+                    <td>
+                        <div class="wycena-actions-v17">
+                            <button class="btn btn-secondary small-btn" onclick="pokazPanelEdycjiPozycjiV17('${esc(String(p.id))}')">Edycja</button>
+                            <button class="btn btn-danger small-btn" onclick="usunPozycjeWyceny('${esc(String(p.id))}')">Usuń</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+
+        if (typeof przeliczWycene === "function") przeliczWycene();
+    };
+
+    window.usunPozycjeWyceny = function(id) {
+        if (typeof rolaUsera !== "undefined" && rolaUsera === "guest") {
+            alert("Gość nie może modyfikować wyceny.");
+            return;
+        }
+        const lista = getWycenaPozycjeV17().filter(p => String(p.id) !== String(id));
+        setWycenaPozycjeV17(lista);
+        renderujWycene();
+    };
+
+    // Przy edycji kosztorysu pilnujemy, żeby pozycje były wczytane do właściwej listy.
+    const oldWczytajKosztorysV17 = window.wczytajKosztorys;
+    if (typeof oldWczytajKosztorysV17 === "function") {
+        window.wczytajKosztorys = function(id) {
+            oldWczytajKosztorysV17(id);
+            try {
+                if (typeof wycenaPozycje !== "undefined" && Array.isArray(wycenaPozycje)) {
+                    setWycenaPozycjeV17(wycenaPozycje.map(normalizePositionV17));
+                }
+            } catch(e) {}
+            setTimeout(() => {
+                ensureEditPanelV17();
+                renderujWycene();
+            }, 40);
+        };
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        setTimeout(() => {
+            ensureEditPanelV17();
+            try { renderujWycene(); } catch(e) {}
+        }, 600);
+    });
+})();
+

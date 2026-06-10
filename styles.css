@@ -2850,3 +2850,140 @@ th:last-child {
   width: auto;
   min-width: 0;
 }
+
+
+/* PATCH V17 — przywrócenie układu Wycena + Edycja pod Dodaj pozycję */
+
+/* Cofnięcie zbyt szerokiego okna Edycji z v15/v16 */
+#section-wycena #panel-edycja-pozycji,
+#wycena #panel-edycja-pozycji,
+#panel-edycja-pozycji.edit-position-card-v17 {
+    width: 100% !important;
+    max-width: none !important;
+    margin-top: 16px !important;
+    margin-bottom: 0 !important;
+    grid-column: auto !important;
+}
+
+/* Edycja ma wyglądać jak druga karta w lewym panelu */
+#panel-edycja-pozycji.edit-position-card-v17 {
+    border: 1px solid rgba(125, 211, 160, 0.34) !important;
+}
+
+#panel-edycja-pozycji.edit-position-card-v17 h2 {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin-bottom: 18px !important;
+}
+
+#panel-edycja-pozycji.edit-position-card-v17 .section-marker {
+    width: 6px !important;
+    height: 34px !important;
+    border-radius: 999px !important;
+    background: #7dd3a0 !important;
+    display: inline-block !important;
+}
+
+#panel-edycja-pozycji.edit-position-card-v17 label {
+    display: block !important;
+    margin-bottom: 12px !important;
+}
+
+#panel-edycja-pozycji.edit-position-card-v17 input,
+#panel-edycja-pozycji.edit-position-card-v17 select {
+    width: 100% !important;
+}
+
+.edit-actions-v17 {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+    margin-top: 10px !important;
+}
+
+/* Akcje w Zestawieniu prac tylko w module Wycena */
+#section-wycena .wycena-actions-v17,
+#wycena .wycena-actions-v17 {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    flex-wrap: nowrap !important;
+}
+
+#section-wycena .wycena-actions-v17 .btn,
+#wycena .wycena-actions-v17 .btn {
+    width: auto !important;
+    min-width: 76px !important;
+    height: 34px !important;
+    padding: 7px 12px !important;
+    white-space: nowrap !important;
+}
+
+/* Kolumna akcji w wycenie ma tylko tyle miejsca, ile trzeba */
+#section-wycena #tabela-wyceny th:last-child,
+#section-wycena #tabela-wyceny td:last-child,
+#wycena #tabela-wyceny th:last-child,
+#wycena #tabela-wyceny td:last-child {
+    width: 175px !important;
+    min-width: 175px !important;
+}
+
+/* Kosztorysy — naprawa ucinania przycisków */
+#section-kosztorysy .table-wrapper {
+    overflow-x: auto !important;
+}
+
+#section-kosztorysy table {
+    min-width: 1180px !important;
+}
+
+#section-kosztorysy th:last-child,
+#section-kosztorysy td:last-child {
+    width: 300px !important;
+    min-width: 300px !important;
+    max-width: none !important;
+}
+
+#section-kosztorysy .table-actions {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+}
+
+#section-kosztorysy .table-actions .btn {
+    min-width: 82px !important;
+    width: auto !important;
+    white-space: nowrap !important;
+}
+
+/* Cofnięcie globalnych reguł z poprzedniej wersji, ale dopiero po regułach modułowych */
+body td:last-child,
+body th:last-child {
+    max-width: none;
+}
+
+@media (max-width: 700px) {
+    .edit-actions-v17 {
+        grid-template-columns: 1fr !important;
+    }
+
+    #section-wycena .wycena-actions-v17,
+    #wycena .wycena-actions-v17 {
+        justify-content: flex-start !important;
+    }
+
+    #section-wycena #tabela-wyceny th:last-child,
+    #section-wycena #tabela-wyceny td:last-child,
+    #wycena #tabela-wyceny th:last-child,
+    #wycena #tabela-wyceny td:last-child {
+        width: 165px !important;
+        min-width: 165px !important;
+    }
+}
+
