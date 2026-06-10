@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-11";
+const APP_VERSION = "2026.06.10-12";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -4645,5 +4645,151 @@ function generujSzybkaWycene() {
         sanitarne: punktySanitarne,
         co: punktyCO || grzejniki
     });
+}
+
+
+
+// ==========================================
+// SZYBKA WYCENA V12 — POPRAWKA DODAWANIA DO ZESTAWIENIA
+// ==========================================
+
+function pobierzLiczbeBezpiecznieV12(value, fallback = 0) {
+    if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
+    if (value === null || value === undefined) return fallback;
+    const parsed = Number(String(value).replace(",", ".").replace(/[^\d.-]/g, ""));
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function przygotujPozycjeDoGlownejWycenyV12(p) {
+    const nazwa = p.nazwa || p.name || p.usluga || "Pozycja";
+    const jednostka = p.jednostka || p.unit || "szt.";
+    const ilosc = pobierzLiczbeBezpiecznieV12(p.ilosc ?? p.quantity ?? p.qty, 1);
+    const cenaNetto = pobierzLiczbeBezpiecznieV12(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? p.netto, 0);
+    const vat = pobierzLiczbeBezpiecznieV12(p.vat ?? p.vat_rate ?? 23, 23);
+
+    return {
+        id: p.id || ("wycena-" + Date.now() + "-" + Math.random().toString(16).slice(2)),
+        usluga_id: p.usluga_id || null,
+
+        nazwa,
+        name: nazwa,
+        usluga: nazwa,
+        opis: p.opis || p.uwaga || p.note || "",
+
+        jednostka,
+        unit: jednostka,
+
+        ilosc,
+        quantity: ilosc,
+
+        cena_netto: cenaNetto,
+        cenaNetto,
+        cena: cenaNetto,
+        price: cenaNetto,
+
+        vat,
+        vat_rate: vat,
+
+        uwaga: p.uwaga || p.note || "",
+        note: p.uwaga || p.note || "",
+        zrodlo: p.zrodlo || "szybka-wycena"
+    };
+}
+
+function dodajPozycjeDoWyceny() {
+    if (!Array.isArray(szybkaWycenaPropozycje) || !szybkaWycenaPropozycje.length) {
+        alert("Najpierw wygeneruj propozycję wyceny.");
+        return;
+    }
+
+    const pozycje = normalizujPozycjeSzybkiejWyceny(szybkaWycenaPropozycje)
+        .map(przygotujPozycjeDoGlownejWycenyV12)
+        .filter(p => p.nazwa && p.ilosc > 0);
+
+    if (!pozycje.length) {
+        alert("Brak poprawnych pozycji do dodania.");
+        return;
+    }
+
+    // Najczęstsza nazwa tablicy w EL-Net.
+    if (!Array.isArray(window.wycenaPozycje)) {
+        window.wycenaPozycje = [];
+    }
+
+    pozycje.forEach(p => window.wycenaPozycje.push(p));
+
+    // Dla starszych fragmentów kodu, które mogą używać zmiennej globalnej bez window.
+    try {
+        if (typeof wycenaPozycje !== "undefined" && Array.isArray(wycenaPozycje) && wycenaPozycje !== window.wycenaPozycje) {
+            pozycje.forEach(p => wycenaPozycje.push(p));
+        }
+    } catch (err) {
+        // ignorujemy — window.wycenaPozycje jest główne
+    }
+
+    // Odśwież tabelę i sumy — obsługa różnych nazw funkcji z wcześniejszych wersji.
+    const renderFns = [
+        "renderujWycene",
+        "renderujPozycjeWyceny",
+        "renderujTabeleWyceny",
+        "renderWycena",
+        "odswiezWycene",
+        "przeliczWycene",
+        "aktualizujPodsumowanieWyceny",
+        "renderujKosztorys"
+    ];
+
+    renderFns.forEach(fn => {
+        try {
+            if (typeof window[fn] === "function") window[fn]();
+        } catch (err) {
+            console.warn("Nie udało się wykonać", fn, err);
+        }
+    });
+
+    try { przeliczWyceneAwaryjnieV12(); } catch (err) { console.warn(err); }
+
+    // Jeżeli istnieje ręczny formularz dodawania, nie czyścimy go. Czyścimy tylko propozycję.
+    szybkaWycenaPropozycje = [];
+    const wynik = document.getElementById("szybka-wycena-wynik");
+    if (wynik) {
+        wynik.innerHTML = `
+            <div class="notice success">
+                Dodano ${pozycje.length} pozycji do zestawienia prac.
+            </div>
+        `;
+    }
+
+    // Przewiń do głównego zestawienia.
+    const zestawienie = document.querySelector("#wycena-pozycje, #lista-pozycji-wyceny, #wycena-table, .wycena-table, .estimate-table, .table-scroll");
+    if (zestawienie && typeof zestawienie.scrollIntoView === "function") {
+        zestawienie.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+}
+
+// Awaryjne przeliczenie tabeli, gdy starsza funkcja renderująca nie zna nowych pól.
+function przeliczWyceneAwaryjnieV12() {
+    const lista = Array.isArray(window.wycenaPozycje) ? window.wycenaPozycje : [];
+    const netto = lista.reduce((sum, p) => {
+        const ilosc = pobierzLiczbeBezpiecznieV12(p.ilosc ?? p.quantity, 0);
+        const cena = pobierzLiczbeBezpiecznieV12(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price, 0);
+        return sum + ilosc * cena;
+    }, 0);
+    const vat = lista.reduce((sum, p) => {
+        const ilosc = pobierzLiczbeBezpiecznieV12(p.ilosc ?? p.quantity, 0);
+        const cena = pobierzLiczbeBezpiecznieV12(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price, 0);
+        const stawka = pobierzLiczbeBezpiecznieV12(p.vat ?? p.vat_rate, 23);
+        return sum + ilosc * cena * stawka / 100;
+    }, 0);
+
+    const kwoty = {
+        netto: netto.toFixed(2) + " PLN",
+        vat: vat.toFixed(2) + " PLN",
+        brutto: (netto + vat).toFixed(2) + " PLN"
+    };
+
+    document.querySelectorAll("[data-wycena-netto], #wycena-netto, .wycena-netto").forEach(el => el.textContent = kwoty.netto);
+    document.querySelectorAll("[data-wycena-vat], #wycena-vat, .wycena-vat").forEach(el => el.textContent = kwoty.vat);
+    document.querySelectorAll("[data-wycena-brutto], #wycena-brutto, .wycena-brutto").forEach(el => el.textContent = kwoty.brutto);
 }
 
