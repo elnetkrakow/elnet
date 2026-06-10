@@ -2648,3 +2648,105 @@ svg {
     min-width: 780px;
   }
 }
+
+
+/* PATCH V20 — tylko panel Edycja pod Dodaj pozycję, bez zmiany układu */
+
+/* Panel Edycja ma siedzieć w tej samej lewej kolumnie co Dodaj pozycję */
+#panel-edycja-pozycji-v20 {
+    width: 100%;
+    margin-top: 16px;
+    border: 1px solid rgba(125, 211, 160, 0.34);
+}
+
+#panel-edycja-pozycji-v20 h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+#panel-edycja-pozycji-v20 .section-marker {
+    width: 6px;
+    height: 34px;
+    border-radius: 999px;
+    background: #7dd3a0;
+    display: inline-block;
+}
+
+#panel-edycja-pozycji-v20 label {
+    display: block;
+    margin-bottom: 12px;
+}
+
+#panel-edycja-pozycji-v20 input,
+#panel-edycja-pozycji-v20 select {
+    width: 100%;
+}
+
+.edit-info-v20 {
+    color: #aebbd0;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.edit-actions-v20 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+/* Przyciski Edycja i Usuń tylko w tabeli Wycena */
+.wycena-actions-v20 {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+}
+
+.wycena-actions-v20 .btn {
+    width: auto;
+    min-width: 74px;
+    height: 34px;
+    padding: 7px 10px;
+    white-space: nowrap;
+}
+
+#tabela-wyceny th:last-child,
+#tabela-wyceny td:last-child {
+    min-width: 170px;
+    width: 170px;
+}
+
+/* Kosztorysy — nie ucinać przycisków */
+#section-kosztorysy .table-wrapper {
+    overflow-x: auto;
+}
+
+#section-kosztorysy table {
+    min-width: 1180px;
+}
+
+#section-kosztorysy th:last-child,
+#section-kosztorysy td:last-child {
+    min-width: 300px;
+    width: 300px;
+}
+
+#section-kosztorysy .table-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+}
+
+#section-kosztorysy .table-actions .btn {
+    white-space: nowrap;
+    min-width: 82px;
+}
+
