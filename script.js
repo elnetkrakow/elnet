@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-25";
+const APP_VERSION = "2026.06.10-26";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -254,6 +254,9 @@ function podepnijZdarzenia() {
 
     const btnAnulujEdycjePanel = document.getElementById("btn-anuluj-edycje");
     if (btnAnulujEdycjePanel) btnAnulujEdycjePanel.addEventListener("click", anulujPanelEdycjiPozycji);
+
+    const btnZapiszUslugeZWyceny = document.getElementById("btn-zapisz-usluge-z-wyceny");
+    if (btnZapiszUslugeZWyceny) btnZapiszUslugeZWyceny.addEventListener("click", zapiszUslugeZWyceny);
 
     const btnZapiszUsluge = document.getElementById("btn-zapisz-usluge");
     if (btnZapiszUsluge) btnZapiszUsluge.addEventListener("click", zapiszUsluge);
@@ -2668,6 +2671,67 @@ function anulujEdycjePozycji() {
     if (btn) btn.textContent = "Dodaj do wyceny";
     const btnAnuluj = document.getElementById("btn-anuluj-edycje-wyceny");
     if (btnAnuluj) btnAnuluj.classList.add("hidden");
+}
+
+async function zapiszUslugeZWyceny() {
+    const nazwa = document.getElementById("wycena-nowa-usluga-nazwa").value.trim();
+    const jednostka = document.getElementById("wycena-nowa-usluga-jednostka").value;
+    const cenaNetto = Number(document.getElementById("wycena-nowa-usluga-cena").value);
+
+    if (!nazwa) {
+        alert("Wpisz nazwę usługi.");
+        return;
+    }
+
+    if (!jednostka) {
+        alert("Wybierz jednostkę.");
+        return;
+    }
+
+    if (isNaN(cenaNetto) || cenaNetto < 0) {
+        alert("Wpisz poprawną cenę netto (liczba >= 0).");
+        return;
+    }
+
+    const payload = {
+        nazwa,
+        jednostka,
+        cena_netto: cenaNetto,
+        cena: cenaNetto,
+        kategoria: "Wycena"
+    };
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/uslugi`, {
+            method: "POST",
+            headers: headers(),
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("Błąd zapisu usługi:", errorText);
+            alert("Nie udało się zapisać usługi. Sprawdź bazę usług lub uprawnienia.");
+            return;
+        }
+
+        // Odśwież lokalną listę usług
+        await pobierzUslugi();
+        renderujSelectUslug();
+
+        // Wyczyść formularz
+        document.getElementById("wycena-nowa-usluga-nazwa").value = "";
+        document.getElementById("wycena-nowa-usluga-jednostka").value = "szt.";
+        document.getElementById("wycena-nowa-usluga-cena").value = "";
+
+        // Pokaż komunikat sukcesu
+        alert("Usługa zapisana w cenniku.");
+
+        zapiszLog("Wycena", "Dodano usługę do cennika", nazwa);
+    } catch (err) {
+        console.error("Błąd zapisu usługi:", err);
+        alert("Nie udało się zapisać usługi. Sprawdź bazę usług lub uprawnienia.");
+    }
 }
 
 function przeliczWycene() {
