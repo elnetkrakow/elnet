@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-24";
+const APP_VERSION = "2026.06.10-25";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -207,8 +207,8 @@ function podepnijZdarzenia() {
         }
     });
 
-    const btnDodajPozycje = document.getElementById("btn-dodaj-pozycje");
-    if (btnDodajPozycje) btnDodajPozycje.addEventListener("click", dodajPozycjeDoWyceny);
+    const btnDodajPozycjeRecznie = document.getElementById("btn-dodaj-pozycje-recznie");
+    if (btnDodajPozycjeRecznie) btnDodajPozycjeRecznie.addEventListener("click", dodajPozycjeRecznieDoWyceny);
 
     const btnSzybkaWycenaGeneruj = document.getElementById("btn-szybka-wycena-generuj");
     if (btnSzybkaWycenaGeneruj) btnSzybkaWycenaGeneruj.addEventListener("click", generujSzybkaWycene);
@@ -2447,7 +2447,7 @@ window.onAndroidSpeechStatus = function(status) {
     btn.textContent = status === "Słucham..." ? "🎙 Słucham..." : "🎙 Dopowiedz";
 };
 
-function dodajPozycjeDoWyceny() {
+function dodajPozycjeRecznieDoWyceny() {
     if (rolaUsera === "guest") {
         alert("Gość nie może modyfikować wyceny.");
         return;
@@ -2478,19 +2478,38 @@ function dodajPozycjeDoWyceny() {
         return;
     }
 
-    wycenaPozycje.push({
-        id: Date.now().toString(),
-        nazwa,
-        jednostka,
-        ilosc,
-        cenaNetto: cena,
-        vatProcent
-    });
+    if (edytowanaPozycjaIdPanel) {
+        wycenaPozycje = wycenaPozycje.map(p => {
+            if (String(p.id) !== String(edytowanaPozycjaIdPanel)) return p;
+            return {
+                ...p,
+                nazwa,
+                jednostka,
+                ilosc,
+                cenaNetto: cena,
+                vatProcent
+            };
+        });
 
-    // clear only ilość by default as before
-    document.getElementById("wycena-ilosc").value = "";
+        renderujWycene();
+        przeliczWycene();
+        anulujPanelEdycjiPozycji();
+    } else {
+        wycenaPozycje.push({
+            id: Date.now().toString(),
+            nazwa,
+            jednostka,
+            ilosc,
+            cenaNetto: cena,
+            vatProcent
+        });
 
-    renderujWycene();
+        // clear only ilość by default as before
+        document.getElementById("wycena-ilosc").value = "";
+
+        renderujWycene();
+        przeliczWycene();
+    }
 }
 
 function renderujWycene() {
@@ -2645,7 +2664,7 @@ function anulujEdycjePozycji() {
     if (jednostka) jednostka.value = "szt.";
 
     // przywróć tekst przycisku i ukryj Anuluj
-    const btn = document.getElementById("btn-dodaj-pozycje");
+    const btn = document.getElementById("btn-dodaj-pozycje-recznie");
     if (btn) btn.textContent = "Dodaj do wyceny";
     const btnAnuluj = document.getElementById("btn-anuluj-edycje-wyceny");
     if (btnAnuluj) btnAnuluj.classList.add("hidden");
@@ -4823,7 +4842,7 @@ function przygotujPozycjeDoGlownejWycenyV12(p) {
     };
 }
 
-function dodajPozycjeDoWyceny() {
+function dodajPozycjeZSzybkiejWyceny() {
     if (!Array.isArray(szybkaWycenaPropozycje) || !szybkaWycenaPropozycje.length) {
         alert("Najpierw wygeneruj propozycję wyceny.");
         return;
