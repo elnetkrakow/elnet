@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-10";
+const APP_VERSION = "2026.06.10-11";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -2211,7 +2211,7 @@ function generujSzybkaWycene() {
         }
     }
 
-    szybkaWycenaPropozycje = propozycje;
+    szybkaWycenaPropozycje = normalizujPozycjeSzybkiejWyceny(propozycje);
     renderujSzybkaWyceneWynik({
         metraz,
         punkty: punktyElektryczne,
@@ -2220,6 +2220,39 @@ function generujSzybkaWycene() {
         remont,
         gniazda: gniazdaPodane,
         laczniki: lacznikiPodane
+    });
+}
+
+
+function normalizujPozycjeSzybkiejWyceny(lista) {
+    if (!Array.isArray(lista)) return [];
+
+    return lista.map((p) => {
+        const cena = Number(
+            p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? p.netto ?? 0
+        );
+        const ilosc = Number(
+            p.ilosc ?? p.quantity ?? p.qty ?? 1
+        );
+        const vat = Number(
+            p.vat ?? p.vat_rate ?? 23
+        );
+
+        return {
+            ...p,
+            nazwa: p.nazwa || p.name || "Pozycja",
+            name: p.name || p.nazwa || "Pozycja",
+            jednostka: p.jednostka || p.unit || "szt.",
+            unit: p.unit || p.jednostka || "szt.",
+            cena_netto: Number.isFinite(cena) ? cena : 0,
+            cenaNetto: Number.isFinite(cena) ? cena : 0,
+            cena: Number.isFinite(cena) ? cena : 0,
+            price: Number.isFinite(cena) ? cena : 0,
+            ilosc: Number.isFinite(ilosc) ? ilosc : 1,
+            quantity: Number.isFinite(ilosc) ? ilosc : 1,
+            vat: Number.isFinite(vat) ? vat : 23,
+            uwaga: p.uwaga || p.note || ""
+        };
     });
 }
 
@@ -4337,7 +4370,7 @@ function generujSzybkaWycene() {
         }
     }
 
-    szybkaWycenaPropozycje = propozycje;
+    szybkaWycenaPropozycje = normalizujPozycjeSzybkiejWyceny(propozycje);
     renderujSzybkaWyceneWynik({
         metraz,
         punkty: punktyElektryczne,
@@ -4381,16 +4414,27 @@ function dodajPozycjeRegulyBezPowielania(lista, config) {
 
     if (istnieje) return;
 
+    const cena = Number(config.cena ?? config.cena_netto ?? config.cenaNetto ?? 0);
+    const ilosc = Number(config.ilosc ?? 1);
+    const vat = Number(config.vat ?? 23);
+
     lista.push({
         id: "rule-" + Date.now() + "-" + Math.random().toString(16).slice(2),
         usluga_id: null,
         nazwa: config.nazwa,
+        name: config.nazwa,
         jednostka: config.jednostka || "szt.",
-        cena_netto: Number(config.cena || 0),
-        cena: Number(config.cena || 0),
-        ilosc: Number(config.ilosc || 1),
-        vat: config.vat ?? 23,
+        unit: config.jednostka || "szt.",
+        cena_netto: cena,
+        cenaNetto: cena,
+        price: cena,
+        cena: cena,
+        ilosc: ilosc,
+        quantity: ilosc,
+        vat: vat,
+        vat_rate: vat,
         uwaga: config.uwaga || "Doliczono automatycznie w trybie remontowym",
+        note: config.uwaga || "Doliczono automatycznie w trybie remontowym",
         zrodlo: "reguly-remontowe"
     });
 }
@@ -4587,7 +4631,7 @@ function generujSzybkaWycene() {
         }
     }
 
-    szybkaWycenaPropozycje = propozycje;
+    szybkaWycenaPropozycje = normalizujPozycjeSzybkiejWyceny(propozycje);
     renderujSzybkaWyceneWynik({
         metraz,
         punkty: punktyElektryczne,

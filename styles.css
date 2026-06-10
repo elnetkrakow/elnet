@@ -2613,3 +2613,38 @@ svg {
         max-width: 150px !important;
     }
 }
+
+
+/* v11 — czytelniejsza tabela szybkiej wyceny w APK */
+.szybka-wycena-wynik,
+#szybka-wycena-wynik {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.szybka-wycena-wynik table,
+#szybka-wycena-wynik table,
+.table-scroll table {
+  min-width: 760px;
+}
+
+.szybka-wycena-wynik th:first-child,
+.szybka-wycena-wynik td:first-child,
+#szybka-wycena-wynik th:first-child,
+#szybka-wycena-wynik td:first-child {
+  min-width: 220px;
+  white-space: normal;
+}
+
+@media (max-width: 700px) {
+  .szybka-wycena-wynik,
+  #szybka-wycena-wynik {
+    overflow-x: auto;
+  }
+
+  .szybka-wycena-wynik table,
+  #szybka-wycena-wynik table {
+    min-width: 780px;
+  }
+}
