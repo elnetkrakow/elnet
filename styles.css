@@ -410,6 +410,42 @@ hr {
     width: 100%;
 }
 
+/* Ensure Action column in Zestawienie prac fits both buttons */
+#tabela-wyceny th:last-child,
+#tabela-wyceny td:last-child {
+    min-width: 170px;
+    width: 170px;
+    text-align: right;
+}
+
+.wycena-actions,
+.table-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+.wycena-actions .btn,
+.table-actions .btn {
+    min-width: 72px;
+    width: auto;
+    padding-left: 10px;
+    padding-right: 10px;
+    white-space: nowrap;
+}
+
+/* If table still needs horizontal space, allow scrolling and slightly increase min-width */
+#section-wycena .table-wrapper {
+    overflow-x: auto;
+}
+
+#section-wycena .table-wrapper table {
+    min-width: 980px;
+}
+
 #section-wycena .table-wrapper thead th,
 #section-wycena .table-wrapper td {
     padding: 14px 16px;
