@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-27";
+const APP_VERSION = "2026.06.10-29";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -272,6 +272,8 @@ function podepnijZdarzenia() {
 
     const btnZastosujKorekte = document.getElementById("btn-zastosuj-korekte-cen");
     if (btnZastosujKorekte) btnZastosujKorekte.addEventListener("click", zastosujKorekteCenPozycji);
+    const btnWyzerujKorekte = document.getElementById("btn-wyzeruj-korekte-cen");
+    if (btnWyzerujKorekte) btnWyzerujKorekte.addEventListener("click", wyzerujKorekteCenPozycji);
 
     const sortujUslugi = document.getElementById("sortuj-uslugi");
     if (sortujUslugi) sortujUslugi.addEventListener("change", renderujUslugi);
@@ -2364,6 +2366,10 @@ function dodajSzybkaWyceneDoTabeli() {
             jednostka: p.jednostka,
             ilosc: Number(p.ilosc),
             cenaNetto: Number(p.cenaNetto),
+            cena_netto: Number(p.cenaNetto),
+            cena: Number(p.cenaNetto),
+            price: Number(p.cenaNetto),
+            cenaBazowa: Number(p.cenaNetto),
             vatProcent: Number(p.vatProcent || 23)
         });
     });
@@ -2496,6 +2502,10 @@ function dodajPozycjeRecznieDoWyceny() {
                 jednostka,
                 ilosc,
                 cenaNetto: cena,
+                cena_netto: cena,
+                cena: cena,
+                price: cena,
+                cenaBazowa: p.cenaBazowa ?? cena,
                 vatProcent
             };
         });
@@ -2510,6 +2520,10 @@ function dodajPozycjeRecznieDoWyceny() {
             jednostka,
             ilosc,
             cenaNetto: cena,
+            cena_netto: cena,
+            cena: cena,
+            price: cena,
+            cenaBazowa: cena,
             vatProcent
         });
 
@@ -2805,6 +2819,16 @@ function ustawVatDlaCalejWyceny() {
     try { przeliczWycene(); } catch (e) { console.warn(e); }
 }
 
+function zapewnijCenyBazowePozycji() {
+    wycenaPozycje = wycenaPozycje.map(p => {
+        const aktualnaCena = Number(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0) || 0;
+        if (p.cenaBazowa === undefined || p.cenaBazowa === null) {
+            return { ...p, cenaBazowa: aktualnaCena };
+        }
+        return p;
+    });
+}
+
 function zastosujKorekteCenPozycji() {
     const input = document.getElementById("wycena-korekta");
     if (!input) return;
@@ -2821,11 +2845,13 @@ function zastosujKorekteCenPozycji() {
         return;
     }
 
+    zapewnijCenyBazowePozycji();
+
     const mnoznik = 1 + procent / 100;
 
     wycenaPozycje = wycenaPozycje.map(p => {
-        const obecnaCena = Number(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0) || 0;
-        const nowaCena = Math.round(obecnaCena * mnoznik * 100) / 100;
+        const baza = Number(p.cenaBazowa ?? p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0) || 0;
+        const nowaCena = Math.round(baza * mnoznik * 100) / 100;
 
         return {
             ...p,
@@ -2841,6 +2867,28 @@ function zastosujKorekteCenPozycji() {
     try { renderujWycene(); } catch (e) { console.warn(e); }
     try { przeliczWycene(); } catch (e) { console.warn(e); }
 }
+
+function wyzerujKorekteCenPozycji() {
+    if (!Array.isArray(wycenaPozycje) || wycenaPozycje.length === 0) return;
+
+    wycenaPozycje = wycenaPozycje.map(p => {
+        const baza = Number(p.cenaBazowa ?? p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0) || 0;
+        return {
+            ...p,
+            cenaNetto: baza,
+            cena_netto: baza,
+            cena: baza,
+            price: baza
+        };
+    });
+
+    const input = document.getElementById("wycena-korekta");
+    if (input) input.value = "0";
+
+    try { renderujWycene(); } catch (e) { console.warn(e); }
+    try { przeliczWycene(); } catch (e) { console.warn(e); }
+}
+
 
 function wyczyscWycene() {
     wycenaPozycje = [];
@@ -3729,6 +3777,8 @@ window.wczytajKosztorys = function(id) {
     } catch {
         wycenaPozycje = [];
     }
+
+    zapewnijCenyBazowePozycji();
 
     document.getElementById("kosztorys-nazwa").value = k.nazwa || "";
     document.getElementById("wycena-korekta").value = k.korekta || 0;
