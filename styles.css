@@ -2198,6 +2198,19 @@ svg {
         min-width: 0 !important;
     }
 
+/* Hide quick estimate card on desktop, keep visible on mobile */
+@media (min-width: 901px) {
+    .mobile-only {
+        display: none !important;
+    }
+}
+
+@media (max-width: 900px) {
+    .mobile-only {
+        display: block !important;
+    }
+}
+
     #section-terminarz .calendar-title {
         text-align: center !important;
         font-size: 17px !important;
