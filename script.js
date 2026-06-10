@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-21";
+const APP_VERSION = "2026.06.10-22";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -28,6 +28,7 @@ let edytowanyTerminId = null;
 let wycenaPozycje = [];
 let szybkaWycenaPropozycje = [];
 let edytowanaUslugaId = null;
+let edytowanaPozycjaId = null;
 let edytowanaInwestycjaId = null;
 let trybEdycjiKosztorysu = false;
 let edytowanyKosztorysId = null;
@@ -243,6 +244,12 @@ function podepnijZdarzenia() {
 
     const btnZapiszKosztorys = document.getElementById("btn-zapisz-kosztorys");
     if (btnZapiszKosztorys) btnZapiszKosztorys.addEventListener("click", zapiszKosztorys);
+
+    const btnZapiszEdycje = document.getElementById("btn-zapisz-edycje");
+    if (btnZapiszEdycje) btnZapiszEdycje.addEventListener("click", zapiszEdycjePozycji);
+
+    const btnAnulujEdycja = document.getElementById("btn-anuluj-edycja");
+    if (btnAnulujEdycja) btnAnulujEdycja.addEventListener("click", anulujEdycjePozycji);
 
     const btnZapiszUsluge = document.getElementById("btn-zapisz-usluge");
     if (btnZapiszUsluge) btnZapiszUsluge.addEventListener("click", zapiszUsluge);
@@ -2494,7 +2501,7 @@ function renderujWycene() {
         const vat = netto * (vatProcent / 100);
         const brutto = netto + vat;
         const akcja = rolaUsera !== "guest"
-            ? `<button class="btn btn-danger small-btn" onclick="usunPozycjeWyceny('${p.id}')">Usuń</button>`
+            ? `<div class="wycena-actions"><button class="btn btn-secondary tiny-btn" onclick="edytujPozycjeWyceny('${p.id}')">Edycja</button><button class="btn btn-danger tiny-btn" onclick="usunPozycjeWyceny('${p.id}')">Usuń</button></div>`
             : "";
 
         return `
@@ -2523,6 +2530,91 @@ window.usunPozycjeWyceny = function(id) {
     wycenaPozycje = wycenaPozycje.filter(p => p.id !== id);
     renderujWycene();
 };
+
+window.edytujPozycjeWyceny = function(id) {
+    if (rolaUsera === "guest") {
+        alert("Tylko zalogowany użytkownik może edytować pozycje.");
+        return;
+    }
+
+    const p = wycenaPozycje.find(x => String(x.id) === String(id));
+    if (!p) return;
+
+    edytowanaPozycjaId = String(id);
+
+    // wczytaj dane do formularza edycji
+    document.getElementById("edycja-nazwa").value = p.nazwa || "";
+    document.getElementById("edycja-jednostka").value = p.jednostka || "szt.";
+    document.getElementById("edycja-ilosc").value = p.ilosc ?? "";
+    document.getElementById("edycja-cena").value = p.cenaNetto ?? "";
+    document.getElementById("edycja-vat").value = p.vatProcent ?? 23;
+    document.getElementById("edycja-uwagi").value = p.uwagi || "";
+
+    // pokaż formularz edycji
+    const pusty = document.getElementById("edycja-pusty");
+    const form = document.getElementById("edycja-form");
+    if (pusty) pusty.classList.add("hidden");
+    if (form) form.classList.remove("hidden");
+};
+
+function zapiszEdycjePozycji() {
+    if (!edytowanaPozycjaId) return;
+
+    const nazwa = document.getElementById("edycja-nazwa").value.trim();
+    const jednostka = document.getElementById("edycja-jednostka").value;
+    const ilosc = Number(document.getElementById("edycja-ilosc").value);
+    const cena = Number(document.getElementById("edycja-cena").value);
+    const vat = Number(document.getElementById("edycja-vat").value);
+    const uwagi = document.getElementById("edycja-uwagi").value.trim();
+
+    if (isNaN(ilosc) || ilosc <= 0) {
+        alert("Wpisz poprawną ilość.");
+        return;
+    }
+
+    if (isNaN(cena) || cena < 0) {
+        alert("Wpisz poprawną cenę.");
+        return;
+    }
+
+    wycenaPozycje = wycenaPozycje.map(p => {
+        if (String(p.id) !== String(edytowanaPozycjaId)) return p;
+        return {
+            ...p,
+            nazwa: nazwa || p.nazwa,
+            jednostka: jednostka,
+            ilosc,
+            cenaNetto: cena,
+            vatProcent: vat,
+            uwagi: uwagi || p.uwagi || ""
+        };
+    });
+
+    // odśwież tabelę i sumy
+    renderujWycene();
+
+    // zamknij formularz edycji
+    anulujEdycjePozycji();
+}
+
+function anulujEdycjePozycji() {
+    edytowanaPozycjaId = null;
+    const pusty = document.getElementById("edycja-pusty");
+    const form = document.getElementById("edycja-form");
+    if (form) form.classList.add("hidden");
+    if (pusty) pusty.classList.remove("hidden");
+
+    // wyczyść pola
+    const fields = ["edycja-nazwa", "edycja-ilosc", "edycja-cena", "edycja-uwagi"];
+    fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
+    const sel = document.getElementById("edycja-vat");
+    if (sel) sel.value = "23";
+    const jednostka = document.getElementById("edycja-jednostka");
+    if (jednostka) jednostka.value = "szt.";
+}
 
 function przeliczWycene() {
     const korekta = Number(document.getElementById("wycena-korekta")?.value || 0);

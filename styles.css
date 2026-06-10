@@ -375,8 +375,36 @@ hr {
     align-items: start;
 }
 
-#section-wycena .layout-two > .card:first-child {
+#section-wycena .layout-two > .card:first-child,
+#section-wycena .layout-two > .left-column {
     max-width: 420px;
+}
+
+/* Edit card column (left) stacks cards vertically without changing widths */
+.left-column {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* Small inline action buttons in Wycena table */
+.wycena-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.tiny-btn {
+    padding: 6px 8px;
+    font-size: 13px;
+    border-radius: 8px;
+    min-width: 0;
+}
+
+#section-wycena .table-wrapper td:last-child .wycena-actions .btn {
+    padding: 6px 8px;
+    min-width: 0;
 }
 
 #section-wycena .table-wrapper {
