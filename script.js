@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-09";
+const APP_VERSION = "2026.06.10-10";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -4331,6 +4331,256 @@ function generujSzybkaWycene() {
     if (!propozycje.length) {
         if (metraz) {
             dodaj({ nazwa: "Robocizna remontowa — wycena szacunkowa", szukaj: ["robocizna", "remont", "prace"], jednostka: "m²", ilosc: metraz, cena: 110, uwaga: "Nie wykryto szczegółów — szacunek z metrażu" });
+        } else {
+            alert("Nie udało się rozpoznać zakresu. Dopisz metraż albo słowa: malowanie, gładź, gniazda, punkty, wod-kan, C.O., wykładzina.");
+            return;
+        }
+    }
+
+    szybkaWycenaPropozycje = propozycje;
+    renderujSzybkaWyceneWynik({
+        metraz,
+        punkty: punktyElektryczne,
+        pokoje,
+        odZera,
+        remont,
+        wymiana,
+        przerobka,
+        gniazda,
+        laczniki,
+        sanitarne: punktySanitarne,
+        co: punktyCO || grzejniki
+    });
+}
+
+
+
+// ==========================================
+// SZYBKA WYCENA V10 — ZESTAWY ROBÓT BEZ POWIELANIA
+// ==========================================
+
+function dodajPozycjeRegulyBezPowielania(lista, config) {
+    if (!config || !config.nazwa) return;
+
+    const key = normalizeText(config.nazwa)
+        .replace(/\s+/g, " ")
+        .replace(/wykonanie /g, "")
+        .replace(/montaz /g, "")
+        .replace(/montaż /g, "")
+        .trim();
+
+    const istnieje = lista.some(p => {
+        const nazwa = normalizeText(p.nazwa || p.name || "")
+            .replace(/\s+/g, " ")
+            .replace(/wykonanie /g, "")
+            .replace(/montaz /g, "")
+            .replace(/montaż /g, "")
+            .trim();
+        return nazwa === key;
+    });
+
+    if (istnieje) return;
+
+    lista.push({
+        id: "rule-" + Date.now() + "-" + Math.random().toString(16).slice(2),
+        usluga_id: null,
+        nazwa: config.nazwa,
+        jednostka: config.jednostka || "szt.",
+        cena_netto: Number(config.cena || 0),
+        cena: Number(config.cena || 0),
+        ilosc: Number(config.ilosc || 1),
+        vat: config.vat ?? 23,
+        uwaga: config.uwaga || "Doliczono automatycznie w trybie remontowym",
+        zrodlo: "reguly-remontowe"
+    });
+}
+
+function generujSzybkaWycene() {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może generować wyceny.");
+        return;
+    }
+
+    const pole = document.getElementById("szybka-wycena-opis");
+    const opisOryginalny = pole?.value?.trim() || "";
+    const opis = normalizeText(opisOryginalny);
+
+    if (!opis) {
+        alert("Opisz zlecenie, np. mieszkanie 30 m², malowanie, gładź, 10 punktów elektrycznych.");
+        return;
+    }
+
+    const metraz = pobierzLiczbeZOpisu(opis, [
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów|metry|metra|m powierzchni)\b/,
+        /mieszkanie\s*(\d+(?:[.,]\d+)?)/,
+        /lokal\s*(\d+(?:[.,]\d+)?)/,
+        /dom\s*(\d+(?:[.,]\d+)?)/
+    ]);
+
+    const pokoje = pobierzLiczbeZOpisu(opis, [
+        /(\d+)\s*(?:pokoi|pokoje|pokojach|pokój|pokoj|pomieszczenia|pomieszczeń)\b/
+    ]);
+
+    const okna = pobierzLiczbeZOpisu(opis, [/(\d+)\s*(?:okien|okna|okno)\b/]) || pokoje || 1;
+    const drzwi = pobierzLiczbeZOpisu(opis, [/(\d+)\s*(?:drzwi|oscieznic|ościeżnic)\b/]) || pokoje || 1;
+
+    const punktyElektryczne = pobierzLiczbeZOpisu(opis, [
+        /(\d+)\s*(?:punktow|punktów|punkty|pkt|punkt)\s*(?:elektrycznych|elektryczne|elektryki|instalacji elektrycznej)?\b/,
+        /(?:instalacj[ai] elektryczn[aej]?|elektryka)[^\d]{0,35}(\d+)\s*(?:szt|punkt|punktow|punktów|pkt)?/
+    ]);
+
+    const gniazda = pobierzLiczbeZOpisu(opis, [
+        /(\d+)\s*(?:gniazd|gniazdek|gniazda|gniazdo)\b/,
+        /(?:gniazd|gniazdek|gniazda|gniazdo)[^\d]{0,20}(\d+)/
+    ]);
+
+    const laczniki = pobierzLiczbeZOpisu(opis, [
+        /(\d+)\s*(?:lacznikow|łączników|wlacznikow|włączników|laczniki|łączniki|wlaczniki|włączniki)\b/,
+        /(\d+)\s*(?:rocznikow|roczników|roczniki)\b/
+    ]);
+
+    const punktySanitarne = pobierzLiczbeZOpisu(opis, [
+        /(\d+)\s*(?:punktow|punktów|punkty|pkt|punkt)\s*(?:sanitarnych|sanitarne|wod-kan|wodkan|wodno|wody|kanalizacji|hydraulicznych)\b/,
+        /(?:instalacj[ai] sanitarn[aej]?|wod-kan|wodkan|kanalizacj[ai]|hydraulik[ai]|wodno kanalizacyjn[aej]?)[^\d]{0,45}(\d+)\s*(?:szt|punkt|punktow|punktów|pkt)?/
+    ]);
+
+    const punktyCO = pobierzLiczbeZOpisu(opis, [
+        /(\d+)\s*(?:punktow|punktów|punkty|pkt|punkt)\s*(?:co|c\.o\.|grzejnikowych|grzejnikowe|centralnego ogrzewania)\b/,
+        /(?:instalacj[ai] co|instalacj[ai] c\.o\.|centralne ogrzewanie|grzejnik|grzejnika|grzejniki)[^\d]{0,45}(\d+)\s*(?:szt|punkt|punktow|punktów|pkt)?/
+    ]);
+
+    const grzejniki = pobierzLiczbeZOpisu(opis, [/(\d+)\s*(?:grzejnikow|grzejników|grzejniki|grzejnik)\b/]);
+
+    const sciankaM2 = pobierzLiczbeZOpisu(opis, [
+        /(?:scianka|ścianka|gk|karton gips|karton-gips|regips)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów)?/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²)\s*(?:scianka|ścianka|gk|karton gips|karton-gips|regips)/
+    ]);
+
+    const podlogaM2 = pobierzLiczbeZOpisu(opis, [
+        /(?:wykladzina|wykładzina|podloge|podłoge|podłogę|podloga|podłoga|panele)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów)?/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²)\s*(?:wykladzina|wykładzina|podloga|podłoga|panele)/
+    ]);
+
+    const odZera = /od zera|nowa instalacja|nowe punkty|wykonanie|wykonac|wykonać|kompletna instalacja|stan deweloperski|deweloperski|generalny/.test(opis);
+    const remont = /remont|stare|stary|modernizacja|przerobka|przeróbka|przerobienie|przerobić|przerobic/.test(opis);
+    const wymiana = /wymiana|wymienic|wymienić|do wymiany/.test(opis);
+    const przerobka = /przerobka|przeróbka|przerobienie|przerobić|przerobic|przeniesienie|przeniesc|przenieść/.test(opis);
+
+    const zakresMalowanie = /malowania|malowanie|pomalowac|pomalować|farba|bialy|biały|kolor|sciany|ściany|sufit/.test(opis);
+    const zakresGladz = /gladz|gładź|gladzie|gładzie|szpachlowanie|szlifowanie/.test(opis);
+    const zakresZabezpieczen = /zabezpiec|folia|folie|taśmy|tasmy|oklejanie|okleic|okleić|parapet|detal|meble/.test(opis);
+    const zakresSanitarny = /sanitarn|wod-kan|wodkan|wodno|kanalizac|hydraul|woda|odpływ|odplyw|podejscie|podejście|umywalk|zlew|wc|toalet|prysznic|wanna/.test(opis);
+    const zakresCO = /c\.o\.|co |centralne ogrzewanie|grzejnik|grzejniki|podlogowka|podłogówka|ogrzewanie/.test(opis);
+
+    const propozycje = [];
+    const dodaj = (config) => dodajPozycjeRegulyBezPowielania(propozycje, config);
+
+    let powierzchniaMalowania = null;
+    let uwagaMalowania = "";
+
+    if (metraz && zakresMalowanie) {
+        const sufit = Math.round(metraz);
+        const sciany = Math.round(metraz * 3);
+        powierzchniaMalowania = sufit + sciany;
+        uwagaMalowania = `Szacunek: sufit ${sufit} m² + ściany ok. ${sciany} m²`;
+    }
+
+    const powierzchniaRobocza = powierzchniaMalowania || (metraz ? Math.round(metraz * 4) : 120);
+
+    // 1. ZABEZPIECZENIE — jeden kontrolowany zestaw, bez łapania każdego słowa osobno.
+    if (zakresZabezpieczen || zakresMalowanie || zakresGladz) {
+        if (metraz) {
+            dodaj({ nazwa: "Zabezpieczenie podłóg folią", jednostka: "m²", ilosc: metraz, cena: 6, uwaga: "Doliczono automatycznie: prace wykończeniowe wymagają zabezpieczenia podłóg" });
+        }
+        dodaj({ nazwa: "Oklejanie taśmą malarską detali", jednostka: "kpl.", ilosc: Math.max(1, pokoje || 1), cena: 80, uwaga: "Doliczono automatycznie: zabezpieczenie detali, narożników, ościeżnic i krawędzi" });
+        if (okna) dodaj({ nazwa: "Zabezpieczenie okien i parapetów", jednostka: "kpl.", ilosc: okna, cena: 45, uwaga: "Szacunek: przyjęto orientacyjnie 1 okno/parapet na pomieszczenie" });
+    }
+
+    // 2. GŁADŹ — bez podwójnej gładzi i bez podwójnego gruntowania.
+    if (zakresGladz) {
+        dodaj({ nazwa: "Przygotowanie powierzchni pod gładź", jednostka: "m²", ilosc: powierzchniaRobocza, cena: 8, uwaga: "Doliczono automatycznie: gładź wymaga przygotowania podłoża" });
+        dodaj({ nazwa: "Gruntowanie pod gładź", jednostka: "m²", ilosc: powierzchniaRobocza, cena: 7, uwaga: "Doliczono automatycznie: gładź wymaga gruntowania" });
+        dodaj({ nazwa: "Montaż narożników aluminiowych", jednostka: "mb", ilosc: Math.max(4, Math.round(okna * 4 + drzwi * 2)), cena: 18, uwaga: "Szacunek: narożniki przy oknach/drzwiach i detalach" });
+        dodaj({ nazwa: "Wykonanie gładzi", jednostka: "m²", ilosc: powierzchniaRobocza, cena: 32, uwaga: "Zakres z opisu: gładź" });
+        dodaj({ nazwa: "Szlifowanie gładzi", jednostka: "m²", ilosc: powierzchniaRobocza, cena: 10, uwaga: "Doliczono automatycznie: po gładzi potrzebne jest szlifowanie" });
+        dodaj({ nazwa: "Gruntowanie pod malowanie", jednostka: "m²", ilosc: powierzchniaRobocza, cena: 7, uwaga: "Doliczono automatycznie: przygotowanie powierzchni po gładzi pod malowanie" });
+    }
+
+    // 3. MALOWANIE.
+    if (zakresMalowanie) {
+        dodaj({ nazwa: "Malowanie ścian i sufitu", jednostka: "m²", ilosc: powierzchniaMalowania || 100, cena: 28, uwaga: uwagaMalowania || "Szacunek powierzchni malowania" });
+    }
+
+    // 4. ELEKTRYKA.
+    if (punktyElektryczne) {
+        dodaj({ nazwa: "Wykonanie punktu elektrycznego", jednostka: "szt.", ilosc: punktyElektryczne, cena: 120, uwaga: "Ilość punktów z opisu" });
+        if (odZera || przerobka) {
+            dodaj({ nazwa: "Kucie / bruzdowanie pod punkt elektryczny", jednostka: "szt.", ilosc: punktyElektryczne, cena: 45, uwaga: "Doliczono automatycznie: nowy/przerabiany punkt wymaga przygotowania trasy" });
+            dodaj({ nazwa: "Naprawa bruzd po elektryce", jednostka: "szt.", ilosc: punktyElektryczne, cena: 35, uwaga: "Doliczono automatycznie: po wykonaniu punktu trzeba naprawić bruzdę" });
+        }
+        dodaj({ nazwa: "Montaż osprzętu elektrycznego", jednostka: "szt.", ilosc: punktyElektryczne, cena: 35, uwaga: "Doliczono automatycznie: punkt wymaga montażu/podłączenia osprzętu" });
+    }
+
+    if (gniazda) {
+        if (wymiana) dodaj({ nazwa: "Demontaż starego gniazda", jednostka: "szt.", ilosc: gniazda, cena: 20, uwaga: "Doliczono automatycznie: wymiana = demontaż starego osprzętu" });
+        dodaj({ nazwa: "Montaż gniazda elektrycznego", jednostka: "szt.", ilosc: gniazda, cena: 90, uwaga: "Ilość gniazd z opisu" });
+    }
+
+    if (laczniki) {
+        if (wymiana) dodaj({ nazwa: "Demontaż starego łącznika / włącznika", jednostka: "szt.", ilosc: laczniki, cena: 20, uwaga: "Doliczono automatycznie: wymiana = demontaż starego osprzętu" });
+        dodaj({ nazwa: "Montaż łącznika światła", jednostka: "szt.", ilosc: laczniki, cena: 80, uwaga: opis.includes("rocznik") ? "Rozpoznano z dyktowania jako „roczniki” — potraktowano jako łączniki" : "Ilość łączników z opisu" });
+    }
+
+    // 5. WOD-KAN.
+    if (zakresSanitarny || punktySanitarne) {
+        const ilosc = punktySanitarne || 1;
+        if (przerobka || wymiana || remont) {
+            dodaj({ nazwa: "Demontaż / odkrycie starego punktu wod-kan", jednostka: "szt.", ilosc, cena: 90, uwaga: "Doliczono automatycznie: przeróbka/wymiana punktu sanitarnego wymaga demontażu lub odkrycia starego układu" });
+        }
+        if (odZera || przerobka || /wykonanie|wykonac|wykonać|nowy/.test(opis)) {
+            dodaj({ nazwa: "Kucie / przygotowanie trasy pod wod-kan", jednostka: "szt.", ilosc, cena: 120, uwaga: "Doliczono automatycznie: nowy punkt sanitarny wymaga przygotowania trasy" });
+        }
+        dodaj({ nazwa: przerobka ? "Przeróbka punktu wod-kan" : "Wykonanie punktu wod-kan", jednostka: "szt.", ilosc, cena: przerobka ? 420 : 360, uwaga: przerobka ? "Zakres z opisu: przeróbka punktu sanitarnego" : "Zakres z opisu: wykonanie punktu sanitarnego" });
+        dodaj({ nazwa: "Naprawa bruzd po instalacji wod-kan", jednostka: "szt.", ilosc, cena: 45, uwaga: "Doliczono automatycznie: po instalacji sanitarnej trzeba naprawić bruzdy" });
+        dodaj({ nazwa: "Próba szczelności instalacji wod-kan", jednostka: "usługa", ilosc: 1, cena: 180, uwaga: "Doliczono automatycznie: instalacja wod-kan wymaga sprawdzenia szczelności" });
+    }
+
+    // 6. C.O.
+    if (zakresCO || punktyCO || grzejniki) {
+        const ilosc = punktyCO || grzejniki || 1;
+        if (przerobka || wymiana || remont) {
+            dodaj({ nazwa: "Demontaż grzejnika / starego podejścia C.O.", jednostka: "szt.", ilosc, cena: 120, uwaga: "Doliczono automatycznie: przeróbka/wymiana C.O. wymaga demontażu starego elementu" });
+        }
+        if (odZera || przerobka || /wykonanie|wykonac|wykonać|nowy/.test(opis)) {
+            dodaj({ nazwa: "Kucie / przygotowanie trasy pod C.O.", jednostka: "szt.", ilosc, cena: 120, uwaga: "Doliczono automatycznie: nowy/przerabiany punkt C.O. wymaga przygotowania trasy" });
+        }
+        dodaj({ nazwa: przerobka ? "Przeróbka punktu C.O." : "Wykonanie punktu C.O.", jednostka: "szt.", ilosc, cena: przerobka ? 450 : 380, uwaga: przerobka ? "Zakres z opisu: przeróbka punktu C.O." : "Zakres z opisu: wykonanie punktu C.O." });
+        if (grzejniki || /grzejnik/.test(opis)) {
+            dodaj({ nazwa: "Montaż grzejnika", jednostka: "szt.", ilosc, cena: 180, uwaga: "Doliczono automatycznie: punkt C.O. zwykle kończy się montażem grzejnika" });
+        }
+        dodaj({ nazwa: "Próba szczelności instalacji C.O.", jednostka: "usługa", ilosc: 1, cena: 200, uwaga: "Doliczono automatycznie: instalacja C.O. wymaga próby szczelności" });
+    }
+
+    // 7. GK.
+    if (/scianka|ścianka|gk|karton gips|karton-gips|regips|dzialowa|działowa/.test(opis)) {
+        const m2 = sciankaM2 || 10;
+        dodaj({ nazwa: "Konstrukcja ścianki GK", jednostka: "m²", ilosc: m2, cena: 85, uwaga: "Doliczono automatycznie: ścianka GK wymaga konstrukcji" });
+        dodaj({ nazwa: "Płytowanie ścianki GK", jednostka: "m²", ilosc: m2, cena: 95, uwaga: "Zakres z opisu: ścianka GK" });
+        dodaj({ nazwa: "Taśmowanie i spoinowanie GK", jednostka: "m²", ilosc: m2, cena: 35, uwaga: "Doliczono automatycznie: GK wymaga spoinowania" });
+        dodaj({ nazwa: "Szlifowanie i gruntowanie GK", jednostka: "m²", ilosc: m2, cena: 18, uwaga: "Doliczono automatycznie: przygotowanie GK pod malowanie" });
+    }
+
+    // 8. PODŁOGI.
+    if (/wykladzina|wykładzina|podloge|podłoge|podłogę|podloga|podłoga|panele|paneli/.test(opis)) {
+        const m2 = podlogaM2 || metraz || 50;
+        dodaj({ nazwa: "Przygotowanie podłoża pod podłogę", jednostka: "m²", ilosc: m2, cena: 12, uwaga: "Doliczono automatycznie: przed ułożeniem podłogi trzeba przygotować podłoże" });
+        dodaj({ nazwa: /panele|paneli/.test(opis) ? "Ułożenie paneli" : "Ułożenie wykładziny", jednostka: "m²", ilosc: m2, cena: /panele|paneli/.test(opis) ? 55 : 45, uwaga: podlogaM2 ? "Metraż podłogi z opisu" : "Przyjęto metraż mieszkania jako powierzchnię podłogi" });
+        dodaj({ nazwa: "Docinki / progi / wykończenie podłogi", jednostka: "kpl.", ilosc: Math.max(1, pokoje || 1), cena: 120, uwaga: "Doliczono automatycznie: podłoga wymaga docinek i wykończeń" });
+    }
+
+    if (!propozycje.length) {
+        if (metraz) {
+            dodaj({ nazwa: "Robocizna remontowa — wycena szacunkowa", jednostka: "m²", ilosc: metraz, cena: 110, uwaga: "Nie wykryto szczegółów — szacunek z metrażu" });
         } else {
             alert("Nie udało się rozpoznać zakresu. Dopisz metraż albo słowa: malowanie, gładź, gniazda, punkty, wod-kan, C.O., wykładzina.");
             return;
