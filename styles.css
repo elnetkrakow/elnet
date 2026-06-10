@@ -2987,3 +2987,146 @@ body th:last-child {
     }
 }
 
+
+
+/* PATCH V18 — Edycja zawsze pod Dodaj pozycję, bez rozwalania układu */
+
+/* Układ dwóch kolumn w wycenie ma zostać klasyczny: lewa karta + prawa tabela */
+#section-wycena .layout-two,
+#wycena .layout-two {
+    display: grid !important;
+    grid-template-columns: minmax(260px, 420px) minmax(720px, 1fr) !important;
+    gap: 24px !important;
+    align-items: start !important;
+}
+
+/* Panel Edycja ma być normalną kartą w lewej kolumnie, pod Dodaj pozycję */
+#panel-edycja-pozycji-v18 {
+    width: 100% !important;
+    max-width: 420px !important;
+    margin-top: 16px !important;
+    grid-column: auto !important;
+    border: 1px solid rgba(125, 211, 160, 0.34) !important;
+    display: block;
+}
+
+#panel-edycja-pozycji-v18 h2 {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin-bottom: 18px !important;
+}
+
+#panel-edycja-pozycji-v18 .section-marker {
+    width: 6px !important;
+    height: 34px !important;
+    border-radius: 999px !important;
+    background: #7dd3a0 !important;
+    display: inline-block !important;
+}
+
+#panel-edycja-pozycji-v18 label {
+    display: block !important;
+    margin-bottom: 12px !important;
+}
+
+#panel-edycja-pozycji-v18 input,
+#panel-edycja-pozycji-v18 select {
+    width: 100% !important;
+}
+
+.edit-empty-v18 {
+    color: #aebbd0;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 12px 0 4px;
+}
+
+.edit-actions-v18 {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    margin-top: 10px !important;
+}
+
+/* Przyciski w Zestawieniu prac: jedna linia, tylko w wycenie */
+#section-wycena .wycena-actions-v18,
+#wycena .wycena-actions-v18 {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+}
+
+#section-wycena .wycena-actions-v18 .btn,
+#wycena .wycena-actions-v18 .btn {
+    min-width: 74px !important;
+    width: auto !important;
+    height: 34px !important;
+    padding: 7px 10px !important;
+    white-space: nowrap !important;
+}
+
+#section-wycena #tabela-wyceny th:last-child,
+#section-wycena #tabela-wyceny td:last-child,
+#wycena #tabela-wyceny th:last-child,
+#wycena #tabela-wyceny td:last-child {
+    width: 170px !important;
+    min-width: 170px !important;
+}
+
+/* Kosztorysy: kolumna akcji szeroka i przewijana, żeby nie ucinać */
+#section-kosztorysy .table-wrapper {
+    overflow-x: auto !important;
+}
+
+#section-kosztorysy table {
+    min-width: 1220px !important;
+}
+
+#section-kosztorysy th:last-child,
+#section-kosztorysy td:last-child {
+    width: 320px !important;
+    min-width: 320px !important;
+    max-width: none !important;
+}
+
+#section-kosztorysy .table-actions {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+}
+
+#section-kosztorysy .table-actions .btn {
+    min-width: 82px !important;
+    width: auto !important;
+    white-space: nowrap !important;
+}
+
+/* Poprzednie panele edycji ukryj, jeśli zostały gdzieś w DOM */
+#panel-edycja-pozycji:not(#panel-edycja-pozycji-v18) {
+    display: none !important;
+}
+
+/* Cofnięcie globalnego zwężania ostatniej kolumny */
+body td:last-child,
+body th:last-child {
+    max-width: none;
+}
+
+@media (max-width: 900px) {
+    #section-wycena .layout-two,
+    #wycena .layout-two {
+        grid-template-columns: 1fr !important;
+    }
+
+    #panel-edycja-pozycji-v18 {
+        max-width: none !important;
+    }
+}
+
