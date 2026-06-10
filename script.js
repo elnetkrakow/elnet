@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-12";
+const APP_VERSION = "2026.06.10-13";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -4792,4 +4792,174 @@ function przeliczWyceneAwaryjnieV12() {
     document.querySelectorAll("[data-wycena-vat], #wycena-vat, .wycena-vat").forEach(el => el.textContent = kwoty.vat);
     document.querySelectorAll("[data-wycena-brutto], #wycena-brutto, .wycena-brutto").forEach(el => el.textContent = kwoty.brutto);
 }
+
+
+
+// ==========================================
+// WYCENA V13 — EDYCJA CENY POZYCJI W KOSZTORYSIE
+// ==========================================
+
+function normalizujPozycjeWycenyV13(p) {
+    const cena = Number(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0);
+    const ilosc = Number(p.ilosc ?? p.quantity ?? 1);
+    const vat = Number(p.vatProcent ?? p.vat ?? p.vat_rate ?? 23);
+
+    return {
+        ...p,
+        id: p.id || ("poz-" + Date.now() + "-" + Math.random().toString(16).slice(2)),
+        nazwa: p.nazwa || p.name || p.usluga || "Pozycja",
+        jednostka: p.jednostka || p.unit || "szt.",
+        ilosc: Number.isFinite(ilosc) ? ilosc : 1,
+        cenaNetto: Number.isFinite(cena) ? cena : 0,
+        vatProcent: Number.isFinite(vat) ? vat : 23
+    };
+}
+
+function formatujKwoteV13(value) {
+    const n = Number(value || 0);
+    return `${n.toFixed(2)} PLN`;
+}
+
+function renderujWycene() {
+    const tbody = document.getElementById("tabela-wyceny");
+    if (!tbody) return;
+
+    wycenaPozycje = Array.isArray(wycenaPozycje)
+        ? wycenaPozycje.map(normalizujPozycjeWycenyV13)
+        : [];
+
+    if (!wycenaPozycje.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-row">Brak pozycji w wycenie.</td></tr>`;
+        przeliczWycene();
+        return;
+    }
+
+    tbody.innerHTML = wycenaPozycje.map(p => {
+        const netto = Number(p.ilosc || 0) * Number(p.cenaNetto || 0);
+        const vatProcent = Number(p.vatProcent || 23);
+        const vat = netto * (vatProcent / 100);
+        const brutto = netto + vat;
+
+        const akcje = rolaUsera !== "guest"
+            ? `
+                <div class="table-actions">
+                    <button class="btn btn-secondary small-btn" onclick="edytujCenePozycjiWyceny('${esc(p.id)}')">Cena</button>
+                    <button class="btn btn-danger small-btn" onclick="usunPozycjeWyceny('${esc(p.id)}')">Usuń</button>
+                </div>
+            `
+            : "";
+
+        return `
+            <tr>
+                <td>${esc(p.nazwa)}</td>
+                <td>${esc(p.jednostka)}</td>
+                <td>${p.ilosc}</td>
+                <td><strong>${formatujKwoteV13(p.cenaNetto)}</strong></td>
+                <td>${formatujKwoteV13(netto)}</td>
+                <td>${vatProcent}%</td>
+                <td>${formatujKwoteV13(brutto)}</td>
+                <td>${akcje}</td>
+            </tr>
+        `;
+    }).join("");
+
+    przeliczWycene();
+}
+
+window.edytujCenePozycjiWyceny = function(id) {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może edytować wyceny.");
+        return;
+    }
+
+    const p = wycenaPozycje.find(x => String(x.id) === String(id));
+    if (!p) {
+        alert("Nie znaleziono pozycji.");
+        return;
+    }
+
+    const obecnaCena = Number(p.cenaNetto || 0);
+    const wpis = prompt(
+        `Nowa cena netto dla pozycji:\n${p.nazwa}\n\nObecnie: ${obecnaCena.toFixed(2)} PLN`,
+        obecnaCena.toFixed(2)
+    );
+
+    if (wpis === null) return;
+
+    const nowaCena = Number(String(wpis).replace(",", "."));
+    if (!Number.isFinite(nowaCena) || nowaCena < 0) {
+        alert("Wpisz poprawną cenę netto.");
+        return;
+    }
+
+    p.cenaNetto = nowaCena;
+    p.cena_netto = nowaCena;
+    p.cena = nowaCena;
+    p.price = nowaCena;
+
+    renderujWycene();
+};
+
+window.edytujIloscPozycjiWyceny = function(id) {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może edytować wyceny.");
+        return;
+    }
+
+    const p = wycenaPozycje.find(x => String(x.id) === String(id));
+    if (!p) {
+        alert("Nie znaleziono pozycji.");
+        return;
+    }
+
+    const obecnaIlosc = Number(p.ilosc || 1);
+    const wpis = prompt(
+        `Nowa ilość dla pozycji:\n${p.nazwa}\n\nObecnie: ${obecnaIlosc}`,
+        String(obecnaIlosc)
+    );
+
+    if (wpis === null) return;
+
+    const nowaIlosc = Number(String(wpis).replace(",", "."));
+    if (!Number.isFinite(nowaIlosc) || nowaIlosc <= 0) {
+        alert("Wpisz poprawną ilość.");
+        return;
+    }
+
+    p.ilosc = nowaIlosc;
+    p.quantity = nowaIlosc;
+
+    renderujWycene();
+};
+
+// Poprawione wczytywanie kosztorysu do edycji — normalizuje stare i nowe pola.
+window.wczytajKosztorys = function(id) {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może edytować kosztorysów.");
+        return;
+    }
+
+    const k = kosztorysy.find(x => String(x.id) === String(id));
+    if (!k) return;
+
+    try {
+        const pozycje = typeof k.pozycje === "string" ? JSON.parse(k.pozycje) : k.pozycje || [];
+        wycenaPozycje = Array.isArray(pozycje) ? pozycje.map(normalizujPozycjeWycenyV13) : [];
+    } catch {
+        wycenaPozycje = [];
+    }
+
+    const nazwaInput = document.getElementById("kosztorys-nazwa");
+    const korektaInput = document.getElementById("wycena-korekta");
+
+    if (nazwaInput) nazwaInput.value = k.nazwa || "";
+    if (korektaInput) korektaInput.value = k.korekta || 0;
+
+    edytowanyKosztorysId = k.id;
+    trybEdycjiKosztorysu = true;
+    aktualizujTrybEdycjiKosztorysuWidok();
+
+    renderujWycene();
+    pokazSekcje("wycena");
+};
 
