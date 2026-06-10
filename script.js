@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-29";
+const APP_VERSION = "2026.06.10-30";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -2547,7 +2547,7 @@ function renderujWycene() {
 
     tbody.innerHTML = wycenaPozycje.map(p => {
         const netto = p.ilosc * p.cenaNetto;
-        const vatProcent = Number(p.vatProcent || 23);
+        const vatProcent = pobierzVatProcent(p);
         const vat = netto * (vatProcent / 100);
         const brutto = netto + vat;
         const akcja = rolaUsera !== "guest"
@@ -2949,7 +2949,7 @@ async function zapiszKosztorys() {
     let sumaVAT = 0;
 
     wycenaPozycje.forEach(p => {
-        const vatProcent = Number(p.vatProcent || 23);
+        const vatProcent = pobierzVatProcent(p);
         const nettoPoKorekcie = p.ilosc * p.cenaNetto * mnoznikKorekty;
         const vat = nettoPoKorekcie * (vatProcent / 100);
 
