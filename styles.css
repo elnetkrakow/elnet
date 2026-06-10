@@ -2211,6 +2211,21 @@ svg {
     }
 }
 
+/* Strong rule to hide quick estimate on desktop while keeping it on mobile */
+@media (min-width: 901px) {
+    #section-wycena .quick-estimate-card,
+    .quick-estimate-card {
+        display: none !important;
+    }
+}
+
+@media (max-width: 900px) {
+    #section-wycena .quick-estimate-card,
+    .quick-estimate-card {
+        display: block !important;
+    }
+}
+
     #section-terminarz .calendar-title {
         text-align: center !important;
         font-size: 17px !important;
