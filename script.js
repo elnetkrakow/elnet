@@ -270,6 +270,9 @@ function podepnijZdarzenia() {
     const vatGlobal = document.getElementById("wycena-vat-global");
     if (vatGlobal) vatGlobal.addEventListener("change", ustawVatDlaCalejWyceny);
 
+    const btnZastosujKorekte = document.getElementById("btn-zastosuj-korekte-cen");
+    if (btnZastosujKorekte) btnZastosujKorekte.addEventListener("click", zastosujKorekteCenPozycji);
+
     const sortujUslugi = document.getElementById("sortuj-uslugi");
     if (sortujUslugi) sortujUslugi.addEventListener("change", renderujUslugi);
 
@@ -2797,6 +2800,43 @@ function ustawVatDlaCalejWyceny() {
         vat: vat,
         vat_rate: vat
     }));
+
+    try { renderujWycene(); } catch (e) { console.warn(e); }
+    try { przeliczWycene(); } catch (e) { console.warn(e); }
+}
+
+function zastosujKorekteCenPozycji() {
+    const input = document.getElementById("wycena-korekta");
+    if (!input) return;
+
+    const raw = String(input.value || "0").replace(',', '.');
+    const procent = Number(raw);
+
+    if (!Number.isFinite(procent) || procent === 0) {
+        return;
+    }
+
+    if (!Array.isArray(wycenaPozycje) || wycenaPozycje.length === 0) {
+        alert("Brak pozycji do korekty.");
+        return;
+    }
+
+    const mnoznik = 1 + procent / 100;
+
+    wycenaPozycje = wycenaPozycje.map(p => {
+        const obecnaCena = Number(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0) || 0;
+        const nowaCena = Math.round(obecnaCena * mnoznik * 100) / 100;
+
+        return {
+            ...p,
+            cenaNetto: nowaCena,
+            cena_netto: nowaCena,
+            cena: nowaCena,
+            price: nowaCena
+        };
+    });
+
+    input.value = "0";
 
     try { renderujWycene(); } catch (e) { console.warn(e); }
     try { przeliczWycene(); } catch (e) { console.warn(e); }
