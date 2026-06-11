@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-28-VAT0";
+const APP_VERSION = "2026.06.10-29-VAT0-WYZERUJ";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -272,6 +272,9 @@ function podepnijZdarzenia() {
 
     const btnZastosujKorekte = document.getElementById("btn-zastosuj-korekte-cen");
     if (btnZastosujKorekte) btnZastosujKorekte.addEventListener("click", zastosujKorekteCenPozycji);
+
+    const btnWyzerujKorekte = document.getElementById("btn-wyzeruj-korekte-cen");
+    if (btnWyzerujKorekte) btnWyzerujKorekte.addEventListener("click", wyzerujKorekteCenPozycji);
 
     const sortujUslugi = document.getElementById("sortuj-uslugi");
     if (sortujUslugi) sortujUslugi.addEventListener("change", renderujUslugi);
@@ -1959,6 +1962,40 @@ function pobierzVatProcent(p) {
     return Number(p?.vatProcent ?? p?.vat ?? p?.vat_rate ?? 23);
 }
 
+function zapewnijCenyBazowePozycji() {
+    wycenaPozycje.forEach((p) => {
+        const aktualnaCena = Number(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0);
+        if (p.cenaBazowa === undefined || p.cenaBazowa === null || Number.isNaN(Number(p.cenaBazowa))) {
+            p.cenaBazowa = aktualnaCena;
+        }
+    });
+}
+
+function wyzerujKorekteCenPozycji() {
+    zapewnijCenyBazowePozycji();
+
+    wycenaPozycje = wycenaPozycje.map((p) => {
+        const cenaBazowa = Number(p.cenaBazowa ?? p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0);
+
+        return {
+            ...p,
+            cenaBazowa,
+            cenaNetto: cenaBazowa,
+            cena_netto: cenaBazowa,
+            cena: cenaBazowa,
+            price: cenaBazowa
+        };
+    });
+
+    const poleKorekty = document.getElementById("wycena-korekta");
+    if (poleKorekty) {
+        poleKorekty.value = 0;
+    }
+
+    try { renderujWycene(); } catch (e) { console.warn(e); }
+    try { przeliczWycene(); } catch (e) { console.warn(e); }
+}
+
 function pobierzLiczbeZOpisu(opis, wzorce) {
     for (const wzorzec of wzorce) {
         const m = opis.match(wzorzec);
@@ -2828,14 +2865,16 @@ function zastosujKorekteCenPozycji() {
         return;
     }
 
+    zapewnijCenyBazowePozycji();
     const mnoznik = 1 + procent / 100;
 
     wycenaPozycje = wycenaPozycje.map(p => {
-        const obecnaCena = Number(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0) || 0;
-        const nowaCena = Math.round(obecnaCena * mnoznik * 100) / 100;
+        const cenaBazowa = Number(p.cenaBazowa ?? p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0) || 0;
+        const nowaCena = Math.round(cenaBazowa * mnoznik * 100) / 100;
 
         return {
             ...p,
+            cenaBazowa,
             cenaNetto: nowaCena,
             cena_netto: nowaCena,
             cena: nowaCena,
