@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.10-27";
+const APP_VERSION = "2026.06.10-28-VAT0";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -1951,6 +1951,14 @@ function znajdzUslugeDoSzybkiejWyceny(slowka, unikaj = []) {
     return najlepszyWynik > 0 ? najlepsza : null;
 }
 
+/**
+ * Helper do pobierania stawki VAT z pozycji.
+ * Używa operatora ?? zamiast || aby prawidłowo obsługiwać VAT 0%.
+ */
+function pobierzVatProcent(p) {
+    return Number(p?.vatProcent ?? p?.vat ?? p?.vat_rate ?? 23);
+}
+
 function pobierzLiczbeZOpisu(opis, wzorce) {
     for (const wzorzec of wzorce) {
         const m = opis.match(wzorzec);
@@ -1973,7 +1981,7 @@ function dodajPropozycje(lista, config) {
         jednostka,
         ilosc: Number(config.ilosc),
         cenaNetto: Number(cenaNetto || 0),
-        vatProcent: Number(config.vatProcent || document.getElementById("wycena-vat")?.value || 23),
+        vatProcent: Number(config.vatProcent ?? document.getElementById("wycena-vat")?.value ?? 23),
         uwaga: usluga ? (config.uwaga || "Dopasowano z cennika") : (config.uwaga || "Cena szacunkowa — sprawdź w cenniku")
     });
 }
@@ -2287,7 +2295,7 @@ function renderujSzybkaWyceneWynik(meta = {}) {
     }
 
     const netto = szybkaWycenaPropozycje.reduce((sum, p) => sum + (Number(p.ilosc) * Number(p.cenaNetto)), 0);
-    const vat = szybkaWycenaPropozycje.reduce((sum, p) => sum + (Number(p.ilosc) * Number(p.cenaNetto) * (Number(p.vatProcent || 23) / 100)), 0);
+    const vat = szybkaWycenaPropozycje.reduce((sum, p) => sum + (Number(p.ilosc) * Number(p.cenaNetto) * (pobierzVatProcent(p) / 100)), 0);
     const brutto = netto + vat;
 
     const metaInfo = [
@@ -2364,7 +2372,7 @@ function dodajSzybkaWyceneDoTabeli() {
             jednostka: p.jednostka,
             ilosc: Number(p.ilosc),
             cenaNetto: Number(p.cenaNetto),
-            vatProcent: Number(p.vatProcent || 23)
+            vatProcent: pobierzVatProcent(p)
         });
     });
 
@@ -2533,7 +2541,7 @@ function renderujWycene() {
 
     tbody.innerHTML = wycenaPozycje.map(p => {
         const netto = p.ilosc * p.cenaNetto;
-        const vatProcent = Number(p.vatProcent || 23);
+        const vatProcent = pobierzVatProcent(p);
         const vat = netto * (vatProcent / 100);
         const brutto = netto + vat;
         const akcja = rolaUsera !== "guest"
@@ -2748,8 +2756,7 @@ function przeliczWycene() {
     let sumaVAT = 0;
 
     wycenaPozycje.forEach(p => {
-        const rawVat = p.vatProcent;
-        const vatProcent = rawVat == null || rawVat === "" ? 23 : Number(rawVat);
+        const vatProcent = pobierzVatProcent(p);
         const vatStawka = Number.isFinite(vatProcent) ? vatProcent : 23;
         const nettoPoKorekcie = p.ilosc * p.cenaNetto * mnoznikKorekty;
         const vat = nettoPoKorekcie * (vatStawka / 100);
@@ -2901,7 +2908,7 @@ async function zapiszKosztorys() {
     let sumaVAT = 0;
 
     wycenaPozycje.forEach(p => {
-        const vatProcent = Number(p.vatProcent || 23);
+        const vatProcent = pobierzVatProcent(p);
         const nettoPoKorekcie = p.ilosc * p.cenaNetto * mnoznikKorekty;
         const vat = nettoPoKorekcie * (vatProcent / 100);
 
@@ -3495,7 +3502,7 @@ function drukujKosztorysDoOkna(id, options) {
     let sumaBrutto = 0;
 
     const rows = pozycje.map(p => {
-        const vatProcent = p.vatProcent == null || p.vatProcent === "" ? 23 : Number(p.vatProcent);
+        const vatProcent = pobierzVatProcent(p);
         const vatPerc = Number.isFinite(vatProcent) ? vatProcent : 23;
         const netto = Number(p.ilosc || 0) * Number(p.cenaNetto || 0);
         const vat = netto * (vatPerc / 100);
