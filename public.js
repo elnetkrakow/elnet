@@ -1,3 +1,72 @@
+// ==========================================
+// Konfiguracja Supabase (publiczny anon key)
+// ==========================================
+const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
+
+// ==========================================
+// Stan cennika
+// ==========================================
+let uslugiZBazy = []; // Usługi pobrane z Supabase
+let cennikoZLive = false; // Czy cennik pochodzi z bazy (live) czy z fallback
+
+const fallbackUslugi = {
+    'Zabezpieczenie podłóg i elementów': 420,
+    'Gruntowanie powierzchni': 18,
+    'Malowanie sufitów': 30,
+    'Malowanie ścian': 32,
+    'Drobne przygotowanie i poprawki podłoża': 380,
+    'Szpachlowanie / gładzie': 28,
+    'Prace podłogowe': 105,
+    'Prace przy drzwiach i oknach': 450,
+};
+
+// ==========================================
+// Pobieranie cennika z Supabase
+// ==========================================
+async function pobierzUslugiZBazy() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/uslugi?select=id,nazwa,cena,jednostka&widoczna_publicznie=eq.true`, {
+            headers: {
+                "apikey": SUPABASE_ANON_KEY,
+                "Content-Type": "application/json"
+            }
+        });
+
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
+
+        uslugiZBazy = await res.json();
+        
+        if (uslugiZBazy.length > 0) {
+            cennikoZLive = true;
+            console.log(`✓ Cennik pobrany z bazy: ${uslugiZBazy.length} usług`);
+            return true;
+        }
+    } catch (err) {
+        console.warn("Nie udało się pobrać cennika z bazy:", err.message);
+    }
+    
+    cennikoZLive = false;
+    return false;
+}
+
+function getCenaUslugi(nazwaUslugi) {
+    // Szukaj w pobranymi usługach z bazy
+    if (uslugiZBazy.length > 0) {
+        const usluga = uslugiZBazy.find(u => 
+            String(u.nazwa || "").toLowerCase().trim() === String(nazwaUslugi || "").toLowerCase().trim()
+        );
+        if (usluga && usluga.cena) {
+            return usluga.cena;
+        }
+    }
+    
+    // Fallback na sztywne ceny
+    return fallbackUslugi[nazwaUslugi] || 0;
+}
+
 const formatPrice = (value) => new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN', maximumFractionDigits: 0 }).format(Math.round(value));
 
 const parseArea = (value) => {
@@ -47,8 +116,8 @@ const estimateQuote = (description, area) => {
             name: 'Zabezpieczenie podłóg i elementów',
             quantity: 1,
             unit: 'ryczałt',
-            unitPrice: 420,
-            total: 420,
+            unitPrice: getCenaUslugi('Zabezpieczenie podłóg i elementów'),
+            total: getCenaUslugi('Zabezpieczenie podłóg i elementów'),
         });
 
         if (gruntArea > 0) {
@@ -56,8 +125,8 @@ const estimateQuote = (description, area) => {
                 name: 'Gruntowanie powierzchni',
                 quantity: gruntArea,
                 unit: 'm²',
-                unitPrice: 18,
-                total: Math.round(gruntArea * 18),
+                unitPrice: getCenaUslugi('Gruntowanie powierzchni'),
+                total: Math.round(gruntArea * getCenaUslugi('Gruntowanie powierzchni')),
             });
         }
 
@@ -66,8 +135,8 @@ const estimateQuote = (description, area) => {
                 name: 'Malowanie sufitów',
                 quantity: ceilingArea,
                 unit: 'm²',
-                unitPrice: 30,
-                total: Math.round(ceilingArea * 30),
+                unitPrice: getCenaUslugi('Malowanie sufitów'),
+                total: Math.round(ceilingArea * getCenaUslugi('Malowanie sufitów')),
             });
         }
 
@@ -76,8 +145,8 @@ const estimateQuote = (description, area) => {
                 name: 'Malowanie ścian',
                 quantity: wallArea,
                 unit: 'm²',
-                unitPrice: 32,
-                total: Math.round(wallArea * 32),
+                unitPrice: getCenaUslugi('Malowanie ścian'),
+                total: Math.round(wallArea * getCenaUslugi('Malowanie ścian')),
             });
         }
 
@@ -85,8 +154,8 @@ const estimateQuote = (description, area) => {
             name: 'Drobne przygotowanie i poprawki podłoża',
             quantity: 1,
             unit: 'ryczałt',
-            unitPrice: 380,
-            total: 380,
+            unitPrice: getCenaUslugi('Drobne przygotowanie i poprawki podłoża'),
+            total: getCenaUslugi('Drobne przygotowanie i poprawki podłoża'),
         });
     }
 
@@ -95,8 +164,8 @@ const estimateQuote = (description, area) => {
             name: 'Szpachlowanie / gładzie',
             quantity: m2,
             unit: 'm²',
-            unitPrice: 28,
-            total: Math.round(m2 * 28),
+            unitPrice: getCenaUslugi('Szpachlowanie / gładzie'),
+            total: Math.round(m2 * getCenaUslugi('Szpachlowanie / gładzie')),
         });
     }
 
@@ -105,8 +174,8 @@ const estimateQuote = (description, area) => {
             name: 'Prace podłogowe',
             quantity: m2,
             unit: 'm²',
-            unitPrice: 105,
-            total: Math.round(m2 * 105),
+            unitPrice: getCenaUslugi('Prace podłogowe'),
+            total: Math.round(m2 * getCenaUslugi('Prace podłogowe')),
         });
     }
 
@@ -115,8 +184,8 @@ const estimateQuote = (description, area) => {
             name: 'Prace przy drzwiach i oknach',
             quantity: 1,
             unit: 'komplet',
-            unitPrice: 450,
-            total: 450,
+            unitPrice: getCenaUslugi('Prace przy drzwiach i oknach'),
+            total: getCenaUslugi('Prace przy drzwiach i oknach'),
         });
     }
 
@@ -185,7 +254,33 @@ const clearQuote = () => {
     hideMessage();
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Pobierz cennik z bazy na starcie
+    const udanoPobrano = await pobierzUslugiZBazy();
+    
+    // Pokaż status cennika
+    const cennikerStatusEl = document.getElementById('cennik-status');
+    if (cennikerStatusEl) {
+        if (udanoPobrano) {
+            cennikerStatusEl.textContent = 'Cennik: aktualny';
+            cennikerStatusEl.className = 'cennik-status cennik-status-live';
+        } else {
+            cennikerStatusEl.textContent = 'Cennik: tryb orientacyjny';
+            cennikerStatusEl.className = 'cennik-status cennik-status-fallback';
+        }
+        cennikerStatusEl.hidden = false;
+    }
+    
+    // Pokaż komunikat ostrzeżenia jeśli nie udało się pobrać
+    if (!udanoPobrano) {
+        const message = document.getElementById('quote-message');
+        if (message) {
+            message.textContent = 'Cennik online chwilowo niedostępny. Pokazano orientacyjne ceny przykładowe.';
+            message.className = 'quote-message quote-message-warning';
+            message.hidden = false;
+        }
+    }
+
     const descriptionInput = document.getElementById('opis');
     const areaInput = document.getElementById('metraz');
     const generateButton = document.getElementById('generate-quote');
