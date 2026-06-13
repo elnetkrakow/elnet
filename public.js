@@ -1,7 +1,7 @@
 // ==========================================
 // Wersja i konfiguracja Supabase
 // ==========================================
-const PUBLIC_QUOTE_VERSION = "v2026.06.13-08";
+const PUBLIC_QUOTE_VERSION = "v2026.06.13-09";
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
 
@@ -27,7 +27,7 @@ const fallbackUslugi = {
 // ==========================================
 async function pobierzUslugiZBazy() {
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/uslugi?select=id,nazwa,cena,jednostka&widoczna_publicznie=eq.true`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/uslugi?select=id,nazwa,cena,cena_netto,jednostka&widoczna_publicznie=eq.true`, {
             headers: {
                 "apikey": SUPABASE_ANON_KEY,
                 "Content-Type": "application/json"
@@ -53,19 +53,54 @@ async function pobierzUslugiZBazy() {
     return false;
 }
 
-function getCenaUslugi(nazwaUslugi) {
-    // Szukaj w pobranymi usługach z bazy
+function znajdzUslugePoSlowach(slowa) {
+    if (!uslugiZBazy.length || !Array.isArray(slowa) || slowa.length === 0) {
+        return null;
+    }
+
+    const keywords = slowa
+        .map(s => String(s || '').toLowerCase().trim())
+        .filter(Boolean);
+
+    if (!keywords.length) {
+        return null;
+    }
+
+    return uslugiZBazy.find(u => {
+        const nazwa = String(u.nazwa || '').toLowerCase();
+        return keywords.every(kw => nazwa.includes(kw));
+    }) || null;
+}
+
+function getCenaUslugi(nazwaUslugi, slowaKluczowe = []) {
     if (uslugiZBazy.length > 0) {
-        const usluga = uslugiZBazy.find(u => 
-            String(u.nazwa || "").toLowerCase().trim() === String(nazwaUslugi || "").toLowerCase().trim()
-        );
-        if (usluga && usluga.cena) {
-            return usluga.cena;
+        const normalizedName = String(nazwaUslugi || '').toLowerCase().trim();
+        let usluga = uslugiZBazy.find(u => String(u.nazwa || '').toLowerCase().trim() === normalizedName);
+
+        if (!usluga) {
+            usluga = znajdzUslugePoSlowach(slowaKluczowe);
+        }
+
+        if (usluga) {
+            const cena = usluga.cena_netto ?? usluga.cena;
+            if (cena !== null && cena !== undefined && !Number.isNaN(Number(cena))) {
+                return Number(cena);
+            }
         }
     }
-    
-    // Fallback na sztywne ceny
+
     return fallbackUslugi[nazwaUslugi] || 0;
+}
+
+function pobierzCeneDlaPozycji(nazwaPozycji, slowaKluczowe = []) {
+    const cena = getCenaUslugi(nazwaPozycji, slowaKluczowe);
+    const matched = uslugiZBazy.length > 0
+        ? uslugiZBazy.find(u => String(u.nazwa || '').toLowerCase().trim() === String(nazwaPozycji || '').toLowerCase().trim())
+            || znajdzUslugePoSlowach(slowaKluczowe)
+        : null;
+    const source = matched ? 'supabase' : 'fallback';
+    console.log('Pozycja:', nazwaPozycji, 'cena:', cena, 'źródło:', source, 'dopasowana usługa:', matched ? matched.nazwa : null);
+    return cena;
 }
 
 const formatPrice = (value) => new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN', maximumFractionDigits: 0 }).format(Math.round(value));
@@ -261,21 +296,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (versionEl) {
         versionEl.textContent = PUBLIC_QUOTE_VERSION;
     }
-    
-    // Pobierz cennik z bazy na starcie
-    const udanoPobrano = await pobierzUslugiZBazy();
-    
-    // Pokaż status cennika
-    const cennikerStatusEl = document.getElementById('cennik-status');
-    if (cennikerStatusEl) {
-        if (udanoPobrano) {
-            cennikerStatusEl.textContent = 'Cennik: Supabase / aktualny';
-            cennikerStatusEl.className = 'cennik-status cennik-status-live';
-        } else {
-            cennikerStatusEl.textContent = 'Cennik: tryb awaryjny / przykładowy';
-            cennikerStatusEl.className = 'cennik-status cennik-status-fallback';
-        }
-        cennikerStatusEl.hidden = false;
+
+        console.log('EL-Net public quote version:', PUBLIC_QUOTE_VERSION);
+
+        // Pobierz cennik z bazy na starcie
+        const udanoPobrano = await pobierzUslugiZBazy();
+        console.log('Pobrane usługi z Supabase:', uslugiZBazy);
+        console.log('Czy używam Supabase:', udanoPobrano === true);
+        console.log('Czy używam fallback:', udanoPobrano !== true);
+        
+        // Pokaż status cennika
+        const cennikerStatusEl = document.getElementById('cennik-status');
+        if (cennikerStatusEl) {
+            if (udanoPobrano) {
+                cennikerStatusEl.textContent = `Cennik: Supabase / aktualny / pobrano ${uslugiZBazy.length} usług`;
+                cennikerStatusEl.className = 'cennik-status cennik-status-live';
+            } else {
+                cennikerStatusEl.textContent = 'Cennik: fallback / ceny przykładowe';
     }
     
     // Pokaż komunikat ostrzeżenia jeśli nie udało się pobrać
