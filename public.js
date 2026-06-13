@@ -297,22 +297,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         versionEl.textContent = PUBLIC_QUOTE_VERSION;
     }
 
-        console.log('EL-Net public quote version:', PUBLIC_QUOTE_VERSION);
+    console.log('PUBLIC_QUOTE_VERSION v2026.06.13-09 loaded');
+    console.log('EL-Net public quote version:', PUBLIC_QUOTE_VERSION);
 
-        // Pobierz cennik z bazy na starcie
-        const udanoPobrano = await pobierzUslugiZBazy();
-        console.log('Pobrane usługi z Supabase:', uslugiZBazy);
-        console.log('Czy używam Supabase:', udanoPobrano === true);
-        console.log('Czy używam fallback:', udanoPobrano !== true);
-        
-        // Pokaż status cennika
-        const cennikerStatusEl = document.getElementById('cennik-status');
-        if (cennikerStatusEl) {
-            if (udanoPobrano) {
-                cennikerStatusEl.textContent = `Cennik: Supabase / aktualny / pobrano ${uslugiZBazy.length} usług`;
-                cennikerStatusEl.className = 'cennik-status cennik-status-live';
-            } else {
-                cennikerStatusEl.textContent = 'Cennik: fallback / ceny przykładowe';
+    // Pobierz cennik z bazy na starcie
+    const udanoPobrano = await pobierzUslugiZBazy();
+    console.log('Pobrane usługi z Supabase:', uslugiZBazy);
+    console.log('Czy używam Supabase:', udanoPobrano === true);
+    console.log('Czy używam fallback:', udanoPobrano !== true);
+    
+    // Pokaż status cennika
+    const cennikerStatusEl = document.getElementById('cennik-status');
+    if (cennikerStatusEl) {
+        if (udanoPobrano) {
+            cennikerStatusEl.textContent = `Cennik: Supabase / aktualny / pobrano ${uslugiZBazy.length} usług`;
+            cennikerStatusEl.className = 'cennik-status cennik-status-live';
+        } else {
+            cennikerStatusEl.textContent = 'Cennik: fallback / ceny przykładowe';
+            cennikerStatusEl.className = 'cennik-status cennik-status-fallback';
+        }
+        cennikerStatusEl.hidden = false;
     }
     
     // Pokaż komunikat ostrzeżenia jeśli nie udało się pobrać
