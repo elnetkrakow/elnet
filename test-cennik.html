@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Test cennika EL-Net</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:16px}
+    table{border-collapse:collapse;width:100%;margin-top:12px}
+    th,td{border:1px solid #ddd;padding:8px;text-align:left}
+    th{background:#f6f6f6}
+    #status{margin-top:6px}
+    #search{width:100%;padding:8px;margin-top:8px}
+  </style>
+</head>
+<body>
+  <h1>Test cennika EL-Net</h1>
+  <div id="status">Ładowanie…</div>
+  <input id="search" placeholder="Szukaj usługi…" aria-label="Szukaj usługi" />
+
+  <table aria-describedby="status">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Nazwa</th>
+        <th>Jednostka</th>
+        <th>Cena</th>
+        <th>Cena netto</th>
+        <th>Widoczna publicznie</th>
+      </tr>
+    </thead>
+    <tbody id="table-body">
+      <tr><td colspan="6">Ładowanie…</td></tr>
+    </tbody>
+  </table>
+
+  <script>
+    // Używamy tego samego publicznego klucza anon jak w projekcie
+    const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
+
+    const statusEl = document.getElementById('status');
+    const tbody = document.getElementById('table-body');
+    const searchEl = document.getElementById('search');
+
+    function escapeHtml(s){
+      return String(s===undefined||s===null?'':s)
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#39;');
+    }
+
+    function renderTable(data){
+      tbody.innerHTML = '';
+      if(!data || data.length === 0){
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="6">Brak pozycji</td>';
+        tbody.appendChild(tr);
+        return;
+      }
+      for(const u of data){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(u.id)}</td>
+          <td>${escapeHtml(u.nazwa)}</td>
+          <td>${escapeHtml(u.jednostka)}</td>
+          <td>${escapeHtml(u.cena)}</td>
+          <td>${escapeHtml(u.cena_netto)}</td>
+          <td>${escapeHtml(u.widoczna_publicznie)}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function loadCennik(){
+      statusEl.textContent = 'Ładowanie…';
+      try{
+        const url = `${SUPABASE_URL}/rest/v1/uslugi?select=id,nazwa,jednostka,cena,cena_netto,widoczna_publicznie&widoczna_publicznie=eq.true`;
+        const res = await fetch(url, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+        if(!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        const data = await res.json();
+        console.log('Pobrane usługi:', data);
+        window.testCennikServices = data;
+        statusEl.textContent = `Pobrano ${data.length} usług`;
+        renderTable(data);
+      }catch(err){
+        console.error(err);
+        statusEl.textContent = 'Błąd pobierania cennika: ' + (err && err.message ? err.message : String(err));
+        tbody.innerHTML = `<tr><td colspan="6">Błąd: ${escapeHtml(err && err.message ? err.message : String(err))}</td></tr>`;
+      }
+    }
+
+    searchEl.addEventListener('input', (e)=>{
+      const q = (e.target.value||'').toLowerCase();
+      const all = window.testCennikServices || [];
+      const filtered = q ? all.filter(s => (s.nazwa||'').toLowerCase().includes(q)) : all;
+      renderTable(filtered);
+      if(window.testCennikServices) statusEl.textContent = `Pobrano ${window.testCennikServices.length} usług` + (q ? ` • Filtrowano: ${filtered.length}` : '');
+    });
+
+    // Start
+    loadCennik();
+  </script>
+</body>
+</html>
