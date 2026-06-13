@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Szybka wycena — EL-Net</title>
+    <link rel="stylesheet" href="styles.css?v=20260613-03">
+</head>
+<body>
+    <div class="site-shell">
+        <a class="back-link" href="index.html">← Wróć</a>
+
+        <header class="quote-header">
+            <div>
+                <p class="brand-label">Szybka wycena</p>
+                <h1 class="quote-title">Szybka wycena prac malarskich i wykończeniowych</h1>
+                <p class="quote-description">Wprowadź zakres prac i metraż. System przygotuje orientacyjną, rzetelną kalkulację bez materiałów oraz z podziałem na główne usługi.</p>
+            </div>
+            <a class="panel-link panel-link--small" href="./panel/">Panel EL-Net</a>
+        </header>
+
+        <section class="quote-main">
+            <div class="quote-card">
+                <span class="quote-highlight">Wycena orientacyjna. Ostateczny koszt po ocenie zakresu prac i warunków na miejscu.</span>
+                <label class="card-label" for="opis">OPIS PRAC (Podaj jak najwięcej szczegółów)</label>
+                <textarea id="opis" rows="6" placeholder="Np. Chciałbym pomalować mieszkanie 50 m², 2 pokoje, ściany i sufity, mieszkanie puste, Kraków. Ściany są w dobrym stanie, bez dużych napraw..."></textarea>
+
+                <div class="quote-fields">
+                    <input id="metraz" placeholder="Metraż / zakres prac (m²)" type="text">
+                    <input id="lokalizacja" placeholder="Lokalizacja (opcjonalnie)" type="text">
+                </div>
+
+                <div class="quote-actions">
+                    <button id="generate-quote" class="btn btn-primary" type="button">Generuj orientacyjną wycenę</button>
+                    <button id="reset-quote" class="btn btn-secondary" type="button">Wyczyść dane</button>
+                </div>
+
+                <div id="quote-message" class="quote-message" hidden></div>
+
+                <p class="quote-helper">Wycena ma charakter orientacyjny. Dokładna oferta jest możliwa po ocenie miejsca i potwierdzeniu zakresu prac.</p>
+            </div>
+
+            <div class="quote-result" id="quote-result" hidden>
+                <div class="quote-result-header">
+                    <h2>Orientacyjna wycena</h2>
+                    <p>Na podstawie opisu przygotowaliśmy szacunkowy kosztorys. Ostateczny koszt ustalamy po wizji lokalnej.</p>
+                    <p class="quote-clarification">Podane kwoty dotyczą orientacyjnej ceny za wykonaną pracę bez materiałów.</p>
+                </div>
+
+                <div id="quote-assumptions" class="quote-assumptions"></div>
+
+                <div class="quote-table-wrapper">
+                    <table class="quote-table">
+                        <thead>
+                            <tr>
+                                <th>Pozycja</th>
+                                <th>Ilość</th>
+                                <th>Jednostka</th>
+                                <th>Cena jednostkowa</th>
+                                <th>Wartość</th>
+                            </tr>
+                        </thead>
+                        <tbody id="quote-items"></tbody>
+                    </table>
+                </div>
+
+                <div class="quote-total">
+                    <span>Szacunkowo razem:</span>
+                    <strong id="quote-total-value">0 zł</strong>
+                </div>
+
+                <p class="quote-clarification">Podane kwoty dotyczą orientacyjnej ceny za wykonaną pracę bez materiałów.</p>
+                <p class="quote-note">To jest wycena orientacyjna. Ostateczny kosztorys wymaga sprawdzenia zakresu prac, warunków na miejscu i potwierdzenia cen.</p>
+            </div>
+        </section>
+    </div>
+    <script src="public.js"></script>
+</body>
+</html>
