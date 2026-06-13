@@ -1,6 +1,7 @@
 // ==========================================
-// Konfiguracja Supabase (publiczny anon key)
+// Wersja i konfiguracja Supabase
 // ==========================================
+const PUBLIC_QUOTE_VERSION = "v2026.06.13-08";
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
 
@@ -255,6 +256,12 @@ const clearQuote = () => {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Wstaw wersję na stronie
+    const versionEl = document.getElementById('quote-version');
+    if (versionEl) {
+        versionEl.textContent = PUBLIC_QUOTE_VERSION;
+    }
+    
     // Pobierz cennik z bazy na starcie
     const udanoPobrano = await pobierzUslugiZBazy();
     
@@ -262,10 +269,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cennikerStatusEl = document.getElementById('cennik-status');
     if (cennikerStatusEl) {
         if (udanoPobrano) {
-            cennikerStatusEl.textContent = 'Cennik: aktualny';
+            cennikerStatusEl.textContent = 'Cennik: Supabase / aktualny';
             cennikerStatusEl.className = 'cennik-status cennik-status-live';
         } else {
-            cennikerStatusEl.textContent = 'Cennik: tryb orientacyjny';
+            cennikerStatusEl.textContent = 'Cennik: tryb awaryjny / przykładowy';
             cennikerStatusEl.className = 'cennik-status cennik-status-fallback';
         }
         cennikerStatusEl.hidden = false;
