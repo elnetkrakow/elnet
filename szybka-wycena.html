@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Szybka wycena — EL-Net</title>
-    <link rel="stylesheet" href="styles.css?v=20260613-03">
+    <link rel="stylesheet" href="styles.css?v=20260614-07">
 </head>
 <body>
     <div class="site-shell">
@@ -12,71 +12,105 @@
 
         <header class="quote-header">
             <div>
-                <p class="brand-label">Szybka wycena</p>
-                <h1 class="quote-title">Szybka wycena prac malarskich i wykończeniowych</h1>
-                <p class="quote-description">Wprowadź zakres prac i metraż. System przygotuje orientacyjną, rzetelną kalkulację bez materiałów oraz z podziałem na główne usługi.</p>
-                <p class="test-version-badge">WERSJA TESTOWA</p>
+                <p class="brand-label">Szybka wycena · v2026.06.14-07</p>
+                <h1 class="quote-title">Kalkulator wyceny z cennika EL-Net</h1>
+                <p class="quote-description">Wersja testowa — kalkulator z publicznego cennika. Wyszukaj i dodaj usługi bezpośrednio z bazy, a następnie określ ich ilość.</p>
             </div>
             <a class="panel-link panel-link--small" href="./panel/">Panel EL-Net</a>
         </header>
 
-        <section class="quote-main">
-            <div class="test-info-box">Ta szybka wycena ma charakter wyłącznie orientacyjny i testowy. Nie stanowi oficjalnego cennika ani oferty handlowej EL-Net.</div>
-            <div class="quote-card">
-                <span class="quote-highlight">Wycena orientacyjna. Ostateczny koszt po ocenie zakresu prac i warunków na miejscu.</span>
-                <label class="card-label" for="opis">OPIS PRAC (Podaj jak najwięcej szczegółów)</label>
-                <textarea id="opis" rows="6" placeholder="Np. Chciałbym pomalować mieszkanie 50 m², 2 pokoje, ściany i sufity, mieszkanie puste, Kraków. Ściany są w dobrym stanie, bez dużych napraw..."></textarea>
+        <section class="quote-calculator-card" style="margin-top: 20px;">
+            <div class="quote-main">
+                <!-- LEWA KOLUMNA: WYSZUKIWARKA & NOTATKA -->
+                <div class="quote-left-panel">
+                    <h2 class="column-title" style="margin: 0 0 4px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 22px; font-weight: 800; color: var(--ink);">Dodaj usługę z cennika</h2>
+                    <p class="column-desc" style="font-size: 14px; color: var(--muted); margin: 0 0 16px;">Wyszukaj usługę, dodaj ją do kosztorysu i wpisz ilość.</p>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <input id="search-usluga" placeholder="Szukaj: malowanie, płytki, gniazdo, hydroizolacja..." type="text" style="font-size: 15px; border: 2px solid var(--green); border-radius: 12px; padding: 12px 16px; width: 100%;">
+                        
+                        <!-- WIDOCZNY BLOK DIAGNOSTYCZNY (widoczny w wersji testowej) -->
+                        <div id="diagnostyka-blok" style="margin-top: 12px; padding: 10px; border: 1px solid var(--line-warm); border-radius: 10px; background: #fffcf7; font-size: 11px; color: var(--muted); text-align: left;">
+                            <div style="font-weight: bold; color: var(--ink); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em;">Panel diagnostyczny</div>
+                            <div style="display: grid; grid-template-columns: auto 1fr; gap: 2px 10px;">
+                                <span>Status cennika:</span> <strong id="diag-status">ładowanie</strong>
+                                <span>Usług w pamięci:</span> <strong id="diag-count">0</strong>
+                                <span>Nazwa tabeli:</span> <strong id="diag-table-name">uslugi</strong>
+                                <span>Pole ceny:</span> <strong id="diag-price-field">cena_netto ?? cena</strong>
+                                <span>Szukasz:</span> <strong id="diag-phrase">-</strong>
+                                <span>Wyników:</span> <strong id="diag-results-count">0</strong>
+                                <span>Pierwsze wyniki:</span> <strong id="diag-first-three">-</strong>
+                            </div>
+                        </div>
 
-                <div class="quote-fields">
-                    <input id="metraz" placeholder="Metraż / zakres prac (m²)" type="text">
-                    <input id="lokalizacja" placeholder="Lokalizacja (opcjonalnie)" type="text">
+                        <div id="search-results" style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto;"></div>
+                    </div>
+
+                    <!-- DELIKATNA SEKCJA NOTATKI -->
+                    <div class="quote-note-section" style="margin-top: 24px; padding-top: 20px; border-top: 1px dashed var(--line); text-align: left;">
+                        <label class="card-label" for="opis" style="font-size: 13.5px; color: var(--ink); font-weight: 700; display: block; margin-bottom: 6px;">Notatka do wyceny (opcjonalnie)</label>
+                        <textarea id="opis" rows="3" placeholder="Np. mieszkanie 50 m², 3 pokoje, prace w Krakowie, dodatkowe uwagi…" style="font-size: 13px; padding: 10px; border-radius: 10px; width: 100%; border: 1px solid var(--line); resize: vertical;"></textarea>
+                        <p style="font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4;">Notatka nie dobiera automatycznie usług. Pozycje dodajesz z cennika powyżej.</p>
+                        
+                        <!-- Hidden inputs kept for javascript safety -->
+                        <input id="metraz" type="hidden">
+                        <input id="lokalizacja" type="hidden">
+                    </div>
                 </div>
 
-                <div class="quote-actions">
-                    <button id="generate-quote" class="btn btn-primary" type="button">Generuj orientacyjną wycenę</button>
-                    <button id="reset-quote" class="btn btn-secondary" type="button">Wyczyść dane</button>
+                <!-- PRAWA KOLUMNA: KOSZTORYS & SUMA -->
+                <div class="quote-result" id="quote-result">
+                    <!-- PRINT ONLY HEADER -->
+                    <div class="print-only print-header" style="border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 16px; text-align: left;">
+                        <h1 style="font-size: 26px; margin: 0 0 6px; font-weight: 800; color: #000; font-family: 'Plus Jakarta Sans', sans-serif;">Kosztorys orientacyjny EL-Net</h1>
+                        <p id="print-date" style="font-size: 13px; margin: 0; color: #555;"></p>
+                    </div>
+
+                    <h2 class="column-title" style="margin: 0 0 16px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 22px; font-weight: 800; color: var(--ink);">Twój kosztorys robocizny</h2>
+                    
+                    <!-- PRINT ONLY NOTE -->
+                    <div id="print-note-container" class="print-only" style="margin: 16px 0; padding: 12px; border: 1px solid #555; border-radius: 8px; background: #fafafa; text-align: left;">
+                        <strong style="display: block; font-size: 13px; margin-bottom: 4px; color: #000;">Notatka do wyceny:</strong>
+                        <div id="print-note-text" style="font-size: 13px; white-space: pre-wrap; color: #333;"></div>
+                    </div>
+                    
+                    <div class="quote-table-wrapper">
+                        <table class="quote-table">
+                            <thead>
+                                <tr>
+                                    <th>Usługa</th>
+                                    <th>Ilość</th>
+                                    <th>Jm.</th>
+                                    <th>Cena</th>
+                                    <th>Wartość</th>
+                                    <th>Usuń</th>
+                                </tr>
+                            </thead>
+                            <tbody id="quote-items">
+                                <!-- Wypełniane przez JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="quote-total" style="margin-top: 24px;">
+                        <span>Szacunkowo razem:</span>
+                        <strong id="quote-total-value">0 zł</strong>
+                    </div>
+
+                    <div class="quote-result-footer" style="margin-top: 24px; border-top: 1px solid var(--line); padding-top: 20px; text-align: left;">
+                        <p class="quote-clarification" style="font-size: 12.5px; line-height: 1.5; color: var(--muted); margin: 0 0 20px 0; border: 1px solid #d8f5e5; padding: 12px; border-radius: 12px; background: #f0fdf4;">
+                            To jest orientacyjna kalkulacja robocizny na podstawie publicznego cennika EL-Net. Nie obejmuje materiałów. Ostateczna oferta wymaga potwierdzenia zakresu prac.
+                        </p>
+                        <button id="reset-quote" class="btn btn-secondary" type="button" style="width: 100%; min-height: 44px; font-size: 14px; font-weight: bold; border-radius: 10px;">Wyczyść kosztorys</button>
+                        <button id="print-quote" class="btn btn-primary" type="button" style="width: 100%; min-height: 44px; font-size: 14px; font-weight: bold; border-radius: 10px; margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            Drukuj kosztorys
+                        </button>
+                    </div>
                 </div>
-
-                <div id="quote-message" class="quote-message" hidden></div>
-
-                <p class="quote-helper">Wycena ma charakter orientacyjny. Dokładna oferta jest możliwa po ocenie miejsca i potwierdzeniu zakresu prac.</p>
-            </div>
-
-            <div class="quote-result" id="quote-result" hidden>
-                <div class="quote-result-header">
-                    <h2>Orientacyjna wycena</h2>
-                    <p>Na podstawie opisu przygotowaliśmy szacunkowy kosztorys. Ostateczny koszt ustalamy po wizji lokalnej.</p>
-                    <p class="quote-clarification">Podane kwoty dotyczą orientacyjnej ceny za wykonaną pracę bez materiałów.</p>
-                </div>
-
-                <p class="quote-test-note">To jest wersja testowa wyceny. Ostateczna cena wymaga indywidualnej wyceny i potwierdzenia zakresu prac.</p>
-                <div id="quote-assumptions" class="quote-assumptions"></div>
-
-                <div class="quote-table-wrapper">
-                    <table class="quote-table">
-                        <thead>
-                            <tr>
-                                <th>Pozycja</th>
-                                <th>Ilość</th>
-                                <th>Jednostka</th>
-                                <th>Cena jednostkowa</th>
-                                <th>Wartość</th>
-                            </tr>
-                        </thead>
-                        <tbody id="quote-items"></tbody>
-                    </table>
-                </div>
-
-                <div class="quote-total">
-                    <span>Szacunkowo razem:</span>
-                    <strong id="quote-total-value">0 zł</strong>
-                </div>
-
-                <p class="quote-clarification">Podane kwoty dotyczą orientacyjnej ceny za wykonaną pracę bez materiałów.</p>
-                <p class="quote-note">To jest wycena orientacyjna. Ostateczny kosztorys wymaga sprawdzenia zakresu prac, warunków na miejscu i potwierdzenia cen.</p>
             </div>
         </section>
     </div>
-    <script src="public.js"></script>
+    <script src="public.js?v=20260614-07"></script>
 </body>
 </html>

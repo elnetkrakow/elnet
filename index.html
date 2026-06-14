@@ -3,137 +3,225 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EL-Net — remonty, instalacje i wykończenia</title>
-  <meta name="description" content="EL-Net — remonty, instalacje i wykończenia w Krakowie i okolicach. Szybka orientacyjna wycena robocizny bez materiałów." />
-  <link rel="stylesheet" href="styles.css?v=20260613-08" />
+  <title>EL-Net — remonty, instalacje i wykończenia w Krakowie</title>
+  <meta name="description" content="EL-Net — profesjonalne remonty, instalacje elektryczne i wykończenia wnętrz z pomysłem w Krakowie i okolicach. Sprawdź szybką, orientacyjną wycenę prac." />
+  <link rel="stylesheet" href="styles.css?v=20260614-02" />
 </head>
-<body>
-  <header class="topbar">
-    <a class="brand" href="index.html" aria-label="EL-Net strona główna">
-      <img src="logo.png" alt="EL-Net" />
-      <span><strong>EL-Net</strong><small>remonty · instalacje · wykończenia</small></span>
-    </a>
-    <nav class="nav" aria-label="Nawigacja">
-      <a href="#remonty">Remonty</a>
-      <a href="#instalacje">Instalacje</a>
-      <a href="#wykonczenia">Wykończenia</a>
-      <a class="nav-quote" href="szybka-wycena.html">Szybka wycena</a>
-      <a href="#kontakt">Kontakt</a>
-      <a class="nav-panel" href="panel/">Panel</a>
-    </nav>
+<body class="home-page">
+
+  <!-- 1. HEADER (Glassmorphism) -->
+  <header class="home-header">
+    <div class="home-header-container">
+      <a class="home-brand" href="index.html" aria-label="EL-Net strona główna">
+        <span class="home-brand-title">EL-Net</span>
+        <span class="home-brand-subtitle">remonty • instalacje • wykończenia</span>
+      </a>
+      <nav class="home-nav" aria-label="Nawigacja główna">
+        <a href="#remonty" class="home-nav-link">Remonty</a>
+        <a href="#instalacje" class="home-nav-link">Instalacje</a>
+        <a href="#wykonczenia" class="home-nav-link">Wykończenia</a>
+        <a href="szybka-wycena.html" class="home-nav-link home-nav-link-highlight">Szybka wycena</a>
+        <a href="#kontakt" class="home-nav-link">Kontakt</a>
+        <a href="panel/" class="home-nav-btn-panel">Panel</a>
+      </nav>
+    </div>
   </header>
 
   <main>
-    <section class="hero-pro">
-      <div class="hero-bg-lines" aria-hidden="true"></div>
-      <div class="hero-inner">
-        <p class="eyebrow">Kraków i okolice · robocizna bez materiałów</p>
-        <h1>Remonty, instalacje i wykończenia.</h1>
-        <p class="hero-lead">Bez zgadywania kosztów. Opisujesz zakres, sprawdzasz orientacyjną wycenę i dopiero wtedy ustalamy szczegóły prac.</p>
-        <div class="hero-actions">
-          <a class="btn btn-main" href="szybka-wycena.html">Zrób szybką wycenę</a>
-          <a class="btn btn-ghost" href="#remonty">Zobacz ofertę</a>
+    <!-- 2. HERO (Kompozycja przestrzenna z pływającymi kartami) -->
+    <section class="home-hero">
+      <div class="home-hero-container">
+        <div class="home-hero-content">
+          <span class="home-section-tag">Kraków i okolice</span>
+          <h1 class="home-hero-title">EL-Net — remonty, instalacje i wykończenia z pomysłem</h1>
+          <p class="home-hero-subtitle">Kraków i okolice. Pomagamy zaplanować zakres prac, przygotować orientacyjną wycenę i wykonać prace bez chaosu.</p>
+          <div class="home-hero-actions">
+            <a href="szybka-wycena.html" class="home-btn home-btn-primary">Szybka wycena</a>
+            <a href="#kontakt" class="home-btn home-btn-secondary">Kontakt</a>
+          </div>
         </div>
-        <div class="hero-steps" aria-label="Najważniejsze elementy oferty">
-          <span>Remonty</span>
-          <span>Instalacje</span>
-          <span>Wykończenia</span>
-          <span>Kosztorysy</span>
+        <div class="home-hero-scene">
+          <div class="home-hero-glow"></div>
+          
+          <!-- Pływająca Karta 1: Remonty -->
+          <div class="home-scene-card home-card-float1" style="z-index: 3;">
+            <div class="home-scene-icon">🛠️</div>
+            <div class="home-scene-body">
+              <span class="home-scene-tag-small">Standard Premium</span>
+              <span class="home-scene-title">Remonty i Wykończenia</span>
+              <span class="home-scene-desc">Precyzyjnie wykonane gładzie, malowanie i podłogi.</span>
+            </div>
+          </div>
+
+          <!-- Pływająca Karta 2: Instalacje -->
+          <div class="home-scene-card home-card-float2" style="z-index: 2;">
+            <div class="home-scene-icon">⚡</div>
+            <div class="home-scene-body">
+              <span class="home-scene-tag-small">Bezpieczeństwo</span>
+              <span class="home-scene-title">Instalacje elektryczne & C.O.</span>
+              <span class="home-scene-desc">Punkty, przyłącza, modernizacje systemów.</span>
+            </div>
+          </div>
+
+          <!-- Pływająca Karta 3: Lokalizacja / Badge -->
+          <div class="home-scene-badge home-card-float3" style="z-index: 4;">
+            <span class="home-badge-number">100%</span>
+            <div class="home-badge-text">
+              <strong>Kraków i okolice</strong>
+              <small>Spokojna realizacja</small>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="intro-strip">
-      <div>
-        <strong>Prosto:</strong> zakres prac, orientacyjna cena, ustalenia i realizacja.
+    <!-- 3. PAS WYRÓŻNIAJĄCY -->
+    <section class="home-highlight">
+      <div class="home-highlight-container">
+        <span class="home-highlight-text">Najpierw zakres i wycena — potem spokojna realizacja.</span>
+        <a href="szybka-wycena.html" class="home-highlight-btn">Sprawdź szybką wycenę</a>
       </div>
-      <a href="szybka-wycena.html">Sprawdź szybką wycenę →</a>
     </section>
 
-    <section class="offer-wrap" id="oferta">
-      <div class="section-title">
-        <p>Oferta</p>
-        <h2>Konkretny zakres prac — bez zbędnej grafiki.</h2>
-      </div>
-
-      <article class="service-row service-row-dark" id="remonty">
-        <div class="service-label"><span>01</span><strong>Remonty</strong></div>
-        <div class="service-content">
-          <h3>Prace remontowe dla mieszkań i lokali</h3>
-          <p>Malowanie, przygotowanie podłoża, prace ścienne, podłogi i poprawki wykończeniowe. Zakres ustalamy przed rozpoczęciem prac.</p>
-          <ul>
-            <li>malowanie i odświeżanie pomieszczeń</li>
-            <li>przygotowanie ścian i drobne naprawy</li>
-            <li>prace podłogowe i wykończeniowe</li>
-          </ul>
+    <!-- 4. SEKCJE USŁUG (Trójwymiarowe Karty) -->
+    <section class="home-services" id="uslugi">
+      <div class="home-services-container">
+        <div class="home-services-intro">
+          <span class="home-section-tag">Nasza oferta</span>
+          <h2 class="home-services-main-title">Kompleksowe usługi z gwarancją jakości</h2>
         </div>
-      </article>
 
-      <article class="service-row" id="instalacje">
-        <div class="service-label"><span>02</span><strong>Instalacje</strong></div>
-        <div class="service-content">
-          <h3>Elektryka, wod-kan i C.O.</h3>
-          <p>Nowe punkty, modernizacje, przeróbki i przygotowanie instalacji pod dalsze prace wykończeniowe.</p>
-          <ul>
-            <li>punkty elektryczne, gniazda, oświetlenie</li>
-            <li>instalacje sanitarne i podłączenia</li>
-            <li>przeróbki pod łazienkę, kuchnię lub lokal</li>
-          </ul>
+        <div class="home-services-grid">
+          <!-- Karta 1: Remonty -->
+          <article class="home-service-card-3d" id="remonty">
+            <span class="home-service-card-3d-num">01</span>
+            <div class="home-service-card-3d-icon">🛠️</div>
+            <h3 class="home-service-card-3d-title">Remonty</h3>
+            <p class="home-service-card-3d-desc">Wykonujemy kompleksowe prace remontowe w mieszkaniach i domach. Zapewniamy doskonałe przygotowanie podłoży i dokładność na każdym etapie.</p>
+            <ul class="home-service-card-3d-list">
+              <li>malowanie</li>
+              <li>przygotowanie podłoża</li>
+              <li>gładzie i poprawki</li>
+              <li>podłogi</li>
+              <li>prace wykończeniowe</li>
+            </ul>
+          </article>
+
+          <!-- Karta 2: Instalacje -->
+          <article class="home-service-card-3d" id="instalacje">
+            <span class="home-service-card-3d-num">02</span>
+            <div class="home-service-card-3d-icon">⚡</div>
+            <h3 class="home-service-card-3d-title">Instalacje</h3>
+            <p class="home-service-card-3d-desc">Bezpieczne i nowoczesne instalacje elektryczne, hydrauliczne oraz grzewcze. Modernizujemy stare instalacje pod nowoczesne standardy.</p>
+            <ul class="home-service-card-3d-list">
+              <li>elektryka</li>
+              <li>punkty elektryczne</li>
+              <li>wod-kan</li>
+              <li>C.O.</li>
+              <li>modernizacje</li>
+            </ul>
+          </article>
+
+          <!-- Karta 3: Wykończenia -->
+          <article class="home-service-card-3d" id="wykonczenia">
+            <span class="home-service-card-3d-num">03</span>
+            <div class="home-service-card-3d-icon">🏠</div>
+            <h3 class="home-service-card-3d-title">Wykończenia</h3>
+            <p class="home-service-card-3d-desc">Prace wykończeniowe mieszkań w stanie deweloperskim lub odświeżenie lokali do ponownego zamieszkania lub na wynajem.</p>
+            <ul class="home-service-card-3d-list">
+              <li>mieszkania deweloperskie</li>
+              <li>lokale do odświeżenia</li>
+              <li>łazienki</li>
+              <li>prace końcowe</li>
+              <li>przygotowanie do użytkowania</li>
+            </ul>
+          </article>
         </div>
-      </article>
+      </div>
+    </section>
 
-      <article class="service-row" id="wykonczenia">
-        <div class="service-label"><span>03</span><strong>Wykończenia</strong></div>
-        <div class="service-content">
-          <h3>Wykończenia po deweloperze i odświeżenia</h3>
-          <p>Pomagamy zamknąć prace tak, żeby mieszkanie było gotowe do użytkowania albo kolejnego etapu inwestycji.</p>
-          <ul>
-            <li>mieszkania po deweloperze</li>
-            <li>lokale do odświeżenia</li>
-            <li>końcowe poprawki i detale</li>
-          </ul>
+    <!-- 5. SEKCJA "JAK PRACUJEMY" (Graficzny Timeline) -->
+    <section class="home-process">
+      <div class="home-services-container">
+        <div class="home-services-intro">
+          <span class="home-section-tag">Nasza Metoda</span>
+          <h2 class="home-services-main-title">Od planowania do idealnego efektu</h2>
         </div>
-      </article>
+
+        <div class="home-process-timeline">
+          <!-- Krok 1 -->
+          <div class="home-process-card-3d">
+            <div class="home-process-card-num-circle">1</div>
+            <h4 class="home-process-card-title">Opisujesz zakres</h4>
+            <p class="home-process-card-desc">Wpisujesz metraż i planowane prace w naszym formularzu.</p>
+          </div>
+
+          <!-- Krok 2 -->
+          <div class="home-process-card-3d">
+            <div class="home-process-card-num-circle">2</div>
+            <h4 class="home-process-card-title">Wycena orientacyjna</h4>
+            <p class="home-process-card-desc">System natychmiast generuje wstępne szacunki kosztów.</p>
+          </div>
+
+          <!-- Krok 3 -->
+          <div class="home-process-card-3d">
+            <div class="home-process-card-num-circle">3</div>
+            <h4 class="home-process-card-title">Ustalamy szczegóły</h4>
+            <p class="home-process-card-desc">Potwierdzamy zakres i dopasowujemy harmonogram prac.</p>
+          </div>
+
+          <!-- Krok 4 -->
+          <div class="home-process-card-3d">
+            <div class="home-process-card-num-circle">4</div>
+            <h4 class="home-process-card-title">Realizacja</h4>
+            <p class="home-process-card-desc">Wykonujemy prace bez opóźnień, dbając o czystość.</p>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <section class="quote-band" id="szybka-wycena">
-      <div>
-        <p>Szybka wycena</p>
-        <h2>Opisz prace i zobacz orientacyjny koszt robocizny.</h2>
-        <span>Wynik jest orientacyjny i nie obejmuje materiałów. Ostateczną wycenę potwierdzamy po sprawdzeniu zakresu.</span>
+    <!-- 6. SEKCJA SZYBKA WYCENA (CTA 3D) -->
+    <section class="home-cta">
+      <div class="home-cta-container">
+        <div class="home-cta-box-3d">
+          <div class="home-cta-box-card">
+            <h2 class="home-cta-title">Opisz zakres i zobacz orientacyjną wycenę</h2>
+            <p class="home-cta-description">Wycena ma charakter testowy i orientacyjny. Ostateczny koszt ustalamy po ocenie zakresu prac i warunków na miejscu.</p>
+            <a href="szybka-wycena.html" class="home-btn home-btn-cta">Przejdź do szybkiej wyceny</a>
+          </div>
+        </div>
       </div>
-      <a class="btn btn-light" href="szybka-wycena.html">Przejdź do szybkiej wyceny</a>
     </section>
 
-    <section class="process" id="proces">
-      <div class="section-title compact">
-        <p>Jak pracujemy</p>
-        <h2>Od opisu do realizacji</h2>
-      </div>
-      <ol class="process-line">
-        <li><span>1</span><strong>Opisujesz zakres</strong><small>mieszkanie, metraż, rodzaj prac</small></li>
-        <li><span>2</span><strong>Sprawdzamy wycenę</strong><small>orientacyjny koszt robocizny</small></li>
-        <li><span>3</span><strong>Ustalamy szczegóły</strong><small>zakres, terminy, warunki</small></li>
-        <li><span>4</span><strong>Realizujemy prace</strong><small>porządek i kontrola kosztów</small></li>
-      </ol>
-    </section>
-
-    <section class="contact" id="kontakt">
-      <div>
-        <p>Kontakt</p>
-        <h2>Masz remont do zaplanowania?</h2>
-        <span>Napisz, co chcesz zrobić. Najpierw ustalimy zakres i orientacyjną cenę robocizny.</span>
-      </div>
-      <div class="contact-actions">
-        <a class="btn btn-main" href="szybka-wycena.html">Szybka wycena</a>
-        <a class="btn btn-ghost" href="tel:">Zadzwoń</a>
+    <!-- 7. KONTAKT -->
+    <section class="home-contact" id="kontakt">
+      <div class="home-contact-container">
+        <div class="home-contact-box">
+          <div class="home-contact-content">
+            <span class="home-section-tag">Porozmawiajmy</span>
+            <h2 class="home-contact-title">Masz remont do zaplanowania?</h2>
+            <p class="home-contact-text">Napisz lub zadzwoń. Zaczniemy od zakresu prac i orientacyjnej wyceny.</p>
+          </div>
+          <div class="home-contact-actions">
+            <a href="szybka-wycena.html" class="home-btn home-btn-primary">Szybka wycena</a>
+            <a href="panel/" class="home-contact-tech-link">Panel EL-Net</a>
+          </div>
+        </div>
       </div>
     </section>
   </main>
 
-  <footer class="footer">
-    <span>EL-Net · Kraków i okolice</span>
-    <a href="panel/">Panel EL-Net</a>
+  <!-- 8. STOPKA -->
+  <footer class="home-footer">
+    <div class="home-footer-container">
+      <div class="home-footer-logo">
+        <strong>EL-Net</strong> • remonty • instalacje • wykończenia
+      </div>
+      <div class="home-footer-location">
+        Kraków i okolice
+      </div>
+    </div>
   </footer>
+
 </body>
 </html>
