@@ -3534,7 +3534,9 @@ function drukujKosztorysDoOkna(id, options) {
         { key: "brutto", label: "Brutto", visible: options.brutto }
     ];
 
-    const headers = columns.filter(c => c.visible).map(c => `<th>${c.label}</th>`).join("");
+    const visibleColumns = columns.filter(c => c.visible);
+    const headers = visibleColumns.map(c => `<th class="col-${c.key}">${c.label}</th>`).join("");
+    const colgroup = visibleColumns.map(c => `<col class="col-${c.key}">`).join("");
 
     let sumaNetto = 0;
     let sumaVAT = 0;
@@ -3552,28 +3554,28 @@ function drukujKosztorysDoOkna(id, options) {
         sumaBrutto += brutto;
 
         const rowCells = [
-            `<td>${esc(p.nazwa || "")}</td>`,
-            options.jednostka ? `<td>${esc(p.jednostka || "")}</td>` : "",
-            options.ilosc ? `<td>${Number(p.ilosc || 0).toFixed(2)}</td>` : "",
-            options.cenaNetto ? `<td>${Number(p.cenaNetto || 0).toFixed(2)} PLN</td>` : "",
-            options.wartoscNetto ? `<td>${netto.toFixed(2)} PLN</td>` : "",
-            options.vat ? `<td>${vatPerc}%</td>` : "",
-            options.brutto ? `<td>${brutto.toFixed(2)} PLN</td>` : ""
+            `<td class="col-nazwa">${esc(p.nazwa || "")}</td>`,
+            options.jednostka ? `<td class="col-jednostka">${esc(p.jednostka || "")}</td>` : "",
+            options.ilosc ? `<td class="col-ilosc">${Number(p.ilosc || 0).toFixed(2)}</td>` : "",
+            options.cenaNetto ? `<td class="col-cenaNetto">${Number(p.cenaNetto || 0).toFixed(2)} PLN</td>` : "",
+            options.wartoscNetto ? `<td class="col-wartoscNetto">${netto.toFixed(2)} PLN</td>` : "",
+            options.vat ? `<td class="col-vat">${vatPerc}%</td>` : "",
+            options.brutto ? `<td class="col-brutto">${brutto.toFixed(2)} PLN</td>` : ""
         ];
 
         return `<tr>${rowCells.join("")}</tr>`;
     }).join("");
 
-    const vatPodsumowanie = Number.isFinite(Number(kosztorys.vat)) ? Number(kosztorys.vat) : sumaVAT;
-    const bruttoPodsumowanie = Number.isFinite(Number(kosztorys.brutto)) ? Number(kosztorys.brutto) : sumaNetto + vatPodsumowanie;
     const nettoPodsumowanie = Number.isFinite(Number(kosztorys.netto)) ? Number(kosztorys.netto) : sumaNetto;
+    const bruttoPodsumowanie = Number.isFinite(Number(kosztorys.brutto)) ? Number(kosztorys.brutto) : sumaBrutto;
+    const vatPodsumowanie = bruttoPodsumowanie - nettoPodsumowanie;
+    const stawkiVat = [...new Set(pozycje.map(p => pobierzVatProcent(p)).filter(v => Number.isFinite(v)).map(v => Number(v)))];
+    const vatLabel = stawkiVat.length === 1 ? `VAT ${stawkiVat[0]}%` : "VAT";
+    const formatujKwote = value => new Intl.NumberFormat("pl-PL", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(Number(value || 0)) + " PLN";
 
-    if (window.AndroidPrint && window.AndroidPrint.printHtml) { window.AndroidPrint.printHtml(html); return; }
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-        console.error("Nie udało się otworzyć okna do druku.");
-        return;
-    }
 
     const html = `
         <!DOCTYPE html>
@@ -3582,17 +3584,26 @@ function drukujKosztorysDoOkna(id, options) {
             <meta charset="UTF-8">
             <title>Kosztorys</title>
             <style>
-                @page { margin: 10mm; }
-                body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; color: #000; }
-                h1 { font-size: 22px; margin: 0 0 8px; }
-                h2 { font-size: 18px; margin: 0 0 6px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-                th, td { border: 1px solid #000; padding: 4px 6px; font-size: 11px; text-align: left; }
+                @page { size: A4 portrait; margin: 8mm; }
+                * { box-sizing: border-box; }
+                body { font-family: Arial, sans-serif; font-size: 10px; margin: 0; color: #000; width: 100%; overflow-wrap: anywhere; }
+                h1 { font-size: 18px; margin: 0 0 6px; }
+                h2 { font-size: 14px; margin: 0 0 5px; }
+                p { margin: 0 0 8px; }
+                table { width: 100%; max-width: 100%; border-collapse: collapse; margin-top: 8px; table-layout: fixed; }
+                th, td { border: 1px solid #000; padding: 2px 3px; font-size: 9px; line-height: 1.2; text-align: left; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; }
                 th { background: #f0f0f0; }
                 thead { display: table-header-group; }
                 tr { break-inside: avoid; page-break-inside: avoid; }
-                .summary { margin-top: 12px; width: 100%; }
-                .summary td { border: none; padding: 4px 6px; font-size: 11px; }
+                .col-nazwa { width: 38%; }
+                .col-jednostka { width: 9%; }
+                .col-ilosc { width: 7%; }
+                .col-cenaNetto { width: 12%; }
+                .col-wartoscNetto { width: 13%; }
+                .col-vat { width: 7%; }
+                .col-brutto { width: 14%; }
+                .summary { margin-top: 10px; width: 100%; table-layout: fixed; }
+                .summary td { border: none; padding: 3px 4px; font-size: 10px; }
                 .summary .label { width: 80%; }
                 .summary .value { text-align: right; }
             </style>
@@ -3602,6 +3613,7 @@ function drukujKosztorysDoOkna(id, options) {
             <h2>${esc(kosztorys.nazwa || "")}</h2>
             <p>Data: ${esc(kosztorys.data || "-")}</p>
             <table>
+                <colgroup>${colgroup}</colgroup>
                 <thead>
                     <tr>${headers}</tr>
                 </thead>
@@ -3612,20 +3624,27 @@ function drukujKosztorysDoOkna(id, options) {
             <table class="summary">
                 <tr>
                     <td class="label"><strong>Netto</strong></td>
-                    <td class="value">${nettoPodsumowanie.toFixed(2)} PLN</td>
+                    <td class="value">${formatujKwote(nettoPodsumowanie)}</td>
                 </tr>
                 <tr>
-                    <td class="label"><strong>VAT</strong></td>
-                    <td class="value">${vatPodsumowanie.toFixed(2)} PLN</td>
+                    <td class="label"><strong>${vatLabel}</strong></td>
+                    <td class="value">${formatujKwote(vatPodsumowanie)}</td>
                 </tr>
                 <tr>
                     <td class="label"><strong>Brutto</strong></td>
-                    <td class="value">${bruttoPodsumowanie.toFixed(2)} PLN</td>
+                    <td class="value">${formatujKwote(bruttoPodsumowanie)}</td>
                 </tr>
             </table>
         </body>
         </html>
     `;
+
+    if (window.AndroidPrint && window.AndroidPrint.printHtml) { window.AndroidPrint.printHtml(html); return; }
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+        console.error("Nie udalo sie otworzyc okna do druku.");
+        return;
+    }
 
     printWindow.document.write(html);
     printWindow.document.close();
