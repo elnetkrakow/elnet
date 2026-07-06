@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-06-ELNET";
+const APP_VERSION = "2026.06.13-07-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -614,7 +614,11 @@ function pokazSekcje(nazwa) {
 // ==========================================
 
 async function odswiezDane() {
-    await Promise.all([
+    console.log("ELNET LOAD DEBUG: currentUser", zalogowanyUser);
+    console.log("ELNET LOAD DEBUG: localStorage elnet_user", localStorage.getItem("elnet_user"));
+    console.log("ELNET LOAD DEBUG: localStorage elnet_token exists", !!localStorage.getItem("elnet_token"));
+
+    await Promise.allSettled([
         pobierzUslugi(),
         pobierzKosztorysy(),
         pobierzInwestycje(),
@@ -635,17 +639,23 @@ async function odswiezDane() {
 
 async function pobierzUslugi() {
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/uslugi?select=*&order=nazwa.asc`, {
+        const url = `${SUPABASE_URL}/rest/v1/uslugi?select=*&order=nazwa.asc`;
+        console.log("ELNET LOAD DEBUG: pobieram tabelę", "uslugi", "userId", zalogowanyUser?.id || null);
+        console.log("ELNET LOAD DEBUG: fetch url", url);
+        const res = await fetch(url, {
             headers: headers()
         });
+        console.log("ELNET LOAD DEBUG: fetch status", "uslugi", res.status, res.ok);
 
         if (!res.ok) {
             const errorText = await res.text();
+            console.error("ELNET LOAD DEBUG: błąd", "uslugi", errorText);
             obsluzBladAutoryzacji(errorText);
             throw new Error(errorText);
         }
 
         uslugi = await res.json();
+        console.log("ELNET LOAD DEBUG: wynik", "uslugi", uslugi);
     } catch (err) {
         console.error("Błąd usług:", err);
         uslugi = [];
@@ -673,17 +683,23 @@ async function pobierzKosztorysy() {
 
 async function pobierzInwestycje() {
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?select=*&order=created_at.desc`, {
+        const url = `${SUPABASE_URL}/rest/v1/inwestycje?select=*&order=created_at.desc`;
+        console.log("ELNET LOAD DEBUG: pobieram tabelę", "inwestycje", "userId", zalogowanyUser?.id || null);
+        console.log("ELNET LOAD DEBUG: fetch url", url);
+        const res = await fetch(url, {
             headers: headers()
         });
+        console.log("ELNET LOAD DEBUG: fetch status", "inwestycje", res.status, res.ok);
 
         if (!res.ok) {
             const errorText = await res.text();
+            console.error("ELNET LOAD DEBUG: błąd", "inwestycje", errorText);
             obsluzBladAutoryzacji(errorText);
             throw new Error(errorText);
         }
 
         inwestycje = await res.json();
+        console.log("ELNET LOAD DEBUG: wynik", "inwestycje", inwestycje);
     } catch (err) {
         console.error("Błąd inwestycji:", err);
         inwestycje = [];
@@ -769,17 +785,23 @@ async function pobierzMagazyn() {
 
 async function pobierzTerminarz() {
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?select=*&order=data_start.asc`, {
+        const url = `${SUPABASE_URL}/rest/v1/terminarz?select=*&order=data_start.asc`;
+        console.log("ELNET LOAD DEBUG: pobieram tabelę", "terminarz", "userId", zalogowanyUser?.id || null);
+        console.log("ELNET LOAD DEBUG: fetch url", url);
+        const res = await fetch(url, {
             headers: headers()
         });
+        console.log("ELNET LOAD DEBUG: fetch status", "terminarz", res.status, res.ok);
 
         if (!res.ok) {
             const errorText = await res.text();
+            console.error("ELNET LOAD DEBUG: błąd", "terminarz", errorText);
             obsluzBladAutoryzacji(errorText);
             throw new Error(errorText);
         }
 
         terminarz = await res.json();
+        console.log("ELNET LOAD DEBUG: wynik", "terminarz", terminarz);
     } catch (err) {
         console.error("Błąd pobierania terminarza:", err);
         terminarz = [];
@@ -1838,16 +1860,26 @@ window.usunMagazyn = async function(id) {
 // ==========================================
 
 function renderujWszystko() {
-    renderujPulpit();
-    renderujSelectUslug();
-    renderujWycene();
-    renderujKosztorysy();
-    renderujUslugi();
-    renderujInwestycje();
-    renderujKalendarzTerminarza();
-    renderujTerminarz();
-    renderujAdministrator();
-    renderujMagazyn();
+    const renderTasks = [
+        ["Pulpit", renderujPulpit],
+        ["Select usług", renderujSelectUslug],
+        ["Wycena", renderujWycene],
+        ["Kosztorysy", renderujKosztorysy],
+        ["Usługi", renderujUslugi],
+        ["Inwestycje", renderujInwestycje],
+        ["Kalendarz terminarza", renderujKalendarzTerminarza],
+        ["Terminarz", renderujTerminarz],
+        ["Administrator", renderujAdministrator],
+        ["Magazyn", renderujMagazyn]
+    ];
+
+    renderTasks.forEach(([name, renderFn]) => {
+        try {
+            renderFn();
+        } catch (err) {
+            console.error(`ELNET LOAD DEBUG: błąd renderowania modułu ${name}`, err);
+        }
+    });
 }
 
 function renderujAdministrator() {
