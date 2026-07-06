@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-05-ELNET";
+const APP_VERSION = "2026.06.13-06-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -929,7 +929,7 @@ function anulujEdycjeTerminu() {
 
 window.usunTermin = async function(id) {
     if (rolaUsera === "guest") {
-        alert("Tylko zalogowany u¿ytkownik mo¿e usuwaæ terminy.");
+        alert("Tylko zalogowany uÅ¼ytkownik moÅ¼e usuwaÄ‡ terminy.");
         return;
     }
 
@@ -938,8 +938,8 @@ window.usunTermin = async function(id) {
     const inwestycja = investmentId ? znajdzInwestycjePoId(investmentId) : null;
 
     if (investmentId && inwestycja) {
-        if (!confirm("Ten wpis jest po³¹czony z inwestycj¹. Czy usun¹æ tylko wpis z Terminarza i od³¹czyæ inwestycjê?")) return;
-    } else if (!confirm("Usun¹æ termin?")) {
+        if (!confirm("Ten wpis jest poÅ‚Ä…czony z inwestycjÄ…. Czy usunÄ…Ä‡ tylko wpis z Terminarza i odÅ‚Ä…czyÄ‡ inwestycjÄ™?")) return;
+    } else if (!confirm("UsunÄ…Ä‡ termin?")) {
         return;
     }
 
@@ -960,10 +960,10 @@ window.usunTermin = async function(id) {
         zapiszLokalnePowiazaniaPanelu();
 
         await odswiezWidokiPoZmianieTerminarza();
-        zapiszLog("Terminarz", "Usuniêto termin", id);
+        zapiszLog("Terminarz", "UsuniÄ™to termin", id);
     } catch (err) {
-        console.error("B³¹d usuwania terminarza:", err);
-        alert("Nie uda³o siê usun¹æ terminu.");
+        console.error("BÅ‚Ä…d usuwania terminarza:", err);
+        alert("Nie udaÅ‚o siÄ™ usunÄ…Ä‡ terminu.");
     }
 };
 
@@ -1037,38 +1037,40 @@ function renderujTerminarz() {
         const linkedInvestment = investmentId ? znajdzInwestycjePoId(investmentId) : null;
         const orphanInvestmentLink = Boolean(investmentId && !linkedInvestment);
         const investmentInfo = orphanInvestmentLink
-            ? `<br><small>Powi¹zana inwestycja nie istnieje</small>`
+            ? `<span class="orphaned-warning">PowiÄ…zana inwestycja nie istnieje</span>`
             : investmentId
-                ? `<br><small>Powi¹zana inwestycja</small>`
+                ? `<span class="linked-event-note">PowiÄ…zana inwestycja</span>`
                 : itemType === "Inwestycja"
-                    ? `<br><small>Typ: Inwestycja</small>`
+                    ? `<span class="linked-event-note">Typ: Inwestycja</span>`
                     : "";
         const canEdit = rolaUsera !== 'guest';
         const editButton = canEdit
             ? `<button class="btn btn-secondary small-btn" onclick="edytujTermin('${esc(item.id)}')">Edytuj</button>`
             : '';
-        const deleteButton = canEdit
+        const deleteButton = canEdit && !orphanInvestmentLink
             ? `<button class="btn btn-danger small-btn" onclick="usunTermin('${esc(item.id)}')">UsuÅ„</button>`
             : '';
         const investmentButton = orphanInvestmentLink
-            ? `<button class="btn btn-danger small-btn" onclick="usunTermin('${esc(item.id)}')">Usuñ wpis z Terminarza</button> <button class="btn btn-secondary small-btn" onclick="odlaczTermin('${esc(item.id)}')">Od³¹cz powi¹zanie</button> <button class="btn btn-secondary small-btn" onclick="polaczTerminZInnaInwestycja('${esc(item.id)}')">Po³¹cz z inn¹ inwestycj¹</button>`
+            ? `<button class="btn btn-danger small-btn" onclick="usunTermin('${esc(item.id)}')">UsuÅ„ wpis</button> <button class="btn btn-secondary small-btn" onclick="odlaczTermin('${esc(item.id)}')">OdÅ‚Ä…cz</button> <button class="btn btn-secondary small-btn" onclick="polaczTerminZInnaInwestycja('${esc(item.id)}')">PoÅ‚Ä…cz z innÄ…</button>`
             : investmentId
-                ? `<button class="btn btn-secondary small-btn" onclick="przejdzDoInwestycjiZTerminu('${esc(item.id)}')">PrzejdŸ do inwestycji</button>`
+                ? `<button class="btn btn-secondary small-btn" onclick="przejdzDoInwestycjiZTerminu('${esc(item.id)}')">PrzejdÅº do inwestycji</button>`
                 : itemType === "Inwestycja"
-                    ? `<button class="btn btn-secondary small-btn" onclick="obsluzTerminInwestycji('${esc(item.id)}')">Obs³u¿ inwestycjê</button>`
+                    ? `<button class="btn btn-secondary small-btn" onclick="obsluzTerminInwestycji('${esc(item.id)}')">ObsÅ‚uÅ¼ inwestycjÄ™</button>`
                     : '';
+        const actionClass = orphanInvestmentLink ? "calendar-row-actions orphaned-actions" : "calendar-row-actions";
+        const rowClass = orphanInvestmentLink ? ' class="orphaned-event"' : '';
         const akcje = [investmentButton, editButton, deleteButton].filter(Boolean).join(' ');
 
         return `
-            <tr>
+            <tr${rowClass}>
                 <td>${esc(startStr)} â€“ ${esc(endStr)}</td>
                 <td>${esc(item.klient || '')}</td>
                 <td>${esc(item.adres || '')}</td>
                 <td>${esc(item.telefon || '')}</td>
-                <td>${statusLabel}${investmentInfo}</td>
+                <td><div class="terminarz-status-stack">${statusLabel}${investmentInfo}</div></td>
                 <td>${esc(item.opis || '')}</td>
                 <td>${esc(days)}</td>
-                <td>${akcje}</td>
+                <td><div class="${actionClass}">${akcje}</div></td>
             </tr>
         `;
     }).join('');
@@ -1168,7 +1170,7 @@ async function zapiszPowiazanieInwestycjaTermin(investmentId, eventId) {
     });
     const inwestycjaText = await inwestycjaRes.text();
     if (!inwestycjaRes.ok) {
-        console.error("B³¹d aktualizacji powi¹zania inwestycji:", {
+        console.error("BÅ‚Ä…d aktualizacji powiÄ…zania inwestycji:", {
             status: inwestycjaRes.status,
             text: inwestycjaText,
             payload: updatePayload
@@ -1184,7 +1186,7 @@ async function zapiszPowiazanieInwestycjaTermin(investmentId, eventId) {
     });
     const terminarzText = await terminarzRes.text();
     if (!terminarzRes.ok) {
-        console.error("B³¹d aktualizacji powi¹zania terminarza:", {
+        console.error("BÅ‚Ä…d aktualizacji powiÄ…zania terminarza:", {
             status: terminarzRes.status,
             text: terminarzText,
             payload: terminarzUpdatePayload
@@ -1320,7 +1322,7 @@ async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
         });
         const text = await res.text();
         if (!res.ok) {
-            console.error("B³¹d aktualizacji powi¹zania terminarza:", {
+            console.error("BÅ‚Ä…d aktualizacji powiÄ…zania terminarza:", {
                 status: res.status,
                 text,
                 payload
@@ -1349,11 +1351,11 @@ async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
     try {
         created = text ? JSON.parse(text) : null;
     } catch (e) {
-        console.error("B³¹d parsowania odpowiedzi Supabase:", e);
+        console.error("BÅ‚Ä…d parsowania odpowiedzi Supabase:", e);
     }
 
     if (!res.ok) {
-        console.error("B³¹d dodania wpisu terminarza:", {
+        console.error("BÅ‚Ä…d dodania wpisu terminarza:", {
             status: res.status,
             text,
             payload
@@ -1462,14 +1464,14 @@ window.obsluzTerminInwestycji = async function(id) {
 window.odlaczTermin = async function(id) {
     const termin = terminarz.find(t => String(t.id) === String(id));
     if (!termin) return;
-    if (!confirm("Od³¹czyæ ten wpis od inwestycji?")) return;
+    if (!confirm("OdÅ‚Ä…czyÄ‡ ten wpis od inwestycji?")) return;
     try {
         await odlaczTerminOdInwestycji(termin);
         await odswiezWidokiPoZmianieTerminarza();
-        zapiszLog("Terminarz", "Od³¹czono wpis od inwestycji", id);
+        zapiszLog("Terminarz", "OdÅ‚Ä…czono wpis od inwestycji", id);
     } catch (err) {
-        console.error("B³¹d od³¹czania wpisu terminarza od inwestycji:", err);
-        alert("Nie uda³o siê od³¹czyæ wpisu od inwestycji.");
+        console.error("BÅ‚Ä…d odÅ‚Ä…czania wpisu terminarza od inwestycji:", err);
+        alert("Nie udaÅ‚o siÄ™ odÅ‚Ä…czyÄ‡ wpisu od inwestycji.");
     }
 };
 
@@ -1482,10 +1484,10 @@ window.polaczTerminZInnaInwestycja = async function(id) {
         await zapiszPowiazanieInwestycjaTermin(inwestycja.id, termin.id);
         zapiszDatyInwestycji(inwestycja.id, termin.data_start, termin.data_koniec || termin.data_start);
         await odswiezWidokiPoZmianieTerminarza();
-        zapiszLog("Terminarz", "Po³¹czono wpis z inn¹ inwestycj¹", id);
+        zapiszLog("Terminarz", "PoÅ‚Ä…czono wpis z innÄ… inwestycjÄ…", id);
     } catch (err) {
-        console.error("B³¹d ³¹czenia wpisu terminarza z inwestycj¹:", err);
-        alert("Nie uda³o siê po³¹czyæ wpisu z inwestycj¹.");
+        console.error("BÅ‚Ä…d Å‚Ä…czenia wpisu terminarza z inwestycjÄ…:", err);
+        alert("Nie udaÅ‚o siÄ™ poÅ‚Ä…czyÄ‡ wpisu z inwestycjÄ….");
     }
 };
 
@@ -1500,7 +1502,7 @@ window.przejdzDoInwestycjiZTerminu = async function(id) {
         return;
     }
 
-    const wybor = prompt("Ta inwestycja zosta³a usuniêta albo nie istnieje.\n1 - Usuñ wpis z Terminarza\n2 - Od³¹cz wpis od inwestycji\n3 - Anuluj", "3");
+    const wybor = prompt("Ta inwestycja zostaÅ‚a usuniÄ™ta albo nie istnieje.\n1 - UsuÅ„ wpis z Terminarza\n2 - OdÅ‚Ä…cz wpis od inwestycji\n3 - Anuluj", "3");
     try {
         if (wybor === "1") {
             await usunTerminZBazy(id);
@@ -1514,8 +1516,8 @@ window.przejdzDoInwestycjiZTerminu = async function(id) {
         }
         await odswiezWidokiPoZmianieTerminarza();
     } catch (err) {
-        console.error("B³¹d obs³ugi osieroconego powi¹zania terminarza:", err);
-        alert("Nie uda³o siê obs³u¿yæ powi¹zania z usuniêt¹ inwestycj¹.");
+        console.error("BÅ‚Ä…d obsÅ‚ugi osieroconego powiÄ…zania terminarza:", err);
+        alert("Nie udaÅ‚o siÄ™ obsÅ‚uÅ¼yÄ‡ powiÄ…zania z usuniÄ™tÄ… inwestycjÄ….");
     }
 };
 
@@ -1531,9 +1533,9 @@ window.dodajInwestycjeDoTerminarza = async function(id) {
         renderujKalendarzTerminarza();
         zapiszLog("Inwestycje", "Dodano inwestycjÄ™ do terminarza", inwestycja.nazwa);
     } catch (err) {
-        console.error("B³¹d dodania inwestycji do terminarza:", err);
+        console.error("BÅ‚Ä…d dodania inwestycji do terminarza:", err);
         console.error("Supabase error:", err?.message, err?.details, err?.hint, err?.code);
-        alert("Nie uda³o siê dodaæ inwestycji do Terminarza. Szczegó³y b³êdu s¹ w konsoli F12.");
+        alert("Nie udaÅ‚o siÄ™ dodaÄ‡ inwestycji do Terminarza. SzczegÃ³Å‚y bÅ‚Ä™du sÄ… w konsoli F12.");
     }
 };
 
@@ -1744,7 +1746,7 @@ function renderujMagazyn() {
                 <td>${kwota} PLN</td>
                 <td>${gwar}</td>
                 <td>${esc(item.uwagi || '')}</td>
-                <td>${akcje}</td>
+                <td><div class="${actionClass}">${akcje}</div></td>
             </tr>
         `;
     }).join('');
@@ -2272,7 +2274,7 @@ function renderujUslugi() {
                 <td>${esc(u.nazwa)}</td>
                 <td>${esc(jednostkaUslugi(u))}</td>
                 <td><strong>${cenaUslugi(u).toFixed(2)} PLN</strong></td>
-                <td>${akcje}</td>
+                <td><div class="${actionClass}">${akcje}</div></td>
             </tr>
         `;
     }).join("");
@@ -4643,13 +4645,13 @@ function zamknijPanelInwestycji() {
 
 window.usunInwestycje = async function(id) {
     if (rolaUsera !== "admin") {
-        alert("Tylko administrator mo¿e usuwaæ inwestycje.");
+        alert("Tylko administrator moÅ¼e usuwaÄ‡ inwestycje.");
         return;
     }
 
     const inwestycja = inwestycje.find(i => String(i.id) === String(id));
     if (!inwestycja) {
-        alert("Nie znaleziono inwestycji do usuniêcia.");
+        alert("Nie znaleziono inwestycji do usuniÄ™cia.");
         return;
     }
 
@@ -4658,7 +4660,7 @@ window.usunInwestycje = async function(id) {
     let linkedAction = "none";
 
     if (linkedEventId) {
-        const wybor = prompt("Ta inwestycja jest po³¹czona z Terminarzem. Co zrobiæ z wpisem w Terminarzu?\n1 - Usuñ równie¿ wpis z Terminarza\n2 - Zostaw wpis w Terminarzu, ale od³¹cz od inwestycji\n3 - Anuluj", "3");
+        const wybor = prompt("Ta inwestycja jest poÅ‚Ä…czona z Terminarzem. Co zrobiÄ‡ z wpisem w Terminarzu?\n1 - UsuÅ„ rÃ³wnieÅ¼ wpis z Terminarza\n2 - Zostaw wpis w Terminarzu, ale odÅ‚Ä…cz od inwestycji\n3 - Anuluj", "3");
         if (wybor === "1") {
             linkedAction = "delete-event";
         } else if (wybor === "2") {
@@ -4666,7 +4668,7 @@ window.usunInwestycje = async function(id) {
         } else {
             return;
         }
-    } else if (!confirm("Usun¹æ inwestycjê razem z jej zaliczkami i kosztami?")) {
+    } else if (!confirm("UsunÄ…Ä‡ inwestycjÄ™ razem z jej zaliczkami i kosztami?")) {
         return;
     }
 
@@ -4699,14 +4701,14 @@ window.usunInwestycje = async function(id) {
         renderujTerminarz();
         renderujKalendarzTerminarza();
         renderujPulpit();
-        zapiszLog("Inwestycje", "Usuniêto inwestycjê", id);
+        zapiszLog("Inwestycje", "UsuniÄ™to inwestycjÄ™", id);
 
         if (String(aktywnaInwestycjaId) === String(id)) {
             zamknijPanelInwestycji();
         }
     } catch (err) {
-        console.error("B³¹d usuwania inwestycji:", err);
-        alert("Nie uda³o siê usun¹æ inwestycji.");
+        console.error("BÅ‚Ä…d usuwania inwestycji:", err);
+        alert("Nie udaÅ‚o siÄ™ usunÄ…Ä‡ inwestycji.");
     }
 }
 

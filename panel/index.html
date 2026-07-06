@@ -5,6 +5,69 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EL-Net - Panel</title>
     <link rel="stylesheet" href="styles.css?v=20260610-27">
+    <style>
+        .terminarz-status-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+        }
+
+        .linked-event-note,
+        .orphaned-warning {
+            display: inline-flex;
+            max-width: 100%;
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-size: 11px;
+            line-height: 1.25;
+            white-space: normal;
+        }
+
+        .linked-event-note {
+            color: #1f4f7a;
+            background: #e8f2fb;
+        }
+
+        .orphaned-warning {
+            color: #8a4a00;
+            background: #fff3cd;
+            border: 1px solid #f0d98c;
+        }
+
+        .calendar-row-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            max-width: 100%;
+        }
+
+        .calendar-row-actions .small-btn {
+            padding: 5px 8px;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+
+        .orphaned-actions {
+            gap: 5px;
+        }
+
+        .orphaned-actions .small-btn {
+            font-size: 12px;
+            padding: 4px 7px;
+        }
+
+        tr.orphaned-event td {
+            vertical-align: top;
+        }
+
+        @media (max-width: 900px) {
+            .calendar-row-actions .small-btn {
+                white-space: normal;
+            }
+        }
+    </style>
 </head>
 
 <body>
@@ -1132,6 +1195,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260613-05"></script>
+    <script src="script.js?v=20260613-06"></script>
 </body>
 </html>
