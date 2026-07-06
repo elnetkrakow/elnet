@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-04-ELNET-DIAG";
+const APP_VERSION = "2026.06.13-04-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -1143,18 +1143,14 @@ function pobierzPowiazanaInwestycjeId(termin) {
 async function zapiszPowiazanieInwestycjaTermin(investmentId, eventId) {
     if (!investmentId || !eventId) return;
     const updatePayload = { calendar_event_id: eventId };
-    console.log("ELNET DEBUG: update inwestycje payload:", updatePayload);
     const inwestycjaRes = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?id=eq.${encodeURIComponent(investmentId)}`, {
         method: "PATCH",
         headers: headers(),
         body: JSON.stringify(updatePayload)
     });
     const inwestycjaText = await inwestycjaRes.text();
-    console.log("ELNET DEBUG: update inwestycje status:", inwestycjaRes.status);
-    console.log("ELNET DEBUG: update inwestycje ok:", inwestycjaRes.ok);
-    console.log("ELNET DEBUG: update inwestycje text:", inwestycjaText);
     if (!inwestycjaRes.ok) {
-        console.error("ELNET DEBUG: UPDATE inwestycje failed", {
+        console.error("B³¹d aktualizacji powi¹zania inwestycji:", {
             status: inwestycjaRes.status,
             text: inwestycjaText,
             payload: updatePayload
@@ -1163,18 +1159,14 @@ async function zapiszPowiazanieInwestycjaTermin(investmentId, eventId) {
     }
 
     const terminarzUpdatePayload = { investment_id: investmentId, type: "Inwestycja" };
-    console.log("ELNET DEBUG: update terminarz payload:", terminarzUpdatePayload);
     const terminarzRes = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${encodeURIComponent(eventId)}`, {
         method: "PATCH",
         headers: headers(),
         body: JSON.stringify(terminarzUpdatePayload)
     });
     const terminarzText = await terminarzRes.text();
-    console.log("ELNET DEBUG: update terminarz status:", terminarzRes.status);
-    console.log("ELNET DEBUG: update terminarz ok:", terminarzRes.ok);
-    console.log("ELNET DEBUG: update terminarz text:", terminarzText);
     if (!terminarzRes.ok) {
-        console.error("ELNET DEBUG: UPDATE terminarz failed", {
+        console.error("B³¹d aktualizacji powi¹zania terminarza:", {
             status: terminarzRes.status,
             text: terminarzText,
             payload: terminarzUpdatePayload
@@ -1250,8 +1242,6 @@ async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
 
     const linkedEventId = pobierzPowiazanyTerminId(inwestycja);
     const payload = payloadTerminuZInwestycji(inwestycja, dataStart, dataKoniec);
-    console.log("ELNET DEBUG: inwestycja:", inwestycja);
-    console.log("ELNET DEBUG: payload terminarz:", payload);
 
     if (linkedEventId) {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${encodeURIComponent(linkedEventId)}`, {
@@ -1260,11 +1250,8 @@ async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
             body: JSON.stringify(payload)
         });
         const text = await res.text();
-        console.log("ELNET DEBUG: update terminarz status:", res.status);
-        console.log("ELNET DEBUG: update terminarz ok:", res.ok);
-        console.log("ELNET DEBUG: update terminarz text:", text);
         if (!res.ok) {
-            console.error("ELNET DEBUG: UPDATE terminarz failed", {
+            console.error("B³¹d aktualizacji powi¹zania terminarza:", {
                 status: res.status,
                 text,
                 payload
@@ -1288,20 +1275,16 @@ async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
         body: JSON.stringify(payload)
     });
     const text = await res.text();
-    console.log("ELNET DEBUG: insert terminarz status:", res.status);
-    console.log("ELNET DEBUG: insert terminarz ok:", res.ok);
-    console.log("ELNET DEBUG: insert terminarz text:", text);
-    console.log("ELNET DEBUG: Supabase response text:", text);
 
     let created = null;
     try {
         created = text ? JSON.parse(text) : null;
     } catch (e) {
-        console.error("ELNET DEBUG: JSON parse error:", e);
+        console.error("B³¹d parsowania odpowiedzi Supabase:", e);
     }
 
     if (!res.ok) {
-        console.error("ELNET DEBUG: INSERT terminarz failed", {
+        console.error("B³¹d dodania wpisu terminarza:", {
             status: res.status,
             text,
             payload
