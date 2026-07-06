@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-04-ELNET";
+const APP_VERSION = "2026.06.13-05-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -928,30 +928,42 @@ function anulujEdycjeTerminu() {
 }
 
 window.usunTermin = async function(id) {
-    if (rolaUsera !== 'admin') {
-        alert('Tylko administrator moÅ¼e usuwaÄ‡ terminy.');
+    if (rolaUsera === "guest") {
+        alert("Tylko zalogowany u¿ytkownik mo¿e usuwaæ terminy.");
         return;
     }
 
-    if (!confirm('UsunÄ…Ä‡ termin?')) return;
+    const termin = terminarz.find(item => String(item.id) === String(id));
+    const investmentId = pobierzPowiazanaInwestycjeId(termin);
+    const inwestycja = investmentId ? znajdzInwestycjePoId(investmentId) : null;
+
+    if (investmentId && inwestycja) {
+        if (!confirm("Ten wpis jest po³¹czony z inwestycj¹. Czy usun¹æ tylko wpis z Terminarza i od³¹czyæ inwestycjê?")) return;
+    } else if (!confirm("Usun¹æ termin?")) {
+        return;
+    }
 
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${id}`, {
-            method: 'DELETE',
-            headers: headers()
-        });
+        await usunTerminZBazy(id);
 
-        if (!res.ok) {
-            throw new Error(await res.text());
+        if (inwestycja) {
+            const inwestycjaRes = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?id=eq.${encodeURIComponent(investmentId)}`, {
+                method: "PATCH",
+                headers: headers(),
+                body: JSON.stringify({ calendar_event_id: null })
+            });
+            if (!inwestycjaRes.ok) throw new Error(await inwestycjaRes.text());
         }
 
-        await pobierzTerminarz();
-        renderujTerminarz();
-        renderujKalendarzTerminarza();
-        zapiszLog('Terminarz', 'UsuniÄ™to termin', id);
+        if (id) delete panelLinks.events[String(id)];
+        if (investmentId) delete panelLinks.investments[String(investmentId)];
+        zapiszLokalnePowiazaniaPanelu();
+
+        await odswiezWidokiPoZmianieTerminarza();
+        zapiszLog("Terminarz", "Usuniêto termin", id);
     } catch (err) {
-        console.error('BÅ‚Ä…d usuwania terminarza:', err);
-        alert('Nie udaÅ‚o siÄ™ usunÄ…Ä‡ terminu.');
+        console.error("B³¹d usuwania terminarza:", err);
+        alert("Nie uda³o siê usun¹æ terminu.");
     }
 };
 
@@ -1022,23 +1034,29 @@ function renderujTerminarz() {
         const statusLabel = `<span class="status-tag status-${status.replace(/\s/g, '-')}">${esc(status || '-')}</span>`;
         const itemType = typTerminu(item);
         const investmentId = pobierzPowiazanaInwestycjeId(item);
-        const investmentInfo = investmentId
-            ? `<br><small>PowiÄ…zana inwestycja</small>`
-            : itemType === "Inwestycja"
-                ? `<br><small>Typ: Inwestycja</small>`
-                : "";
+        const linkedInvestment = investmentId ? znajdzInwestycjePoId(investmentId) : null;
+        const orphanInvestmentLink = Boolean(investmentId && !linkedInvestment);
+        const investmentInfo = orphanInvestmentLink
+            ? `<br><small>Powi¹zana inwestycja nie istnieje</small>`
+            : investmentId
+                ? `<br><small>Powi¹zana inwestycja</small>`
+                : itemType === "Inwestycja"
+                    ? `<br><small>Typ: Inwestycja</small>`
+                    : "";
         const canEdit = rolaUsera !== 'guest';
         const editButton = canEdit
             ? `<button class="btn btn-secondary small-btn" onclick="edytujTermin('${esc(item.id)}')">Edytuj</button>`
             : '';
-        const deleteButton = rolaUsera === 'admin'
+        const deleteButton = canEdit
             ? `<button class="btn btn-danger small-btn" onclick="usunTermin('${esc(item.id)}')">UsuÅ„</button>`
             : '';
-        const investmentButton = investmentId
-            ? `<button class="btn btn-secondary small-btn" onclick="przejdzDoInwestycjiZTerminu('${esc(item.id)}')">PrzejdÅº do inwestycji</button>`
-            : itemType === "Inwestycja"
-                ? `<button class="btn btn-secondary small-btn" onclick="obsluzTerminInwestycji('${esc(item.id)}')">ObsÅ‚uÅ¼ inwestycjÄ™</button>`
-                : '';
+        const investmentButton = orphanInvestmentLink
+            ? `<button class="btn btn-danger small-btn" onclick="usunTermin('${esc(item.id)}')">Usuñ wpis z Terminarza</button> <button class="btn btn-secondary small-btn" onclick="odlaczTermin('${esc(item.id)}')">Od³¹cz powi¹zanie</button> <button class="btn btn-secondary small-btn" onclick="polaczTerminZInnaInwestycja('${esc(item.id)}')">Po³¹cz z inn¹ inwestycj¹</button>`
+            : investmentId
+                ? `<button class="btn btn-secondary small-btn" onclick="przejdzDoInwestycjiZTerminu('${esc(item.id)}')">PrzejdŸ do inwestycji</button>`
+                : itemType === "Inwestycja"
+                    ? `<button class="btn btn-secondary small-btn" onclick="obsluzTerminInwestycji('${esc(item.id)}')">Obs³u¿ inwestycjê</button>`
+                    : '';
         const akcje = [investmentButton, editButton, deleteButton].filter(Boolean).join(' ');
 
         return `
@@ -1193,6 +1211,57 @@ function zapiszDatyInwestycji(investmentId, dataStart, dataKoniec) {
         data_koniec: dataKoniec || dataStart
     };
     zapiszLokalnePowiazaniaPanelu();
+}
+
+function znajdzInwestycjePoId(id) {
+    return (inwestycje || []).find(i => String(i.id) === String(id));
+}
+
+async function usunTerminZBazy(id) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: headers()
+    });
+    if (!res.ok) throw new Error(await res.text());
+}
+
+async function odlaczTerminOdInwestycji(termin, options = {}) {
+    if (!termin) return;
+    const investmentId = pobierzPowiazanaInwestycjeId(termin);
+    const terminarzRes = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${encodeURIComponent(termin.id)}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify({ investment_id: null, type: "Zadanie" })
+    });
+    if (!terminarzRes.ok) throw new Error(await terminarzRes.text());
+
+    const inwestycja = investmentId ? znajdzInwestycjePoId(investmentId) : null;
+    if (inwestycja && !options.skipInvestmentUpdate) {
+        const inwestycjaRes = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?id=eq.${encodeURIComponent(investmentId)}`, {
+            method: "PATCH",
+            headers: headers(),
+            body: JSON.stringify({ calendar_event_id: null })
+        });
+        if (!inwestycjaRes.ok) throw new Error(await inwestycjaRes.text());
+    }
+
+    if (termin.id) {
+        delete panelLinks.events[String(termin.id)];
+        panelLinks.eventTypes[String(termin.id)] = "Zadanie";
+    }
+    if (investmentId) {
+        delete panelLinks.investments[String(investmentId)];
+    }
+    zapiszLokalnePowiazaniaPanelu();
+}
+
+async function odswiezWidokiPoZmianieTerminarza() {
+    await pobierzInwestycje();
+    await pobierzTerminarz();
+    renderujInwestycje();
+    renderujTerminarz();
+    renderujKalendarzTerminarza();
+    renderujPulpit();
 }
 
 function pobierzDatyInwestycji(inwestycja) {
@@ -1390,12 +1459,64 @@ window.obsluzTerminInwestycji = async function(id) {
     }
 };
 
-window.przejdzDoInwestycjiZTerminu = function(id) {
+window.odlaczTermin = async function(id) {
+    const termin = terminarz.find(t => String(t.id) === String(id));
+    if (!termin) return;
+    if (!confirm("Od³¹czyæ ten wpis od inwestycji?")) return;
+    try {
+        await odlaczTerminOdInwestycji(termin);
+        await odswiezWidokiPoZmianieTerminarza();
+        zapiszLog("Terminarz", "Od³¹czono wpis od inwestycji", id);
+    } catch (err) {
+        console.error("B³¹d od³¹czania wpisu terminarza od inwestycji:", err);
+        alert("Nie uda³o siê od³¹czyæ wpisu od inwestycji.");
+    }
+};
+
+window.polaczTerminZInnaInwestycja = async function(id) {
+    const termin = terminarz.find(t => String(t.id) === String(id));
+    if (!termin) return;
+    const inwestycja = wybierzIstniejacaInwestycje();
+    if (!inwestycja) return;
+    try {
+        await zapiszPowiazanieInwestycjaTermin(inwestycja.id, termin.id);
+        zapiszDatyInwestycji(inwestycja.id, termin.data_start, termin.data_koniec || termin.data_start);
+        await odswiezWidokiPoZmianieTerminarza();
+        zapiszLog("Terminarz", "Po³¹czono wpis z inn¹ inwestycj¹", id);
+    } catch (err) {
+        console.error("B³¹d ³¹czenia wpisu terminarza z inwestycj¹:", err);
+        alert("Nie uda³o siê po³¹czyæ wpisu z inwestycj¹.");
+    }
+};
+
+window.przejdzDoInwestycjiZTerminu = async function(id) {
     const termin = terminarz.find(t => String(t.id) === String(id));
     const investmentId = pobierzPowiazanaInwestycjeId(termin);
     if (!investmentId) return;
-    pokazSekcje("inwestycje");
-    window.otworzInwestycje(investmentId);
+    const inwestycja = znajdzInwestycjePoId(investmentId);
+    if (inwestycja) {
+        pokazSekcje("inwestycje");
+        window.otworzInwestycje(investmentId);
+        return;
+    }
+
+    const wybor = prompt("Ta inwestycja zosta³a usuniêta albo nie istnieje.\n1 - Usuñ wpis z Terminarza\n2 - Od³¹cz wpis od inwestycji\n3 - Anuluj", "3");
+    try {
+        if (wybor === "1") {
+            await usunTerminZBazy(id);
+            delete panelLinks.events[String(id)];
+            delete panelLinks.investments[String(investmentId)];
+            zapiszLokalnePowiazaniaPanelu();
+        } else if (wybor === "2") {
+            await odlaczTerminOdInwestycji(termin, { skipInvestmentUpdate: true });
+        } else {
+            return;
+        }
+        await odswiezWidokiPoZmianieTerminarza();
+    } catch (err) {
+        console.error("B³¹d obs³ugi osieroconego powi¹zania terminarza:", err);
+        alert("Nie uda³o siê obs³u¿yæ powi¹zania z usuniêt¹ inwestycj¹.");
+    }
 };
 
 window.dodajInwestycjeDoTerminarza = async function(id) {
@@ -4522,33 +4643,70 @@ function zamknijPanelInwestycji() {
 
 window.usunInwestycje = async function(id) {
     if (rolaUsera !== "admin") {
-        alert("Tylko administrator moÅ¼e usuwaÄ‡ inwestycje.");
+        alert("Tylko administrator mo¿e usuwaæ inwestycje.");
         return;
     }
 
-    if (!confirm("UsunÄ…Ä‡ inwestycjÄ™ razem z jej zaliczkami i kosztami?")) return;
+    const inwestycja = inwestycje.find(i => String(i.id) === String(id));
+    if (!inwestycja) {
+        alert("Nie znaleziono inwestycji do usuniêcia.");
+        return;
+    }
+
+    const linkedEventId = pobierzPowiazanyTerminId(inwestycja);
+    const linkedTermin = linkedEventId ? terminarz.find(t => String(t.id) === String(linkedEventId)) : null;
+    let linkedAction = "none";
+
+    if (linkedEventId) {
+        const wybor = prompt("Ta inwestycja jest po³¹czona z Terminarzem. Co zrobiæ z wpisem w Terminarzu?\n1 - Usuñ równie¿ wpis z Terminarza\n2 - Zostaw wpis w Terminarzu, ale od³¹cz od inwestycji\n3 - Anuluj", "3");
+        if (wybor === "1") {
+            linkedAction = "delete-event";
+        } else if (wybor === "2") {
+            linkedAction = "detach-event";
+        } else {
+            return;
+        }
+    } else if (!confirm("Usun¹æ inwestycjê razem z jej zaliczkami i kosztami?")) {
+        return;
+    }
 
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?id=eq.${id}`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?id=eq.${encodeURIComponent(id)}`, {
             method: "DELETE",
             headers: headers()
         });
 
         if (!res.ok) throw new Error(await res.text());
 
+        if (linkedAction === "delete-event" && linkedEventId) {
+            await usunTerminZBazy(linkedEventId);
+        } else if (linkedAction === "detach-event" && linkedEventId) {
+            await odlaczTerminOdInwestycji(linkedTermin || {
+                id: linkedEventId,
+                investment_id: id
+            }, { skipInvestmentUpdate: true });
+        }
+
+        if (linkedEventId) delete panelLinks.events[String(linkedEventId)];
+        delete panelLinks.investments[String(id)];
+        zapiszLokalnePowiazaniaPanelu();
+
         await pobierzInwestycje();
+        await pobierzTerminarz();
         await pobierzInwestycjeZaliczki();
         await pobierzInwestycjeKoszty();
         renderujInwestycje();
+        renderujTerminarz();
+        renderujKalendarzTerminarza();
         renderujPulpit();
-        zapiszLog("Inwestycje", "UsuniÄ™to inwestycjÄ™", id);
+        zapiszLog("Inwestycje", "Usuniêto inwestycjê", id);
 
         if (String(aktywnaInwestycjaId) === String(id)) {
             zamknijPanelInwestycji();
         }
     } catch (err) {
-        console.error(err);
-        alert("Nie udaÅ‚o siÄ™ usunÄ…Ä‡ inwestycji.");
+        console.error("B³¹d usuwania inwestycji:", err);
+        alert("Nie uda³o siê usun¹æ inwestycji.");
     }
 }
 
