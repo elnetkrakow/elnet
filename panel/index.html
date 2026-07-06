@@ -536,6 +536,8 @@
                 <label for="inwestycja-status">Status</label>
                 <select id="inwestycja-status">
                     <option value="aktywna">Aktywna</option>
+                    <option value="planowana">Planowana</option>
+                    <option value="do realizacji">Do realizacji</option>
                     <option value="zakończona">Zakończona</option>
                     <option value="wstrzymana">Wstrzymana</option>
                 </select>
@@ -853,6 +855,14 @@
                             </select>
                         </div>
 
+                        <div class="form-group">
+                            <label for="terminarz-type">Typ wpisu</label>
+                            <select id="terminarz-type">
+                                <option value="Zadanie">Zadanie</option>
+                                <option value="Inwestycja">Inwestycja</option>
+                            </select>
+                        </div>
+
                         <button id="btn-dodaj-termin" class="btn btn-main">Dodaj termin</button>
                         <button id="btn-anuluj-termin" class="btn btn-secondary small-btn hidden">Anuluj edycję</button>
                     </div>
@@ -1122,6 +1132,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260610-27"></script>
+    <script src="script.js?v=20260613-03"></script>
 </body>
 </html>

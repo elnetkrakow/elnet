@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-01-ELNET";
+const APP_VERSION = "2026.06.13-03-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -24,6 +24,16 @@ let magazyn = [];
 let terminarz = [];
 let calendarDate = new Date();
 let edytowanyTerminId = null;
+const PANEL_BACKUP_PREFIX = "elnet_panel_backup";
+const PANEL_LINKS_KEY = "elnet_panel_calendar_investment_links_v1";
+let panelLinks = {
+    investments: {},
+    events: {},
+    eventTypes: {},
+    investmentDates: {},
+    todayPrompts: {},
+    backupCreatedForVersion: null
+};
 
 let wycenaPozycje = [];
 let szybkaWycenaPropozycje = [];
@@ -43,6 +53,67 @@ function headers() {
         "Prefer": "return=representation"
     };
 }
+
+function wczytajLokalnePowiazaniaPanelu() {
+    try {
+        const raw = localStorage.getItem(PANEL_LINKS_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        panelLinks = {
+            investments: parsed.investments || {},
+            events: parsed.events || {},
+            eventTypes: parsed.eventTypes || {},
+            investmentDates: parsed.investmentDates || {},
+            todayPrompts: parsed.todayPrompts || {},
+            backupCreatedForVersion: parsed.backupCreatedForVersion || null
+        };
+    } catch (err) {
+        console.warn("Nie udalo sie wczytac lokalnych powiazan panelu:", err);
+    }
+}
+
+function zapiszLokalnePowiazaniaPanelu() {
+    try {
+        localStorage.setItem(PANEL_LINKS_KEY, JSON.stringify(panelLinks));
+    } catch (err) {
+        console.warn("Nie udalo sie zapisac lokalnych powiazan panelu:", err);
+    }
+}
+
+function wyczyscTylkoSesje() {
+    try {
+        localStorage.removeItem("elnet_token");
+        localStorage.removeItem("elnet_user");
+        sessionStorage.clear();
+    } catch (e) {
+        /* ignore */
+    }
+}
+
+function utworzKopieBezpieczenstwaPanelu() {
+    if (panelLinks.backupCreatedForVersion === APP_VERSION) return;
+    try {
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const key = `${PANEL_BACKUP_PREFIX}_${APP_VERSION}_${stamp}`;
+        localStorage.setItem(key, JSON.stringify({
+            version: APP_VERSION,
+            createdAt: new Date().toISOString(),
+            inwestycje,
+            terminarz,
+            kosztorysy,
+            inwestycjeZaliczki,
+            inwestycjeKoszty,
+            inwestycjePraceDodatkowe,
+            links: panelLinks
+        }));
+        panelLinks.backupCreatedForVersion = APP_VERSION;
+        zapiszLokalnePowiazaniaPanelu();
+    } catch (err) {
+        console.warn("Nie udalo sie utworzyc kopii bezpieczenstwa panelu:", err);
+    }
+}
+
+wczytajLokalnePowiazaniaPanelu();
 
 async function zapiszLog(modul, akcja, opis = "", szczegoly = {}) {
     try {
@@ -109,7 +180,7 @@ function obsluzBladAutoryzacji(errorText) {
 
     if (isOnLoginScreen) {
         // Jeśli już na ekranie logowania, tylko wyczyść storage
-        try { localStorage.clear(); sessionStorage.clear(); } catch (e) { /* ignore */ }
+        wyczyscTylkoSesje();
         accessToken = null;
         zalogowanyUser = null;
         rolaUsera = 'guest';
@@ -121,7 +192,7 @@ function obsluzBladAutoryzacji(errorText) {
     authErrorHandled = true;
 
     // Clear session and reset state
-    try { localStorage.clear(); sessionStorage.clear(); } catch (e) { /* ignore */ }
+    wyczyscTylkoSesje();
     accessToken = null;
     zalogowanyUser = null;
     rolaUsera = 'guest';
@@ -320,8 +391,7 @@ function podepnijZdarzenia() {
 
     const btnAdminClear = document.getElementById("btn-admin-clear");
     if (btnAdminClear) btnAdminClear.addEventListener("click", () => {
-        localStorage.clear();
-        sessionStorage.clear();
+        wyczyscTylkoSesje();
         location.reload();
     });
 
@@ -556,7 +626,11 @@ async function odswiezDane() {
         pobierzTerminarz()
     ]);
 
+    utworzKopieBezpieczenstwaPanelu();
+    await zsynchronizujAktywneInwestycjeZTerminarzem();
+
     renderujWszystko();
+    sprawdzDzisiejszeInwestycjeWTerminarzu();
 }
 
 async function pobierzUslugi() {
@@ -725,6 +799,7 @@ async function dodajTermin() {
     const telefon = document.getElementById('terminarz-telefon')?.value.trim();
     const opis = document.getElementById('terminarz-opis')?.value.trim();
     const status = document.getElementById('terminarz-status')?.value || 'zaplanowane';
+    const type = document.getElementById('terminarz-type')?.value || 'Zadanie';
 
     if (!dataStart || !dataKoniec) {
         alert('Podaj datę rozpoczęcia i zakończenia.');
@@ -750,6 +825,7 @@ async function dodajTermin() {
         telefon: telefon,
         opis: opis,
         status: status,
+        type: type,
         user_id: zalogowanyUser?.id || null
     };
 
@@ -775,6 +851,11 @@ async function dodajTermin() {
             throw new Error(await res.text());
         }
 
+        const zapisane = await res.json();
+        const zapisanyTermin = Array.isArray(zapisane) ? zapisane[0] : zapisane;
+        const terminId = edytowanyTerminId || zapisanyTermin?.id;
+        if (terminId) ustawTypTerminu(terminId, type);
+
         await pobierzTerminarz();
         renderujTerminarz();
         renderujKalendarzTerminarza();
@@ -793,6 +874,8 @@ async function dodajTermin() {
         document.getElementById('terminarz-telefon').value = '';
         document.getElementById('terminarz-opis').value = '';
         document.getElementById('terminarz-status').value = 'zaplanowane';
+        const typeEl = document.getElementById('terminarz-type');
+        if (typeEl) typeEl.value = 'Zadanie';
     } catch (err) {
         console.error('Błąd zapisu terminarza:', err);
         const msg = err?.message || String(err);
@@ -817,6 +900,8 @@ window.edytujTermin = function(id) {
     document.getElementById('terminarz-telefon').value = termin.telefon || '';
     document.getElementById('terminarz-opis').value = termin.opis || '';
     document.getElementById('terminarz-status').value = termin.status || 'zaplanowane';
+    const typeEl = document.getElementById('terminarz-type');
+    if (typeEl) typeEl.value = typTerminu(termin);
 
     const btnDodajTermin = document.getElementById('btn-dodaj-termin');
     if (btnDodajTermin) btnDodajTermin.textContent = 'Zapisz zmiany';
@@ -833,6 +918,8 @@ function anulujEdycjeTerminu() {
     document.getElementById('terminarz-telefon').value = '';
     document.getElementById('terminarz-opis').value = '';
     document.getElementById('terminarz-status').value = 'zaplanowane';
+    const typeEl = document.getElementById('terminarz-type');
+    if (typeEl) typeEl.value = 'Zadanie';
 
     const btnDodajTermin = document.getElementById('btn-dodaj-termin');
     if (btnDodajTermin) btnDodajTermin.textContent = 'Dodaj termin';
@@ -933,6 +1020,13 @@ function renderujTerminarz() {
         const days = start && end ? Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1) : '-';
         const status = String(item.status || '').toLowerCase();
         const statusLabel = `<span class="status-tag status-${status.replace(/\s/g, '-')}">${esc(status || '-')}</span>`;
+        const itemType = typTerminu(item);
+        const investmentId = pobierzPowiazanaInwestycjeId(item);
+        const investmentInfo = investmentId
+            ? `<br><small>Powiązana inwestycja</small>`
+            : itemType === "Inwestycja"
+                ? `<br><small>Typ: Inwestycja</small>`
+                : "";
         const canEdit = rolaUsera !== 'guest';
         const editButton = canEdit
             ? `<button class="btn btn-secondary small-btn" onclick="edytujTermin('${esc(item.id)}')">Edytuj</button>`
@@ -940,7 +1034,12 @@ function renderujTerminarz() {
         const deleteButton = rolaUsera === 'admin'
             ? `<button class="btn btn-danger small-btn" onclick="usunTermin('${esc(item.id)}')">Usuń</button>`
             : '';
-        const akcje = [editButton, deleteButton].filter(Boolean).join(' ');
+        const investmentButton = investmentId
+            ? `<button class="btn btn-secondary small-btn" onclick="przejdzDoInwestycjiZTerminu('${esc(item.id)}')">Przejdź do inwestycji</button>`
+            : itemType === "Inwestycja"
+                ? `<button class="btn btn-secondary small-btn" onclick="obsluzTerminInwestycji('${esc(item.id)}')">Obsłuż inwestycję</button>`
+                : '';
+        const akcje = [investmentButton, editButton, deleteButton].filter(Boolean).join(' ');
 
         return `
             <tr>
@@ -948,7 +1047,7 @@ function renderujTerminarz() {
                 <td>${esc(item.klient || '')}</td>
                 <td>${esc(item.adres || '')}</td>
                 <td>${esc(item.telefon || '')}</td>
-                <td>${statusLabel}</td>
+                <td>${statusLabel}${investmentInfo}</td>
                 <td>${esc(item.opis || '')}</td>
                 <td>${esc(days)}</td>
                 <td>${akcje}</td>
@@ -1021,6 +1120,323 @@ function parseDateLocal(value) {
     const [year, month, day] = String(value).split("-").map(Number);
     if (!year || !month || !day) return null;
     return new Date(year, month - 1, day);
+}
+
+function typTerminu(item) {
+    return item?.type || panelLinks.eventTypes?.[String(item?.id)] || "Zadanie";
+}
+
+function ustawTypTerminu(id, type) {
+    if (!id) return;
+    panelLinks.eventTypes[String(id)] = type || "Zadanie";
+    zapiszLokalnePowiazaniaPanelu();
+}
+
+function pobierzPowiazanyTerminId(inwestycja) {
+    return inwestycja?.calendar_event_id || inwestycja?.calendarEventId || panelLinks.investments?.[String(inwestycja?.id)]?.calendarEventId || null;
+}
+
+function pobierzPowiazanaInwestycjeId(termin) {
+    return termin?.investment_id || termin?.investmentId || panelLinks.events?.[String(termin?.id)]?.investmentId || null;
+}
+
+async function zapiszPowiazanieInwestycjaTermin(investmentId, eventId) {
+    if (!investmentId || !eventId) return;
+    const inwestycjaRes = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?id=eq.${encodeURIComponent(investmentId)}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify({ calendar_event_id: eventId })
+    });
+    if (!inwestycjaRes.ok) throw new Error(await inwestycjaRes.text());
+
+    const terminarzRes = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${encodeURIComponent(eventId)}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify({ investment_id: investmentId, type: "Inwestycja" })
+    });
+    if (!terminarzRes.ok) throw new Error(await terminarzRes.text());
+
+    panelLinks.investments[String(investmentId)] = {
+        ...(panelLinks.investments[String(investmentId)] || {}),
+        calendarEventId: String(eventId)
+    };
+    panelLinks.events[String(eventId)] = {
+        ...(panelLinks.events[String(eventId)] || {}),
+        investmentId: String(investmentId)
+    };
+    panelLinks.eventTypes[String(eventId)] = "Inwestycja";
+    zapiszLokalnePowiazaniaPanelu();
+}
+
+function zapiszDatyInwestycji(investmentId, dataStart, dataKoniec) {
+    if (!investmentId || !dataStart) return;
+    panelLinks.investmentDates[String(investmentId)] = {
+        data_start: dataStart,
+        data_koniec: dataKoniec || dataStart
+    };
+    zapiszLokalnePowiazaniaPanelu();
+}
+
+function pobierzDatyInwestycji(inwestycja) {
+    const local = panelLinks.investmentDates?.[String(inwestycja?.id)] || {};
+    const dataStart = inwestycja?.data_start || inwestycja?.data_rozpoczecia || inwestycja?.start_date || local.data_start || "";
+    const dataKoniec = inwestycja?.data_koniec || inwestycja?.data_zakonczenia || inwestycja?.end_date || local.data_koniec || dataStart;
+    return { dataStart, dataKoniec };
+}
+
+function czyStatusInwestycjiDoTerminarza(status) {
+    const normalized = String(status || "").toLowerCase().trim();
+    return ["aktywna", "planowana", "do realizacji"].includes(normalized);
+}
+
+function statusTerminuDlaInwestycji(status) {
+    const normalized = String(status || "").toLowerCase().trim();
+    if (normalized === "aktywna") return "w trakcie";
+    return "zaplanowane";
+}
+
+function payloadTerminuZInwestycji(inwestycja, dataStart, dataKoniec) {
+    return {
+        data_start: dataStart,
+        data_koniec: dataKoniec || dataStart,
+        klient: inwestycja.klient || inwestycja.nazwa || "",
+        adres: inwestycja.adres || "",
+        telefon: "",
+        opis: `Inwestycja: ${inwestycja.nazwa || ""}`.trim(),
+        status: statusTerminuDlaInwestycji(inwestycja.status),
+        investment_id: inwestycja.id,
+        type: "Inwestycja",
+        user_id: zalogowanyUser?.id || null
+    };
+}
+
+async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
+    if (!inwestycja || !czyStatusInwestycjiDoTerminarza(inwestycja.status)) return null;
+
+    let { dataStart, dataKoniec } = pobierzDatyInwestycji(inwestycja);
+    if (!dataStart && options.pytajODaty) {
+        dataStart = prompt("Podaj datę rozpoczęcia inwestycji (RRRR-MM-DD):", formatDateLocal(new Date()));
+        if (!dataStart) return null;
+        dataKoniec = prompt("Podaj datę zakończenia inwestycji (RRRR-MM-DD):", dataStart) || dataStart;
+        zapiszDatyInwestycji(inwestycja.id, dataStart, dataKoniec);
+    }
+    if (!dataStart) return null;
+
+    const linkedEventId = pobierzPowiazanyTerminId(inwestycja);
+    const payload = payloadTerminuZInwestycji(inwestycja, dataStart, dataKoniec);
+
+    if (linkedEventId) {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${encodeURIComponent(linkedEventId)}`, {
+            method: "PATCH",
+            headers: headers(),
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error(await res.text());
+        ustawTypTerminu(linkedEventId, "Inwestycja");
+        await zapiszPowiazanieInwestycjaTermin(inwestycja.id, linkedEventId);
+        return linkedEventId;
+    }
+
+    const alreadyLinked = terminarz.find(t => String(pobierzPowiazanaInwestycjeId(t)) === String(inwestycja.id));
+    if (alreadyLinked) {
+        await zapiszPowiazanieInwestycjaTermin(inwestycja.id, alreadyLinked.id);
+        return alreadyLinked.id;
+    }
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const created = await res.json();
+    const eventId = Array.isArray(created) ? created[0]?.id : created?.id;
+    if (eventId) {
+        await zapiszPowiazanieInwestycjaTermin(inwestycja.id, eventId);
+    }
+    return eventId || null;
+}
+
+async function zsynchronizujAktywneInwestycjeZTerminarzem() {
+    for (const inwestycja of inwestycje || []) {
+        const { dataStart } = pobierzDatyInwestycji(inwestycja);
+        if (dataStart && czyStatusInwestycjiDoTerminarza(inwestycja.status)) {
+            try {
+                await zsynchronizujInwestycjeZTerminarzem(inwestycja);
+            } catch (err) {
+                console.warn("Nie udalo sie zsynchronizowac inwestycji z terminarzem:", inwestycja.id, err);
+            }
+        }
+    }
+    await pobierzInwestycje();
+    await pobierzTerminarz();
+}
+
+async function utworzInwestycjeZTerminu(termin, status = "planowana") {
+    const payload = {
+        nazwa: termin.opis || `Inwestycja ${termin.klient || termin.data_start || ""}`.trim(),
+        klient: termin.klient || "",
+        adres: termin.adres || "",
+        status,
+        opis: "",
+        user_id: zalogowanyUser?.id || null
+    };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const created = await res.json();
+    const inwestycja = Array.isArray(created) ? created[0] : created;
+    if (inwestycja?.id) {
+        await zapiszPowiazanieInwestycjaTermin(inwestycja.id, termin.id);
+        zapiszDatyInwestycji(inwestycja.id, termin.data_start, termin.data_koniec || termin.data_start);
+    }
+    return inwestycja;
+}
+
+async function ustawStatusInwestycji(investmentId, status) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?id=eq.${encodeURIComponent(investmentId)}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify({ status })
+    });
+    if (!res.ok) throw new Error(await res.text());
+}
+
+function wybierzIstniejacaInwestycje() {
+    const lista = (inwestycje || []).slice(0, 20);
+    if (!lista.length) {
+        alert("Brak inwestycji do połączenia.");
+        return null;
+    }
+    const opis = lista.map((i, index) => `${index + 1}. ${i.nazwa || i.id} - ${i.klient || "bez klienta"}`).join("\n");
+    const wybor = prompt(`Wybierz numer inwestycji do połączenia:\n${opis}`);
+    const index = Number(wybor) - 1;
+    return lista[index] || null;
+}
+
+window.obsluzTerminInwestycji = async function(id) {
+    const termin = terminarz.find(t => String(t.id) === String(id));
+    if (!termin) return;
+    if (typTerminu(termin) !== "Inwestycja") {
+        alert("Ten wpis nie jest oznaczony jako typ Inwestycja.");
+        return;
+    }
+
+    const wybor = prompt("Wybierz opcję:\n1 - Utwórz inwestycję z tego wpisu\n2 - Połącz z istniejącą inwestycją\n3 - Zostaw tylko w Terminarzu", "3");
+    try {
+        if (wybor === "1") {
+            await utworzInwestycjeZTerminu(termin, "planowana");
+        } else if (wybor === "2") {
+            const inwestycja = wybierzIstniejacaInwestycje();
+            if (!inwestycja) return;
+            await zapiszPowiazanieInwestycjaTermin(inwestycja.id, termin.id);
+            zapiszDatyInwestycji(inwestycja.id, termin.data_start, termin.data_koniec || termin.data_start);
+        } else {
+            return;
+        }
+        await pobierzInwestycje();
+        await pobierzTerminarz();
+        renderujInwestycje();
+        renderujTerminarz();
+        renderujKalendarzTerminarza();
+        zapiszLog("Terminarz", "Powiązano wpis z inwestycją", id);
+    } catch (err) {
+        console.error(err);
+        alert("Nie udało się obsłużyć powiązania inwestycji.");
+    }
+};
+
+window.przejdzDoInwestycjiZTerminu = function(id) {
+    const termin = terminarz.find(t => String(t.id) === String(id));
+    const investmentId = pobierzPowiazanaInwestycjeId(termin);
+    if (!investmentId) return;
+    pokazSekcje("inwestycje");
+    window.otworzInwestycje(investmentId);
+};
+
+window.dodajInwestycjeDoTerminarza = async function(id) {
+    const inwestycja = inwestycje.find(i => String(i.id) === String(id));
+    if (!inwestycja) return;
+    try {
+        await zsynchronizujInwestycjeZTerminarzem(inwestycja, { pytajODaty: true });
+        await pobierzInwestycje();
+        await pobierzTerminarz();
+        renderujInwestycje();
+        renderujTerminarz();
+        renderujKalendarzTerminarza();
+        zapiszLog("Inwestycje", "Dodano inwestycję do terminarza", inwestycja.nazwa);
+    } catch (err) {
+        console.error(err);
+        alert("Nie udało się dodać inwestycji do Terminarza.");
+    }
+};
+
+window.pokazInwestycjeWTerminarzu = function(id) {
+    const inwestycja = inwestycje.find(i => String(i.id) === String(id));
+    const eventId = pobierzPowiazanyTerminId(inwestycja);
+    const termin = terminarz.find(t => String(t.id) === String(eventId));
+    pokazSekcje("terminarz");
+    if (termin?.data_start) {
+        const dateFilter = document.getElementById("terminarz-date-filter");
+        if (dateFilter) dateFilter.value = termin.data_start;
+        renderujTerminarz();
+    }
+};
+
+async function przesunTerminInwestycji(termin) {
+    const nowaData = prompt("Podaj nową datę rozpoczęcia (RRRR-MM-DD):", termin.data_start || formatDateLocal(new Date()));
+    if (!nowaData) return;
+    const nowyKoniec = prompt("Podaj nową datę zakończenia (RRRR-MM-DD):", termin.data_koniec || nowaData) || nowaData;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${encodeURIComponent(termin.id)}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify({ data_start: nowaData, data_koniec: nowyKoniec, status: "przesunięte" })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const investmentId = pobierzPowiazanaInwestycjeId(termin);
+    if (investmentId) zapiszDatyInwestycji(investmentId, nowaData, nowyKoniec);
+}
+
+function sprawdzDzisiejszeInwestycjeWTerminarzu() {
+    const today = formatDateLocal(new Date());
+    const dzisiejsze = (terminarz || []).filter(t => typTerminu(t) === "Inwestycja" && t.data_start === today);
+    dzisiejsze.forEach(termin => {
+        const promptKey = `${today}_${termin.id}`;
+        if (panelLinks.todayPrompts[promptKey]) return;
+        panelLinks.todayPrompts[promptKey] = true;
+        zapiszLokalnePowiazaniaPanelu();
+        setTimeout(async () => {
+            const wybor = prompt("Czy inwestycja jest aktualna?\n1 - Tak, oznacz jako aktywną\n2 - Przesuń termin\n3 - Utwórz inwestycję\n4 - Połącz z istniejącą\n5 - Zostaw bez zmian", "5");
+            try {
+                if (wybor === "1") {
+                    let investmentId = pobierzPowiazanaInwestycjeId(termin);
+                    if (!investmentId) {
+                        const inwestycja = await utworzInwestycjeZTerminu(termin, "aktywna");
+                        investmentId = inwestycja?.id;
+                    } else {
+                        await ustawStatusInwestycji(investmentId, "aktywna");
+                    }
+                    if (investmentId) await zapiszPowiazanieInwestycjaTermin(investmentId, termin.id);
+                } else if (wybor === "2") {
+                    await przesunTerminInwestycji(termin);
+                } else if (wybor === "3") {
+                    await utworzInwestycjeZTerminu(termin, "planowana");
+                } else if (wybor === "4") {
+                    const inwestycja = wybierzIstniejacaInwestycje();
+                    if (inwestycja) await zapiszPowiazanieInwestycjaTermin(inwestycja.id, termin.id);
+                } else {
+                    return;
+                }
+                await odswiezDane();
+            } catch (err) {
+                console.error(err);
+                alert("Nie udało się wykonać wybranej akcji dla dzisiejszej inwestycji.");
+            }
+        }, 800);
+    });
 }
 
 function getKalendarzStatus(date, precomputedCount) {
@@ -3898,6 +4314,13 @@ function renderujInwestycje() {
         const zaliczki = sumaZaliczekDlaInwestycji(i.id);
         const koszty = sumaKosztowDlaInwestycji(i.id);
         const roznica = zaliczki - koszty;
+        const linkedEventId = pobierzPowiazanyTerminId(i);
+        const calendarInfo = linkedEventId
+            ? `<br><small>Połączone z Terminarzem</small>`
+            : "";
+        const calendarButton = linkedEventId
+            ? `<button class="btn btn-secondary small-btn" onclick="pokazInwestycjeWTerminarzu('${esc(i.id)}')">Pokaż w Terminarzu</button>`
+            : `<button class="btn btn-secondary small-btn" onclick="dodajInwestycjeDoTerminarza('${esc(i.id)}')">Dodaj do Terminarza</button>`;
 
         const akcje = rolaUsera === "admin"
             ? `<button class="btn btn-secondary small-btn" onclick="edytujInwestycje('${esc(i.id)}')">Edytuj</button><button class="btn btn-danger small-btn" onclick="usunInwestycje('${esc(i.id)}')">Usuń</button>`
@@ -3905,12 +4328,12 @@ function renderujInwestycje() {
 
         return `
             <tr>
-                <td><strong>${esc(i.nazwa)}</strong><br><small>${esc(i.adres || "")}</small></td>
+                <td><strong>${esc(i.nazwa)}</strong><br><small>${esc(i.adres || "")}</small>${calendarInfo}</td>
                 <td>${esc(i.klient || "-")}</td>
                 <td class="nowrap-cell">${zaliczki.toFixed(2)} PLN</td>
                 <td class="nowrap-cell">${koszty.toFixed(2)} PLN</td>
                 <td class="nowrap-cell"><strong>${roznica.toFixed(2)} PLN</strong></td>
-                <td><div class="table-actions investycje-actions"><button class="btn btn-secondary small-btn" onclick="otworzInwestycje('${esc(i.id)}')">Otwórz</button>${akcje}</div></td>
+                <td><div class="table-actions investycje-actions"><button class="btn btn-secondary small-btn" onclick="otworzInwestycje('${esc(i.id)}')">Otwórz</button>${calendarButton}${akcje}</div></td>
             </tr>
         `;
     }).join("");
@@ -3966,6 +4389,10 @@ async function dodajInwestycje() {
 
         if (!res.ok) throw new Error(await res.text());
 
+        const zapisane = await res.json();
+        const zapisanaInwestycja = Array.isArray(zapisane) ? zapisane[0] : zapisane;
+        const zapisanaInwestycjaId = edytowanaInwestycjaId || zapisanaInwestycja?.id;
+
         document.getElementById("inwestycja-nazwa").value = "";
         document.getElementById("inwestycja-klient").value = "";
         document.getElementById("inwestycja-adres").value = "";
@@ -3979,7 +4406,14 @@ async function dodajInwestycje() {
         if (btnAnuluj) btnAnuluj.classList.add("hidden");
 
         await pobierzInwestycje();
+        const inwestycjaPoZapisie = inwestycje.find(i => String(i.id) === String(zapisanaInwestycjaId));
+        if (inwestycjaPoZapisie && pobierzPowiazanyTerminId(inwestycjaPoZapisie)) {
+            await zsynchronizujInwestycjeZTerminarzem(inwestycjaPoZapisie);
+            await pobierzTerminarz();
+        }
         renderujInwestycje();
+        renderujTerminarz();
+        renderujKalendarzTerminarza();
         renderujPulpit();
         zapiszLog("Inwestycje", akcjaInwestycji, nazwa);
     } catch (err) {
