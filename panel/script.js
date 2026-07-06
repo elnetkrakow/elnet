@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-03-ELNET";
+const APP_VERSION = "2026.06.13-04-ELNET-DIAG";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -1142,19 +1142,45 @@ function pobierzPowiazanaInwestycjeId(termin) {
 
 async function zapiszPowiazanieInwestycjaTermin(investmentId, eventId) {
     if (!investmentId || !eventId) return;
+    const updatePayload = { calendar_event_id: eventId };
+    console.log("ELNET DEBUG: update inwestycje payload:", updatePayload);
     const inwestycjaRes = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?id=eq.${encodeURIComponent(investmentId)}`, {
         method: "PATCH",
         headers: headers(),
-        body: JSON.stringify({ calendar_event_id: eventId })
+        body: JSON.stringify(updatePayload)
     });
-    if (!inwestycjaRes.ok) throw new Error(await inwestycjaRes.text());
+    const inwestycjaText = await inwestycjaRes.text();
+    console.log("ELNET DEBUG: update inwestycje status:", inwestycjaRes.status);
+    console.log("ELNET DEBUG: update inwestycje ok:", inwestycjaRes.ok);
+    console.log("ELNET DEBUG: update inwestycje text:", inwestycjaText);
+    if (!inwestycjaRes.ok) {
+        console.error("ELNET DEBUG: UPDATE inwestycje failed", {
+            status: inwestycjaRes.status,
+            text: inwestycjaText,
+            payload: updatePayload
+        });
+        throw new Error(inwestycjaText);
+    }
 
+    const terminarzUpdatePayload = { investment_id: investmentId, type: "Inwestycja" };
+    console.log("ELNET DEBUG: update terminarz payload:", terminarzUpdatePayload);
     const terminarzRes = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${encodeURIComponent(eventId)}`, {
         method: "PATCH",
         headers: headers(),
-        body: JSON.stringify({ investment_id: investmentId, type: "Inwestycja" })
+        body: JSON.stringify(terminarzUpdatePayload)
     });
-    if (!terminarzRes.ok) throw new Error(await terminarzRes.text());
+    const terminarzText = await terminarzRes.text();
+    console.log("ELNET DEBUG: update terminarz status:", terminarzRes.status);
+    console.log("ELNET DEBUG: update terminarz ok:", terminarzRes.ok);
+    console.log("ELNET DEBUG: update terminarz text:", terminarzText);
+    if (!terminarzRes.ok) {
+        console.error("ELNET DEBUG: UPDATE terminarz failed", {
+            status: terminarzRes.status,
+            text: terminarzText,
+            payload: terminarzUpdatePayload
+        });
+        throw new Error(terminarzText);
+    }
 
     panelLinks.investments[String(investmentId)] = {
         ...(panelLinks.investments[String(investmentId)] || {}),
@@ -1224,6 +1250,8 @@ async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
 
     const linkedEventId = pobierzPowiazanyTerminId(inwestycja);
     const payload = payloadTerminuZInwestycji(inwestycja, dataStart, dataKoniec);
+    console.log("ELNET DEBUG: inwestycja:", inwestycja);
+    console.log("ELNET DEBUG: payload terminarz:", payload);
 
     if (linkedEventId) {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${encodeURIComponent(linkedEventId)}`, {
@@ -1231,7 +1259,18 @@ async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
             headers: headers(),
             body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error(await res.text());
+        const text = await res.text();
+        console.log("ELNET DEBUG: update terminarz status:", res.status);
+        console.log("ELNET DEBUG: update terminarz ok:", res.ok);
+        console.log("ELNET DEBUG: update terminarz text:", text);
+        if (!res.ok) {
+            console.error("ELNET DEBUG: UPDATE terminarz failed", {
+                status: res.status,
+                text,
+                payload
+            });
+            throw new Error(text);
+        }
         ustawTypTerminu(linkedEventId, "Inwestycja");
         await zapiszPowiazanieInwestycjaTermin(inwestycja.id, linkedEventId);
         return linkedEventId;
@@ -1248,8 +1287,27 @@ async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
         headers: headers(),
         body: JSON.stringify(payload)
     });
-    if (!res.ok) throw new Error(await res.text());
-    const created = await res.json();
+    const text = await res.text();
+    console.log("ELNET DEBUG: insert terminarz status:", res.status);
+    console.log("ELNET DEBUG: insert terminarz ok:", res.ok);
+    console.log("ELNET DEBUG: insert terminarz text:", text);
+    console.log("ELNET DEBUG: Supabase response text:", text);
+
+    let created = null;
+    try {
+        created = text ? JSON.parse(text) : null;
+    } catch (e) {
+        console.error("ELNET DEBUG: JSON parse error:", e);
+    }
+
+    if (!res.ok) {
+        console.error("ELNET DEBUG: INSERT terminarz failed", {
+            status: res.status,
+            text,
+            payload
+        });
+        throw new Error(text);
+    }
     const eventId = Array.isArray(created) ? created[0]?.id : created?.id;
     if (eventId) {
         await zapiszPowiazanieInwestycjaTermin(inwestycja.id, eventId);
@@ -1369,8 +1427,9 @@ window.dodajInwestycjeDoTerminarza = async function(id) {
         renderujKalendarzTerminarza();
         zapiszLog("Inwestycje", "Dodano inwestycjÄ™ do terminarza", inwestycja.nazwa);
     } catch (err) {
-        console.error(err);
-        alert("Nie udaÅ‚o siÄ™ dodaÄ‡ inwestycji do Terminarza.");
+        console.error("B³¹d dodania inwestycji do terminarza:", err);
+        console.error("Supabase error:", err?.message, err?.details, err?.hint, err?.code);
+        alert("Nie uda³o siê dodaæ inwestycji do Terminarza. Szczegó³y b³êdu s¹ w konsoli F12.");
     }
 };
 
