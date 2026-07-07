@@ -64,7 +64,7 @@
             overflow: visible !important;
             text-overflow: clip !important;
             white-space: nowrap !important;
-            text-align: left !important;
+            text-align: right !important;
             padding-right: 14px !important;
         }
 
@@ -76,6 +76,7 @@
             overflow: visible !important;
             text-overflow: clip !important;
             white-space: nowrap !important;
+            text-align: right !important;
         }
 
         .linked-event-note,
@@ -101,14 +102,14 @@
         }
 
         .calendar-row-actions {
-            display: inline-flex;
+            display: flex;
             align-items: center;
-            justify-content: flex-start;
+            justify-content: flex-end;
             gap: 6px;
             flex-wrap: nowrap;
             white-space: nowrap;
-            width: auto;
-            min-width: max-content;
+            width: 100%;
+            min-width: 0;
             max-width: none !important;
             overflow: visible !important;
             text-overflow: clip !important;
@@ -1280,6 +1281,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260613-12"></script>
+    <script src="script.js?v=20260613-13"></script>
 </body>
 </html>
