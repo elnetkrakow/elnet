@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-13-ELNET";
+const APP_VERSION = "2026.06.13-14-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -1081,10 +1081,11 @@ function renderujTerminarz() {
                     : '';
         const actionClass = orphanInvestmentLink ? "calendar-row-actions orphaned-actions" : "calendar-row-actions";
         const rowClass = orphanInvestmentLink ? ' class="orphaned-event"' : '';
+        const rowIdAttr = ` data-calendar-event-id="${esc(item.id)}"`;
         const akcje = [investmentButton, editButton, deleteButton].filter(Boolean).join(' ');
 
         return `
-            <tr${rowClass}>
+            <tr${rowClass}${rowIdAttr}>
                 <td>${esc(startStr)} – ${esc(endStr)}</td>
                 <td>${esc(item.klient || '')}</td>
                 <td>${esc(item.adres || '')}</td>
@@ -1564,13 +1565,39 @@ window.dodajInwestycjeDoTerminarza = async function(id) {
 window.pokazInwestycjeWTerminarzu = function(id) {
     const inwestycja = inwestycje.find(i => String(i.id) === String(id));
     const eventId = pobierzPowiazanyTerminId(inwestycja);
-    const termin = terminarz.find(t => String(t.id) === String(eventId));
     pokazSekcje("terminarz");
-    if (termin?.data_start) {
-        const dateFilter = document.getElementById("terminarz-date-filter");
-        if (dateFilter) dateFilter.value = termin.data_start;
-        renderujTerminarz();
+
+    const dateFilter = document.getElementById("terminarz-date-filter");
+    if (dateFilter) dateFilter.value = "";
+
+    renderujTerminarz();
+
+    if (!eventId) {
+        alert("Powiązany wpis Terminarza nie istnieje.");
+        return;
     }
+
+    setTimeout(() => {
+        const searchFilter = document.getElementById("terminarz-search");
+        let row = Array.from(document.querySelectorAll("[data-calendar-event-id]"))
+            .find(el => String(el.dataset.calendarEventId) === String(eventId));
+
+        if (!row && searchFilter?.value) {
+            searchFilter.value = "";
+            renderujTerminarz();
+            row = Array.from(document.querySelectorAll("[data-calendar-event-id]"))
+                .find(el => String(el.dataset.calendarEventId) === String(eventId));
+        }
+
+        if (!row) {
+            alert("Powiązany wpis Terminarza nie istnieje.");
+            return;
+        }
+
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+        row.classList.add("calendar-row-highlight");
+        setTimeout(() => row.classList.remove("calendar-row-highlight"), 3000);
+    }, 0);
 };
 
 async function przesunTerminInwestycji(termin) {
