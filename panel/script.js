@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-08-ELNET";
+const APP_VERSION = "2026.06.13-09-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -1053,18 +1053,18 @@ function renderujTerminarz() {
         const endStr = end ? end.toLocaleDateString('pl-PL') : '-';
         const days = start && end ? Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1) : '-';
         const status = String(item.status || '').toLowerCase();
-        const statusLabel = `<span class="status-tag status-${status.replace(/\s/g, '-')}">${esc(status || '-')}</span>`;
         const itemType = typTerminu(item);
         const investmentId = pobierzPowiazanaInwestycjeId(item);
         const linkedInvestment = investmentId ? znajdzInwestycjePoId(investmentId) : null;
         const orphanInvestmentLink = Boolean(investmentId && !linkedInvestment);
+        const statusText = linkedInvestment ? `${status || '-'} · PI` : (status || '-');
+        const statusTitle = linkedInvestment ? 'PI — powiązana inwestycja' : '';
+        const statusLabel = `<span class="status-tag status-${status.replace(/\s/g, '-')}" title="${esc(statusTitle)}">${esc(statusText)}</span>`;
         const investmentInfo = orphanInvestmentLink
             ? `<span class="orphaned-warning">Powiązana inwestycja nie istnieje</span>`
-            : investmentId
-                ? `<span class="linked-event-note">Powiązana inwestycja</span>`
-                : itemType === "Inwestycja"
-                    ? `<span class="linked-event-note">Typ: Inwestycja</span>`
-                    : "";
+            : itemType === "Inwestycja" && !linkedInvestment
+                ? `<span class="linked-event-note">Typ: Inwestycja</span>`
+                : "";
         const canEdit = rolaUsera !== 'guest';
         const editButton = canEdit
             ? `<button class="btn btn-secondary small-btn" onclick="edytujTermin('${esc(item.id)}')">Edytuj</button>`

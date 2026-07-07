@@ -13,6 +13,51 @@
             gap: 4px;
         }
 
+        .terminarz-scroll table {
+            table-layout: fixed;
+            min-width: 1180px;
+        }
+
+        .terminarz-scroll th:nth-child(1),
+        .terminarz-scroll td:nth-child(1) {
+            width: 120px;
+        }
+
+        .terminarz-scroll th:nth-child(2),
+        .terminarz-scroll td:nth-child(2) {
+            width: 145px;
+        }
+
+        .terminarz-scroll th:nth-child(3),
+        .terminarz-scroll td:nth-child(3) {
+            width: 165px;
+        }
+
+        .terminarz-scroll th:nth-child(4),
+        .terminarz-scroll td:nth-child(4) {
+            width: 115px;
+        }
+
+        .terminarz-scroll th:nth-child(5),
+        .terminarz-scroll td:nth-child(5) {
+            width: 130px;
+        }
+
+        .terminarz-scroll th:nth-child(6),
+        .terminarz-scroll td:nth-child(6) {
+            width: auto;
+        }
+
+        .terminarz-scroll th:nth-child(7),
+        .terminarz-scroll td:nth-child(7) {
+            width: 55px;
+        }
+
+        .terminarz-scroll th:nth-child(8),
+        .terminarz-scroll td:nth-child(8) {
+            width: 325px;
+        }
+
         .linked-event-note,
         .orphaned-warning {
             display: inline-flex;
@@ -37,19 +82,21 @@
 
         .calendar-row-actions {
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: 6px;
             align-items: center;
             max-width: 100%;
         }
 
         .calendar-row-actions .small-btn {
-            padding: 5px 8px;
+            padding: 4px 7px;
+            font-size: 12px;
             line-height: 1.2;
             white-space: nowrap;
         }
 
         .orphaned-actions {
+            flex-wrap: wrap;
             gap: 5px;
         }
 
@@ -1195,6 +1242,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260613-08"></script>
+    <script src="script.js?v=20260613-09"></script>
 </body>
 </html>
