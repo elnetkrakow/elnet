@@ -170,6 +170,105 @@
             width: auto;
         }
 
+        .delete-investment-modal {
+            width: min(620px, calc(100% - 32px));
+            border-color: rgba(34, 197, 94, 0.35);
+        }
+
+        .modal-header-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .modal-close-btn {
+            width: 34px;
+            height: 34px;
+            border: 1px solid rgba(148, 163, 184, 0.32);
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.75);
+            color: #e5e7eb;
+            cursor: pointer;
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .delete-investment-lead {
+            margin: 0 0 18px;
+            color: #cbd5e1;
+            line-height: 1.5;
+        }
+
+        .delete-investment-options {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .delete-investment-option {
+            display: block;
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 16px;
+            background: rgba(15, 23, 42, 0.68);
+            color: #e5e7eb;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .delete-investment-option strong,
+        .delete-investment-option span {
+            display: block;
+        }
+
+        .delete-investment-option strong {
+            margin-bottom: 5px;
+        }
+
+        .delete-investment-option span {
+            color: #94a3b8;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .delete-investment-option.danger {
+            border-color: rgba(239, 68, 68, 0.38);
+        }
+
+        .delete-investment-option.neutral {
+            border-color: rgba(59, 130, 246, 0.34);
+        }
+
+        .delete-investment-option.selected {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.22);
+            background: rgba(22, 101, 52, 0.18);
+        }
+
+        .delete-investment-option.danger.selected {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.22);
+            background: rgba(127, 29, 29, 0.22);
+        }
+
+        @media (max-width: 700px) {
+            .delete-investment-modal {
+                width: calc(100% - 20px);
+                padding: 20px;
+            }
+
+            .delete-investment-modal .modal-actions {
+                flex-direction: column-reverse;
+            }
+
+            .delete-investment-modal .modal-actions .btn {
+                width: 100%;
+            }
+        }
+
         @media (max-width: 900px) {
             .calendar-row-actions .small-btn {
                 white-space: normal;
@@ -1311,6 +1410,30 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260613-16"></script>
+    <div id="usun-inwestycje-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="usun-inwestycje-title">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content delete-investment-modal">
+            <div class="modal-header-row">
+                <h2 id="usun-inwestycje-title">Usuwanie inwestycji</h2>
+                <button id="btn-zamknij-usun-inwestycje-modal" class="modal-close-btn" type="button" aria-label="Zamknij">×</button>
+            </div>
+            <p class="delete-investment-lead">Ta inwestycja jest połączona z Terminarzem. Wybierz, co zrobić z powiązanym wpisem.</p>
+            <div class="delete-investment-options">
+                <button class="delete-investment-option danger" type="button" data-delete-investment-choice="delete-event">
+                    <strong>Usuń inwestycję i wpis z Terminarza</strong>
+                    <span>Inwestycja oraz powiązany termin zostaną usunięte.</span>
+                </button>
+                <button class="delete-investment-option neutral" type="button" data-delete-investment-choice="detach-event">
+                    <strong>Usuń inwestycję, ale zostaw wpis w Terminarzu</strong>
+                    <span>Wpis pozostanie w Terminarzu jako zwykłe zadanie i zostanie odłączony od inwestycji.</span>
+                </button>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-anuluj-usun-inwestycje" class="btn btn-secondary small-btn" type="button">Anuluj</button>
+                <button id="btn-potwierdz-usun-inwestycje" class="btn btn-main" type="button" disabled>Potwierdź</button>
+            </div>
+        </div>
+    </div>
+    <script src="script.js?v=20260613-17"></script>
 </body>
 </html>

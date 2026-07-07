@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-16-ELNET";
+const APP_VERSION = "2026.06.13-17-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -43,6 +43,8 @@ let edytowanaPozycjaIdPanel = null;
 let edytowanaInwestycjaId = null;
 let edytowanaZaliczkaId = null;
 let edytowanyKosztId = null;
+let usunInwestycjeModalResolve = null;
+let usunInwestycjeModalWybor = null;
 let trybEdycjiKosztorysu = false;
 let edytowanyKosztorysId = null;
 let aktualnyDrukowanyKosztorysId = null;
@@ -372,6 +374,29 @@ function podepnijZdarzenia() {
 
     const btnDrukujInwestycje = document.getElementById("btn-drukuj-inwestycje");
     if (btnDrukujInwestycje) btnDrukujInwestycje.addEventListener("click", pokazModalDrukuInwestycji);
+
+    const btnZamknijUsunInwestycje = document.getElementById("btn-zamknij-usun-inwestycje-modal");
+    if (btnZamknijUsunInwestycje) btnZamknijUsunInwestycje.addEventListener("click", () => zamknijModalUsuwaniaInwestycji(null));
+
+    const btnAnulujUsunInwestycje = document.getElementById("btn-anuluj-usun-inwestycje");
+    if (btnAnulujUsunInwestycje) btnAnulujUsunInwestycje.addEventListener("click", () => zamknijModalUsuwaniaInwestycji(null));
+
+    const btnPotwierdzUsunInwestycje = document.getElementById("btn-potwierdz-usun-inwestycje");
+    if (btnPotwierdzUsunInwestycje) btnPotwierdzUsunInwestycje.addEventListener("click", potwierdzWyborUsuwaniaInwestycji);
+
+    const usunInwestycjeBackdrop = document.querySelector("#usun-inwestycje-modal .modal-backdrop");
+    if (usunInwestycjeBackdrop) usunInwestycjeBackdrop.addEventListener("click", () => zamknijModalUsuwaniaInwestycji(null));
+
+    document.querySelectorAll("[data-delete-investment-choice]").forEach(btn => {
+        btn.addEventListener("click", () => wybierzOpcjeUsuwaniaInwestycji(btn.dataset.deleteInvestmentChoice));
+    });
+
+    document.addEventListener("keydown", event => {
+        const modal = document.getElementById("usun-inwestycje-modal");
+        if (event.key === "Escape" && modal && !modal.classList.contains("hidden")) {
+            zamknijModalUsuwaniaInwestycji(null);
+        }
+    });
 
     const btnDodajZaliczke = document.getElementById("btn-dodaj-zaliczke");
     if (btnDodajZaliczke) btnDodajZaliczke.addEventListener("click", dodajZaliczke);
@@ -4711,6 +4736,71 @@ function zamknijPanelInwestycji() {
     }
 }
 
+function ustawStanModalaUsuwaniaInwestycji(isSaving) {
+    const modal = document.getElementById("usun-inwestycje-modal");
+    if (!modal) return;
+    modal.querySelectorAll("button").forEach(btn => {
+        btn.disabled = isSaving;
+    });
+}
+
+function wybierzOpcjeUsuwaniaInwestycji(choice) {
+    usunInwestycjeModalWybor = choice;
+    document.querySelectorAll("[data-delete-investment-choice]").forEach(btn => {
+        btn.classList.toggle("selected", btn.dataset.deleteInvestmentChoice === choice);
+    });
+
+    const confirmBtn = document.getElementById("btn-potwierdz-usun-inwestycje");
+    if (!confirmBtn) return;
+    confirmBtn.disabled = !choice;
+    if (!choice) {
+        confirmBtn.classList.remove("btn-danger");
+        confirmBtn.classList.add("btn-main");
+        confirmBtn.textContent = "Potwierdź";
+        return;
+    }
+    confirmBtn.classList.toggle("btn-danger", choice === "delete-event");
+    confirmBtn.classList.toggle("btn-main", choice !== "delete-event");
+    confirmBtn.textContent = choice === "delete-event" ? "Usuń oba wpisy" : "Usuń i odłącz";
+}
+
+function zamknijModalUsuwaniaInwestycji(result) {
+    const modal = document.getElementById("usun-inwestycje-modal");
+    if (modal) modal.classList.add("hidden");
+    ustawStanModalaUsuwaniaInwestycji(false);
+    usunInwestycjeModalWybor = null;
+    document.querySelectorAll("[data-delete-investment-choice]").forEach(btn => btn.classList.remove("selected"));
+    const confirmBtn = document.getElementById("btn-potwierdz-usun-inwestycje");
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.classList.remove("btn-danger");
+        confirmBtn.classList.add("btn-main");
+        confirmBtn.textContent = "Potwierdź";
+    }
+
+    if (usunInwestycjeModalResolve) {
+        const resolve = usunInwestycjeModalResolve;
+        usunInwestycjeModalResolve = null;
+        resolve(result);
+    }
+}
+
+function potwierdzWyborUsuwaniaInwestycji() {
+    if (!usunInwestycjeModalWybor) return;
+    ustawStanModalaUsuwaniaInwestycji(true);
+    zamknijModalUsuwaniaInwestycji(usunInwestycjeModalWybor);
+}
+
+function pokazModalUsuwaniaInwestycji() {
+    const modal = document.getElementById("usun-inwestycje-modal");
+    if (!modal) return Promise.resolve(null);
+    modal.classList.remove("hidden");
+    wybierzOpcjeUsuwaniaInwestycji(null);
+    return new Promise(resolve => {
+        usunInwestycjeModalResolve = resolve;
+    });
+}
+
 window.usunInwestycje = async function(id) {
     if (rolaUsera !== "admin") {
         alert("Tylko administrator może usuwać inwestycje.");
@@ -4728,14 +4818,8 @@ window.usunInwestycje = async function(id) {
     let linkedAction = "none";
 
     if (linkedEventId) {
-        const wybor = prompt("Ta inwestycja jest połączona z Terminarzem. Co zrobić z wpisem w Terminarzu?\n1 - Usuń również wpis z Terminarza\n2 - Zostaw wpis w Terminarzu, ale odłącz od inwestycji\n3 - Anuluj", "3");
-        if (wybor === "1") {
-            linkedAction = "delete-event";
-        } else if (wybor === "2") {
-            linkedAction = "detach-event";
-        } else {
-            return;
-        }
+        linkedAction = await pokazModalUsuwaniaInwestycji();
+        if (!linkedAction) return;
     } else if (!confirm("Usunąć inwestycję razem z jej zaliczkami i kosztami?")) {
         return;
     }
