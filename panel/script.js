@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-11-ELNET";
+const APP_VERSION = "2026.06.13-12-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -1075,7 +1075,7 @@ function renderujTerminarz() {
         const investmentButton = orphanInvestmentLink
             ? `<button class="btn btn-danger small-btn" onclick="usunTermin('${esc(item.id)}')">Usuń wpis</button> <button class="btn btn-secondary small-btn" onclick="odlaczTermin('${esc(item.id)}')">Odłącz</button> <button class="btn btn-secondary small-btn" onclick="polaczTerminZInnaInwestycja('${esc(item.id)}')">Połącz z inną</button>`
             : investmentId
-                ? `<button class="btn btn-secondary small-btn" onclick="przejdzDoInwestycjiZTerminu('${esc(item.id)}')">Przejdź do inwestycji</button>`
+                ? `<button class="btn btn-secondary small-btn" onclick="przejdzDoInwestycjiZTerminu('${esc(item.id)}')">Do inwestycji</button>`
                 : itemType === "Inwestycja"
                     ? `<button class="btn btn-secondary small-btn" onclick="obsluzTerminInwestycji('${esc(item.id)}')">Obsłuż inwestycję</button>`
                     : '';
