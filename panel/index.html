@@ -785,7 +785,7 @@
 
     <div class="layout-two">
         <div class="card" id="card-inwestycje-form">
-            <h2>Dodaj inwestycję</h2>
+            <h2 id="inwestycja-form-title">Nowa inwestycja</h2>
 
             <div class="form-group">
                 <label for="inwestycja-nazwa">Nazwa inwestycji</label>
@@ -803,6 +803,26 @@
             </div>
 
             <div class="form-group">
+                <label for="inwestycja-telefon">Telefon</label>
+                <input type="text" id="inwestycja-telefon" placeholder="np. 600 000 000">
+            </div>
+
+            <div class="form-group">
+                <label for="inwestycja-data-start">Data rozpoczęcia</label>
+                <input type="date" id="inwestycja-data-start">
+            </div>
+
+            <div class="form-group">
+                <label for="inwestycja-data-koniec">Data zakończenia</label>
+                <input type="date" id="inwestycja-data-koniec">
+            </div>
+
+            <div class="form-group">
+                <label for="inwestycja-opis">Opis prac</label>
+                <textarea id="inwestycja-opis" placeholder="Zakres prac, uwagi, ustalenia"></textarea>
+            </div>
+
+            <div class="form-group">
                 <label for="inwestycja-status">Status</label>
                 <select id="inwestycja-status">
                     <option value="aktywna">Aktywna</option>
@@ -810,10 +830,11 @@
                     <option value="do realizacji">Do realizacji</option>
                     <option value="zakończona">Zakończona</option>
                     <option value="wstrzymana">Wstrzymana</option>
+                    <option value="anulowana">Anulowana</option>
                 </select>
             </div>
 
-            <button id="btn-dodaj-inwestycje" class="btn btn-main">Dodaj inwestycję</button>
+            <button id="btn-dodaj-inwestycje" class="btn btn-main">Zapisz inwestycję</button>
             <button id="btn-anuluj-inwestycje" class="btn btn-secondary small-btn hidden">Anuluj edycję</button>
         </div>
 
@@ -856,13 +877,14 @@
     </div>
 
     <div id="panel-inwestycji" class="card hidden">
-        <div class="card-header">
-            <h2 id="wybrana-inwestycja-title">Wybrana inwestycja</h2>
-            <div class="button-row">
-                <button id="btn-drukuj-inwestycje" class="btn btn-secondary small-btn">Drukuj rozliczenie</button>
-                <button id="btn-zamknij-inwestycje" class="btn btn-danger small-btn">Zamknij</button>
+            <div class="card-header">
+                <h2 id="wybrana-inwestycja-title">Wybrana inwestycja</h2>
+                <div class="button-row">
+                    <button id="btn-drukuj-inwestycje" class="btn btn-secondary small-btn">Drukuj rozliczenie</button>
+                    <button id="btn-zamknij-inwestycje" class="btn btn-danger small-btn">Zamknij</button>
+                </div>
             </div>
-        </div>
+            <div id="wybrana-inwestycja-meta" class="linked-item"></div>
 
         <div class="investment-summary-grid">
             <div class="summary-box">
@@ -1089,7 +1111,11 @@
 
                 <div class="layout-two">
                     <div class="card" id="card-terminarz-form">
-                        <h2>Nowa praca</h2>
+                        <h2>Nowe zadanie</h2>
+                        <div class="button-row">
+                            <button id="btn-terminarz-nowa-inwestycja" class="btn btn-main small-btn">Nowa inwestycja</button>
+                            <button id="btn-terminarz-nowe-zadanie" class="btn btn-secondary small-btn">Nowe zadanie</button>
+                        </div>
 
                         <div class="form-group">
                             <label for="terminarz-data-start">Data rozpoczęcia</label>
@@ -1137,11 +1163,15 @@
                             <label for="terminarz-type">Typ wpisu</label>
                             <select id="terminarz-type">
                                 <option value="Zadanie">Zadanie</option>
+                                <option value="Urlop">Urlop</option>
+                                <option value="Pomiar">Pomiar</option>
+                                <option value="Spotkanie">Spotkanie</option>
+                                <option value="Serwis">Serwis</option>
                                 <option value="Inwestycja">Inwestycja</option>
                             </select>
                         </div>
 
-                        <button id="btn-dodaj-termin" class="btn btn-main">Dodaj termin</button>
+                        <button id="btn-dodaj-termin" class="btn btn-main">Dodaj zadanie</button>
                         <button id="btn-anuluj-termin" class="btn btn-secondary small-btn hidden">Anuluj edycję</button>
                     </div>
 
@@ -1434,6 +1464,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260613-17"></script>
+    <script src="script.js?v=20260613-18"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-17-ELNET";
+const APP_VERSION = "2026.06.13-18-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -368,6 +368,15 @@ function podepnijZdarzenia() {
 
     const btnDodajInwestycje = document.getElementById("btn-dodaj-inwestycje");
     if (btnDodajInwestycje) btnDodajInwestycje.addEventListener("click", dodajInwestycje);
+
+    const btnTerminarzNowaInwestycja = document.getElementById("btn-terminarz-nowa-inwestycja");
+    if (btnTerminarzNowaInwestycja) btnTerminarzNowaInwestycja.addEventListener("click", () => otworzFormularzInwestycji({ source: "terminarz" }));
+
+    const btnTerminarzNoweZadanie = document.getElementById("btn-terminarz-nowe-zadanie");
+    if (btnTerminarzNoweZadanie) btnTerminarzNoweZadanie.addEventListener("click", () => {
+        anulujEdycjeTerminu();
+        document.getElementById("card-terminarz-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
 
     const btnZamknijInwestycje = document.getElementById("btn-zamknij-inwestycje");
     if (btnZamknijInwestycje) btnZamknijInwestycje.addEventListener("click", zamknijPanelInwestycji);
@@ -918,7 +927,7 @@ async function dodajTermin() {
 
         edytowanyTerminId = null;
         const btnDodajTermin = document.getElementById('btn-dodaj-termin');
-        if (btnDodajTermin) btnDodajTermin.textContent = 'Dodaj termin';
+        if (btnDodajTermin) btnDodajTermin.textContent = 'Dodaj zadanie';
         const btnAnulujTermin = document.getElementById('btn-anuluj-termin');
         if (btnAnulujTermin) btnAnulujTermin.classList.add('hidden');
 
@@ -946,6 +955,12 @@ window.edytujTermin = function(id) {
 
     const termin = terminarz.find(item => String(item.id) === String(id));
     if (!termin) return;
+
+    const investmentId = pobierzPowiazanaInwestycjeId(termin);
+    if (typTerminu(termin) === "Inwestycja" && investmentId) {
+        otworzFormularzInwestycji({ id: investmentId, source: "terminarz" });
+        return;
+    }
 
     edytowanyTerminId = String(id);
     document.getElementById('terminarz-data-start').value = termin.data_start || '';
@@ -977,7 +992,7 @@ function anulujEdycjeTerminu() {
     if (typeEl) typeEl.value = 'Zadanie';
 
     const btnDodajTermin = document.getElementById('btn-dodaj-termin');
-    if (btnDodajTermin) btnDodajTermin.textContent = 'Dodaj termin';
+    if (btnDodajTermin) btnDodajTermin.textContent = 'Dodaj zadanie';
     const btnAnulujTermin = document.getElementById('btn-anuluj-termin');
     if (btnAnulujTermin) btnAnulujTermin.classList.add('hidden');
 }
@@ -1337,6 +1352,9 @@ function czyStatusInwestycjiDoTerminarza(status) {
 function statusTerminuDlaInwestycji(status) {
     const normalized = String(status || "").toLowerCase().trim();
     if (normalized === "aktywna") return "w trakcie";
+    if (normalized === "zakończona") return "zakończone";
+    if (normalized === "anulowana") return "odwołane";
+    if (normalized === "wstrzymana") return "przesunięte";
     return "zaplanowane";
 }
 
@@ -1346,8 +1364,8 @@ function payloadTerminuZInwestycji(inwestycja, dataStart, dataKoniec) {
         data_koniec: dataKoniec || dataStart,
         klient: inwestycja.klient || inwestycja.nazwa || "",
         adres: inwestycja.adres || "",
-        telefon: "",
-        opis: `Inwestycja: ${inwestycja.nazwa || ""}`.trim(),
+        telefon: inwestycja.telefon || "",
+        opis: inwestycja.opis || `Inwestycja: ${inwestycja.nazwa || ""}`.trim(),
         status: statusTerminuDlaInwestycji(inwestycja.status),
         investment_id: inwestycja.id,
         type: "Inwestycja",
@@ -1356,7 +1374,8 @@ function payloadTerminuZInwestycji(inwestycja, dataStart, dataKoniec) {
 }
 
 async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
-    if (!inwestycja || !czyStatusInwestycjiDoTerminarza(inwestycja.status)) return null;
+    if (!inwestycja) return null;
+    if (!options.force && !czyStatusInwestycjiDoTerminarza(inwestycja.status)) return null;
 
     let { dataStart, dataKoniec } = pobierzDatyInwestycji(inwestycja);
     if (!dataStart && options.pytajODaty) {
@@ -1445,8 +1464,11 @@ async function utworzInwestycjeZTerminu(termin, status = "planowana") {
         nazwa: termin.opis || `Inwestycja ${termin.klient || termin.data_start || ""}`.trim(),
         klient: termin.klient || "",
         adres: termin.adres || "",
+        telefon: termin.telefon || "",
+        data_start: termin.data_start || null,
+        data_koniec: termin.data_koniec || termin.data_start || null,
         status,
-        opis: "",
+        opis: termin.opis || "",
         user_id: zalogowanyUser?.id || null
     };
     const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje`, {
@@ -1644,7 +1666,15 @@ async function przesunTerminInwestycji(termin) {
     });
     if (!res.ok) throw new Error(await res.text());
     const investmentId = pobierzPowiazanaInwestycjeId(termin);
-    if (investmentId) zapiszDatyInwestycji(investmentId, nowaData, nowyKoniec);
+    if (investmentId) {
+        const inwestycjaRes = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?id=eq.${encodeURIComponent(investmentId)}`, {
+            method: "PATCH",
+            headers: headers(),
+            body: JSON.stringify({ data_start: nowaData, data_koniec: nowyKoniec })
+        });
+        if (!inwestycjaRes.ok) throw new Error(await inwestycjaRes.text());
+        zapiszDatyInwestycji(investmentId, nowaData, nowyKoniec);
+    }
 }
 
 function sprawdzDzisiejszeInwestycjeWTerminarzu() {
@@ -4597,38 +4627,118 @@ function renderujInwestycje() {
     }
 }
 
+function pobierzPolaFormularzaInwestycji() {
+    const dataStart = document.getElementById("inwestycja-data-start")?.value || "";
+    const dataKoniec = document.getElementById("inwestycja-data-koniec")?.value || "";
+    const nazwa = document.getElementById("inwestycja-nazwa")?.value.trim() || "";
+    const klient = document.getElementById("inwestycja-klient")?.value.trim() || "";
+    const adres = document.getElementById("inwestycja-adres")?.value.trim() || "";
+    const telefon = document.getElementById("inwestycja-telefon")?.value.trim() || "";
+    const opis = document.getElementById("inwestycja-opis")?.value.trim() || "";
+    const status = document.getElementById("inwestycja-status")?.value || "aktywna";
+
+    if (!nazwa) {
+        alert("Wpisz nazwę inwestycji.");
+        return null;
+    }
+
+    if (dataStart && dataKoniec && parseDateLocal(dataKoniec) < parseDateLocal(dataStart)) {
+        alert("Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.");
+        return null;
+    }
+
+    return {
+        nazwa,
+        klient,
+        adres,
+        telefon,
+        data_start: dataStart || null,
+        data_koniec: dataKoniec || null,
+        opis,
+        status
+    };
+}
+
+function ustawTrybFormularzaInwestycji({ editing = false, source = "inwestycje" } = {}) {
+    const title = document.getElementById("inwestycja-form-title");
+    const btnDodaj = document.getElementById("btn-dodaj-inwestycje");
+    const btnAnuluj = document.getElementById("btn-anuluj-inwestycje");
+    if (title) title.textContent = editing ? "Edytuj inwestycję" : "Nowa inwestycja";
+    if (btnDodaj) {
+        btnDodaj.textContent = editing ? "Zapisz zmiany" : "Zapisz inwestycję";
+        btnDodaj.disabled = false;
+        btnDodaj.dataset.source = source;
+    }
+    if (btnAnuluj) btnAnuluj.classList.toggle("hidden", !editing && source !== "terminarz");
+}
+
+function wyczyscFormularzInwestycji() {
+    document.getElementById("inwestycja-nazwa").value = "";
+    document.getElementById("inwestycja-klient").value = "";
+    document.getElementById("inwestycja-adres").value = "";
+    document.getElementById("inwestycja-telefon").value = "";
+    document.getElementById("inwestycja-data-start").value = "";
+    document.getElementById("inwestycja-data-koniec").value = "";
+    document.getElementById("inwestycja-opis").value = "";
+    document.getElementById("inwestycja-status").value = "aktywna";
+}
+
+function wypelnijFormularzInwestycji(inwestycja) {
+    const { dataStart, dataKoniec } = pobierzDatyInwestycji(inwestycja);
+    document.getElementById("inwestycja-nazwa").value = inwestycja?.nazwa || "";
+    document.getElementById("inwestycja-klient").value = inwestycja?.klient || "";
+    document.getElementById("inwestycja-adres").value = inwestycja?.adres || "";
+    document.getElementById("inwestycja-telefon").value = inwestycja?.telefon || "";
+    document.getElementById("inwestycja-data-start").value = dataStart || "";
+    document.getElementById("inwestycja-data-koniec").value = dataKoniec || "";
+    document.getElementById("inwestycja-opis").value = inwestycja?.opis || "";
+    document.getElementById("inwestycja-status").value = inwestycja?.status || "aktywna";
+}
+
+function otworzFormularzInwestycji({ id = null, source = "inwestycje" } = {}) {
+    pokazSekcje("inwestycje");
+    if (id) {
+        const inwestycja = inwestycje.find(i => String(i.id) === String(id));
+        if (!inwestycja) {
+            alert("Nie znaleziono inwestycji do edycji.");
+            return;
+        }
+        edytowanaInwestycjaId = inwestycja.id;
+        wypelnijFormularzInwestycji(inwestycja);
+        ustawTrybFormularzaInwestycji({ editing: true, source });
+    } else {
+        edytowanaInwestycjaId = null;
+        wyczyscFormularzInwestycji();
+        ustawTrybFormularzaInwestycji({ editing: false, source });
+    }
+    document.getElementById("card-inwestycje-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 async function dodajInwestycje() {
     if (rolaUsera === "guest") {
         alert("Gość nie może dodawać inwestycji.");
         return;
     }
 
-    const nazwa = document.getElementById("inwestycja-nazwa").value.trim();
-    const klient = document.getElementById("inwestycja-klient").value.trim();
-    const adres = document.getElementById("inwestycja-adres").value.trim();
-    const status = document.getElementById("inwestycja-status").value;
+    const payload = pobierzPolaFormularzaInwestycji();
+    if (!payload) return;
 
-    if (!nazwa) {
-        alert("Wpisz nazwę inwestycji.");
-        return;
+    const btnDodaj = document.getElementById("btn-dodaj-inwestycje");
+    const originalText = btnDodaj?.textContent || "Zapisz inwestycję";
+    if (btnDodaj?.disabled) return;
+    if (btnDodaj) {
+        btnDodaj.disabled = true;
+        btnDodaj.textContent = "Zapisywanie...";
     }
 
-    const payload = {
-        nazwa,
-        klient,
-        adres,
-        status,
-        opis: "",
-        user_id: zalogowanyUser?.id
-    };
-
-    const akcjaInwestycji = edytowanaInwestycjaId ? "Edytowano inwestycję" : "Dodano inwestycję";
+    const editingId = edytowanaInwestycjaId;
+    const akcjaInwestycji = editingId ? "Edytowano inwestycję" : "Dodano inwestycję";
 
     try {
         let res;
 
-        if (edytowanaInwestycjaId) {
-            res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?id=eq.${edytowanaInwestycjaId}`, {
+        if (editingId) {
+            res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?id=eq.${encodeURIComponent(editingId)}`, {
                 method: "PATCH",
                 headers: headers(),
                 body: JSON.stringify(payload)
@@ -4637,7 +4747,7 @@ async function dodajInwestycje() {
             res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje`, {
                 method: "POST",
                 headers: headers(),
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ ...payload, user_id: zalogowanyUser?.id })
             });
         }
 
@@ -4645,34 +4755,57 @@ async function dodajInwestycje() {
 
         const zapisane = await res.json();
         const zapisanaInwestycja = Array.isArray(zapisane) ? zapisane[0] : zapisane;
-        const zapisanaInwestycjaId = edytowanaInwestycjaId || zapisanaInwestycja?.id;
-
-        document.getElementById("inwestycja-nazwa").value = "";
-        document.getElementById("inwestycja-klient").value = "";
-        document.getElementById("inwestycja-adres").value = "";
-        document.getElementById("inwestycja-status").value = "aktywna";
-        edytowanaInwestycjaId = null;
-
-        const btnDodaj = document.getElementById("btn-dodaj-inwestycje");
-        if (btnDodaj) btnDodaj.textContent = "Dodaj inwestycję";
-
-        const btnAnuluj = document.getElementById("btn-anuluj-inwestycje");
-        if (btnAnuluj) btnAnuluj.classList.add("hidden");
+        const zapisanaInwestycjaId = editingId || zapisanaInwestycja?.id;
 
         await pobierzInwestycje();
         const inwestycjaPoZapisie = inwestycje.find(i => String(i.id) === String(zapisanaInwestycjaId));
-        if (inwestycjaPoZapisie && pobierzPowiazanyTerminId(inwestycjaPoZapisie)) {
-            await zsynchronizujInwestycjeZTerminarzem(inwestycjaPoZapisie);
+
+        let keepInvestmentFormOpen = false;
+        try {
+            if (!editingId && inwestycjaPoZapisie?.data_start) {
+                await zsynchronizujInwestycjeZTerminarzem(inwestycjaPoZapisie, { force: true });
+                await pobierzInwestycje();
+                await pobierzTerminarz();
+            } else if (editingId && inwestycjaPoZapisie && pobierzPowiazanyTerminId(inwestycjaPoZapisie)) {
+                await zsynchronizujInwestycjeZTerminarzem(inwestycjaPoZapisie, { force: true });
+                await pobierzTerminarz();
+            }
+        } catch (syncErr) {
+            console.error("Błąd synchronizacji inwestycji z Terminarzem:", syncErr);
+            if (!editingId) {
+                edytowanaInwestycjaId = zapisanaInwestycjaId;
+                ustawTrybFormularzaInwestycji({ editing: true, source: btnDodaj?.dataset.source || "inwestycje" });
+                keepInvestmentFormOpen = true;
+                alert("Inwestycja została utworzona, ale nie udało się dodać jej do Terminarza.");
+            } else {
+                alert("Inwestycja została zapisana, ale nie udało się zaktualizować wpisu w Terminarzu.");
+            }
             await pobierzTerminarz();
         }
+
+        if (!keepInvestmentFormOpen) {
+            wyczyscFormularzInwestycji();
+            edytowanaInwestycjaId = null;
+            ustawTrybFormularzaInwestycji({ editing: false, source: "inwestycje" });
+        }
+
         renderujInwestycje();
         renderujTerminarz();
         renderujKalendarzTerminarza();
         renderujPulpit();
-        zapiszLog("Inwestycje", akcjaInwestycji, nazwa);
+        zapiszLog("Inwestycje", akcjaInwestycji, payload.nazwa);
     } catch (err) {
         console.error(err);
         alert("Nie udało się zapisać inwestycji. Sprawdź tabelę inwestycje i RLS.");
+    } finally {
+        if (btnDodaj) {
+            btnDodaj.disabled = false;
+            if (edytowanaInwestycjaId) {
+                btnDodaj.textContent = "Zapisz zmiany";
+            } else {
+                btnDodaj.textContent = originalText === "Zapisywanie..." ? "Zapisz inwestycję" : originalText;
+            }
+        }
     }
 }
 
@@ -4694,35 +4827,13 @@ window.edytujInwestycje = function(id) {
         alert("Tylko administrator może edytować inwestycje.");
         return;
     }
-
-    const inwestycja = inwestycje.find(i => String(i.id) === String(id));
-    if (!inwestycja) return;
-
-    edytowanaInwestycjaId = inwestycja.id;
-    document.getElementById("inwestycja-nazwa").value = inwestycja.nazwa || "";
-    document.getElementById("inwestycja-klient").value = inwestycja.klient || "";
-    document.getElementById("inwestycja-adres").value = inwestycja.adres || "";
-    document.getElementById("inwestycja-status").value = inwestycja.status || "aktywna";
-
-    const btnDodaj = document.getElementById("btn-dodaj-inwestycje");
-    if (btnDodaj) btnDodaj.textContent = "Zapisz zmiany";
-
-    const btnAnuluj = document.getElementById("btn-anuluj-inwestycje");
-    if (btnAnuluj) btnAnuluj.classList.remove("hidden");
+    otworzFormularzInwestycji({ id, source: "inwestycje" });
 };
 
 function anulujEdycjeInwestycji() {
     edytowanaInwestycjaId = null;
-    document.getElementById("inwestycja-nazwa").value = "";
-    document.getElementById("inwestycja-klient").value = "";
-    document.getElementById("inwestycja-adres").value = "";
-    document.getElementById("inwestycja-status").value = "aktywna";
-
-    const btnDodaj = document.getElementById("btn-dodaj-inwestycje");
-    if (btnDodaj) btnDodaj.textContent = "Dodaj inwestycję";
-
-    const btnAnuluj = document.getElementById("btn-anuluj-inwestycje");
-    if (btnAnuluj) btnAnuluj.classList.add("hidden");
+    wyczyscFormularzInwestycji();
+    ustawTrybFormularzaInwestycji({ editing: false, source: "inwestycje" });
 }
 
 function zamknijPanelInwestycji() {
@@ -4871,6 +4982,16 @@ function renderujPanelInwestycji() {
     const title = document.getElementById("wybrana-inwestycja-title");
     if (title) {
         title.textContent = `${inwestycja.nazwa} — ${inwestycja.klient || "bez klienta"}`;
+    }
+
+    const meta = document.getElementById("wybrana-inwestycja-meta");
+    if (meta) {
+        const { dataStart, dataKoniec } = pobierzDatyInwestycji(inwestycja);
+        meta.innerHTML = `
+            <p><strong>Telefon:</strong> ${esc(inwestycja.telefon || "-")}</p>
+            <p><strong>Termin:</strong> ${esc(dataStart || "-")}${dataKoniec ? ` – ${esc(dataKoniec)}` : ""}</p>
+            <p><strong>Opis:</strong> ${esc(inwestycja.opis || "-")}</p>
+        `;
     }
 
     const zaliczkiLista = inwestycjeZaliczki.filter(z => String(z.inwestycja_id) === String(aktywnaInwestycjaId));
