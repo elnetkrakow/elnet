@@ -17,9 +17,9 @@
             overflow-x: auto;
         }
 
-        .terminarz-scroll table {
-            table-layout: fixed;
-            min-width: 1400px;
+        #section-terminarz .terminarz-scroll table {
+            table-layout: auto !important;
+            min-width: 1400px !important;
         }
 
         .terminarz-scroll th:nth-child(1),
@@ -58,9 +58,24 @@
         }
 
         .calendar-actions-column {
-            width: 340px;
-            min-width: 340px;
-            white-space: nowrap;
+            width: 310px !important;
+            min-width: 310px !important;
+            max-width: none !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: nowrap !important;
+            text-align: left !important;
+            padding-right: 14px !important;
+        }
+
+        #section-terminarz .terminarz-scroll th.calendar-actions-column,
+        #section-terminarz .terminarz-scroll td.calendar-actions-column {
+            width: 310px !important;
+            min-width: 310px !important;
+            max-width: none !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: nowrap !important;
         }
 
         .linked-event-note,
@@ -86,21 +101,29 @@
         }
 
         .calendar-row-actions {
-            display: flex;
+            display: inline-flex;
             align-items: center;
             justify-content: flex-start;
             gap: 6px;
             flex-wrap: nowrap;
             white-space: nowrap;
-            width: max-content;
+            width: auto;
             min-width: max-content;
+            max-width: none !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
         }
 
         .calendar-row-actions button,
         .calendar-row-actions a {
+            display: inline-flex;
             flex: 0 0 auto;
-            width: auto;
-            white-space: nowrap;
+            width: auto !important;
+            min-width: auto !important;
+            max-width: none !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: nowrap !important;
         }
 
         .calendar-row-actions .small-btn {
@@ -616,7 +639,7 @@
                                         <th>Nazwa</th>
                                         <th>Jedn.</th>
                                         <th>Cena netto</th>
-                                        <th class="calendar-actions-column">Akcje</th>
+                                        <th>Akcje</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tabela-uslug">
@@ -1033,7 +1056,7 @@
                                         <th>Status</th>
                                         <th>Opis</th>
                                         <th>Dni</th>
-                                        <th>Akcje</th>
+                                        <th class="calendar-actions-column">Akcje</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tabela-terminarz">
@@ -1257,6 +1280,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260613-10"></script>
+    <script src="script.js?v=20260613-11"></script>
 </body>
 </html>
