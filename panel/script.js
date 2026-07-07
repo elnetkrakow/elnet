@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-07-ELNET";
+const APP_VERSION = "2026.06.13-08-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -1768,7 +1768,7 @@ function renderujMagazyn() {
                 <td>${kwota} PLN</td>
                 <td>${gwar}</td>
                 <td>${esc(item.uwagi || '')}</td>
-                <td><div class="${actionClass}">${akcje}</div></td>
+                <td><div class="table-actions">${akcje}</div></td>
             </tr>
         `;
     }).join('');
@@ -2306,7 +2306,7 @@ function renderujUslugi() {
                 <td>${esc(u.nazwa)}</td>
                 <td>${esc(jednostkaUslugi(u))}</td>
                 <td><strong>${cenaUslugi(u).toFixed(2)} PLN</strong></td>
-                <td><div class="${actionClass}">${akcje}</div></td>
+                <td><div class="table-actions">${akcje}</div></td>
             </tr>
         `;
     }).join("");
