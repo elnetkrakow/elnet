@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-09-ELNET";
+const APP_VERSION = "2026.06.13-10-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -1092,7 +1092,7 @@ function renderujTerminarz() {
                 <td><div class="terminarz-status-stack">${statusLabel}${investmentInfo}</div></td>
                 <td>${esc(item.opis || '')}</td>
                 <td>${esc(days)}</td>
-                <td><div class="${actionClass}">${akcje}</div></td>
+                <td class="calendar-actions-column"><div class="${actionClass}">${akcje}</div></td>
             </tr>
         `;
     }).join('');

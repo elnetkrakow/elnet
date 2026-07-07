@@ -13,49 +13,54 @@
             gap: 4px;
         }
 
+        .terminarz-scroll {
+            overflow-x: auto;
+        }
+
         .terminarz-scroll table {
             table-layout: fixed;
-            min-width: 1180px;
+            min-width: 1400px;
         }
 
         .terminarz-scroll th:nth-child(1),
         .terminarz-scroll td:nth-child(1) {
-            width: 120px;
+            width: 175px;
         }
 
         .terminarz-scroll th:nth-child(2),
         .terminarz-scroll td:nth-child(2) {
-            width: 145px;
+            width: 150px;
         }
 
         .terminarz-scroll th:nth-child(3),
         .terminarz-scroll td:nth-child(3) {
-            width: 165px;
+            width: 190px;
         }
 
         .terminarz-scroll th:nth-child(4),
         .terminarz-scroll td:nth-child(4) {
-            width: 115px;
+            width: 110px;
         }
 
         .terminarz-scroll th:nth-child(5),
         .terminarz-scroll td:nth-child(5) {
-            width: 130px;
+            width: 125px;
         }
 
         .terminarz-scroll th:nth-child(6),
         .terminarz-scroll td:nth-child(6) {
-            width: auto;
+            min-width: 250px;
         }
 
         .terminarz-scroll th:nth-child(7),
         .terminarz-scroll td:nth-child(7) {
-            width: 55px;
+            width: 50px;
         }
 
-        .terminarz-scroll th:nth-child(8),
-        .terminarz-scroll td:nth-child(8) {
-            width: 325px;
+        .calendar-actions-column {
+            width: 340px;
+            min-width: 340px;
+            white-space: nowrap;
         }
 
         .linked-event-note,
@@ -82,10 +87,20 @@
 
         .calendar-row-actions {
             display: flex;
-            flex-wrap: nowrap;
-            gap: 6px;
             align-items: center;
-            max-width: 100%;
+            justify-content: flex-start;
+            gap: 6px;
+            flex-wrap: nowrap;
+            white-space: nowrap;
+            width: max-content;
+            min-width: max-content;
+        }
+
+        .calendar-row-actions button,
+        .calendar-row-actions a {
+            flex: 0 0 auto;
+            width: auto;
+            white-space: nowrap;
         }
 
         .calendar-row-actions .small-btn {
@@ -601,7 +616,7 @@
                                         <th>Nazwa</th>
                                         <th>Jedn.</th>
                                         <th>Cena netto</th>
-                                        <th>Akcje</th>
+                                        <th class="calendar-actions-column">Akcje</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tabela-uslug">
@@ -1242,6 +1257,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260613-09"></script>
+    <script src="script.js?v=20260613-10"></script>
 </body>
 </html>
