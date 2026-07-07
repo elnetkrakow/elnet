@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-14-ELNET";
+const APP_VERSION = "2026.06.13-15-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -41,6 +41,8 @@ let edytowanaUslugaId = null;
 let edytowanaPozycjaId = null;
 let edytowanaPozycjaIdPanel = null;
 let edytowanaInwestycjaId = null;
+let edytowanaZaliczkaId = null;
+let edytowanyKosztId = null;
 let trybEdycjiKosztorysu = false;
 let edytowanyKosztorysId = null;
 let aktualnyDrukowanyKosztorysId = null;
@@ -374,8 +376,14 @@ function podepnijZdarzenia() {
     const btnDodajZaliczke = document.getElementById("btn-dodaj-zaliczke");
     if (btnDodajZaliczke) btnDodajZaliczke.addEventListener("click", dodajZaliczke);
 
+    const btnAnulujZaliczke = document.getElementById("btn-anuluj-zaliczke");
+    if (btnAnulujZaliczke) btnAnulujZaliczke.addEventListener("click", anulujEdycjeZaliczki);
+
     const btnDodajKoszt = document.getElementById("btn-dodaj-koszt");
     if (btnDodajKoszt) btnDodajKoszt.addEventListener("click", dodajKoszt);
+
+    const btnAnulujKoszt = document.getElementById("btn-anuluj-koszt");
+    if (btnAnulujKoszt) btnAnulujKoszt.addEventListener("click", anulujEdycjeKosztu);
 
     const btnDodajPracaDodatkowa = document.getElementById("btn-dodaj-praca-dodatkowa");
     if (btnDodajPracaDodatkowa) btnDodajPracaDodatkowa.addEventListener("click", dodajPraceDodatkowa);
@@ -4648,6 +4656,8 @@ async function dodajInwestycje() {
 
 window.otworzInwestycje = function(id) {
     aktywnaInwestycjaId = id;
+    anulujEdycjeZaliczki();
+    anulujEdycjeKosztu();
     renderujPanelInwestycji();
 
     const panel = document.getElementById("panel-inwestycji");
@@ -4694,6 +4704,8 @@ function anulujEdycjeInwestycji() {
 }
 
 function zamknijPanelInwestycji() {
+    anulujEdycjeZaliczki();
+    anulujEdycjeKosztu();
     aktywnaInwestycjaId = null;
 
     const panel = document.getElementById("panel-inwestycji");
@@ -4874,6 +4886,111 @@ function renderujPowiazaneKosztorysyInwestycji() {
     `;
 }
 
+function pobierzKwoteFormularza(inputId, komunikat) {
+    const raw = String(document.getElementById(inputId)?.value || "").replace(",", ".").trim();
+    const kwota = Number(raw);
+    if (!Number.isFinite(kwota) || kwota <= 0) {
+        alert(komunikat);
+        return null;
+    }
+    return kwota;
+}
+
+function ustawPrzyciskZapisu(button, isSaving) {
+    if (!button) return;
+    button.disabled = isSaving;
+}
+
+function anulujEdycjeZaliczki() {
+    edytowanaZaliczkaId = null;
+    const today = formatDateLocal(new Date());
+    const title = document.getElementById("zaliczka-form-title");
+    const btn = document.getElementById("btn-dodaj-zaliczke");
+    const cancel = document.getElementById("btn-anuluj-zaliczke");
+    if (title) title.textContent = "Dodaj zaliczkę";
+    if (btn) {
+        btn.textContent = "Dodaj zaliczkę";
+        btn.disabled = false;
+    }
+    if (cancel) cancel.classList.add("hidden");
+    const data = document.getElementById("zaliczka-data");
+    const kwota = document.getElementById("zaliczka-kwota");
+    const platnosc = document.getElementById("zaliczka-platnosc");
+    const opis = document.getElementById("zaliczka-opis");
+    if (data) data.value = today;
+    if (kwota) kwota.value = "";
+    if (platnosc) platnosc.selectedIndex = 0;
+    if (opis) opis.value = "";
+}
+
+function anulujEdycjeKosztu() {
+    edytowanyKosztId = null;
+    const today = formatDateLocal(new Date());
+    const title = document.getElementById("koszt-form-title");
+    const btn = document.getElementById("btn-dodaj-koszt");
+    const cancel = document.getElementById("btn-anuluj-koszt");
+    if (title) title.textContent = "Dodaj koszt";
+    if (btn) {
+        btn.textContent = "Dodaj koszt";
+        btn.disabled = false;
+    }
+    if (cancel) cancel.classList.add("hidden");
+    const data = document.getElementById("koszt-data");
+    const kwota = document.getElementById("koszt-kwota");
+    const kategoria = document.getElementById("koszt-kategoria");
+    const opis = document.getElementById("koszt-opis");
+    if (data) data.value = today;
+    if (kwota) kwota.value = "";
+    if (kategoria) kategoria.selectedIndex = 0;
+    if (opis) opis.value = "";
+}
+
+window.edytujZaliczke = function(id) {
+    const zaliczka = inwestycjeZaliczki.find(z =>
+        String(z.id) === String(id) && String(z.inwestycja_id) === String(aktywnaInwestycjaId)
+    );
+    if (!zaliczka) {
+        alert("Nie znaleziono zaliczki do edycji.");
+        return;
+    }
+
+    edytowanaZaliczkaId = String(id);
+    const title = document.getElementById("zaliczka-form-title");
+    const btn = document.getElementById("btn-dodaj-zaliczke");
+    const cancel = document.getElementById("btn-anuluj-zaliczke");
+    if (title) title.textContent = "Edytuj zaliczkę";
+    if (btn) btn.textContent = "Zapisz zmiany";
+    if (cancel) cancel.classList.remove("hidden");
+    document.getElementById("zaliczka-data").value = zaliczka.data || "";
+    document.getElementById("zaliczka-kwota").value = Number(zaliczka.kwota || 0);
+    document.getElementById("zaliczka-platnosc").value = zaliczka.sposob_platnosci || "gotówka";
+    document.getElementById("zaliczka-opis").value = zaliczka.opis || "";
+    document.getElementById("card-zaliczka-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
+};
+
+window.edytujKoszt = function(id) {
+    const koszt = inwestycjeKoszty.find(k =>
+        String(k.id) === String(id) && String(k.inwestycja_id) === String(aktywnaInwestycjaId)
+    );
+    if (!koszt) {
+        alert("Nie znaleziono kosztu do edycji.");
+        return;
+    }
+
+    edytowanyKosztId = String(id);
+    const title = document.getElementById("koszt-form-title");
+    const btn = document.getElementById("btn-dodaj-koszt");
+    const cancel = document.getElementById("btn-anuluj-koszt");
+    if (title) title.textContent = "Edytuj koszt";
+    if (btn) btn.textContent = "Zapisz zmiany";
+    if (cancel) cancel.classList.remove("hidden");
+    document.getElementById("koszt-data").value = koszt.data || "";
+    document.getElementById("koszt-kwota").value = Number(koszt.kwota || 0);
+    document.getElementById("koszt-kategoria").value = koszt.kategoria || "materiały";
+    document.getElementById("koszt-opis").value = koszt.opis || "";
+    document.getElementById("card-koszt-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
+};
+
 function renderujTabeleZaliczek(lista) {
     const tbody = document.getElementById("tabela-zaliczek");
     if (!tbody) return;
@@ -4885,7 +5002,7 @@ function renderujTabeleZaliczek(lista) {
 
     tbody.innerHTML = lista.map(z => {
         const akcja = rolaUsera === "admin"
-            ? `<button class="btn btn-danger small-btn" onclick="usunZaliczke('${esc(z.id)}')">Usuń</button>`
+            ? `<div class="table-actions"><button class="btn btn-secondary small-btn" onclick="edytujZaliczke('${esc(z.id)}')">Edytuj</button><button class="btn btn-danger small-btn" onclick="usunZaliczke('${esc(z.id)}')">Usuń</button></div>`
             : "";
 
         return `
@@ -4911,7 +5028,7 @@ function renderujTabeleKosztow(lista) {
 
     tbody.innerHTML = lista.map(k => {
         const akcja = rolaUsera === "admin"
-            ? `<button class="btn btn-danger small-btn" onclick="usunKoszt('${esc(k.id)}')">Usuń</button>`
+            ? `<div class="table-actions"><button class="btn btn-secondary small-btn" onclick="edytujKoszt('${esc(k.id)}')">Edytuj</button><button class="btn btn-danger small-btn" onclick="usunKoszt('${esc(k.id)}')">Usuń</button></div>`
             : "";
 
         return `
@@ -4931,10 +5048,6 @@ async function dodajZaliczke() {
         alert("Gość nie może dodawać zaliczek.");
         return;
     }
-    if (rolaUsera === "guest") {
-        alert("Gość nie może dodawać zaliczek.");
-        return;
-    }
 
     if (!aktywnaInwestycjaId) {
         alert("Najpierw otwórz inwestycję.");
@@ -4942,7 +5055,7 @@ async function dodajZaliczke() {
     }
 
     const data = document.getElementById("zaliczka-data").value;
-    const kwota = Number(document.getElementById("zaliczka-kwota").value);
+    const kwota = pobierzKwoteFormularza("zaliczka-kwota", "Wpisz poprawną kwotę zaliczki.");
     const sposob_platnosci = document.getElementById("zaliczka-platnosc").value;
     const opis = document.getElementById("zaliczka-opis").value.trim();
 
@@ -4951,39 +5064,52 @@ async function dodajZaliczke() {
         return;
     }
 
-    if (isNaN(kwota) || kwota <= 0) {
-        alert("Wpisz poprawną kwotę zaliczki.");
-        return;
-    }
+    if (kwota === null) return;
 
     const payload = {
-        inwestycja_id: aktywnaInwestycjaId,
         data,
         kwota,
         sposob_platnosci,
-        opis,
-        user_id: zalogowanyUser?.id
+        opis
     };
 
+    const btn = document.getElementById("btn-dodaj-zaliczke");
+    ustawPrzyciskZapisu(btn, true);
+
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje_zaliczki`, {
-            method: "POST",
+        const editingId = edytowanaZaliczkaId;
+        const url = editingId
+            ? `${SUPABASE_URL}/rest/v1/inwestycje_zaliczki?id=eq.${encodeURIComponent(editingId)}&inwestycja_id=eq.${encodeURIComponent(aktywnaInwestycjaId)}`
+            : `${SUPABASE_URL}/rest/v1/inwestycje_zaliczki`;
+        const body = editingId
+            ? payload
+            : { ...payload, inwestycja_id: aktywnaInwestycjaId, user_id: zalogowanyUser?.id };
+
+        const res = await fetch(url, {
+            method: editingId ? "PATCH" : "POST",
             headers: headers(),
-            body: JSON.stringify(payload)
+            body: JSON.stringify(body)
         });
 
-        if (!res.ok) throw new Error(await res.text());
+        const responseText = await res.text();
+        if (!res.ok) throw new Error(responseText);
+        if (editingId) {
+            const updated = responseText ? JSON.parse(responseText) : [];
+            if (Array.isArray(updated) && !updated.length) {
+                throw new Error("Nie znaleziono zaliczki do aktualizacji.");
+            }
+        }
 
-        document.getElementById("zaliczka-kwota").value = "";
-        document.getElementById("zaliczka-opis").value = "";
+        anulujEdycjeZaliczki();
 
         await pobierzInwestycjeZaliczki();
         renderujInwestycje();
         renderujPanelInwestycji();
-        zapiszLog("Inwestycje", "Dodano zaliczkę", opis);
+        zapiszLog("Inwestycje", editingId ? "Zmieniono zaliczkę" : "Dodano zaliczkę", opis);
     } catch (err) {
-        console.error(err);
-        alert("Nie udało się zapisać zaliczki.");
+        console.error("Błąd zapisu zaliczki:", err);
+        alert(edytowanaZaliczkaId ? "Nie udało się zapisać zmian." : "Nie udało się zapisać zaliczki.");
+        ustawPrzyciskZapisu(btn, false);
     }
 }
 
@@ -4999,7 +5125,7 @@ async function dodajKoszt() {
     }
 
     const data = document.getElementById("koszt-data").value;
-    const kwota = Number(document.getElementById("koszt-kwota").value);
+    const kwota = pobierzKwoteFormularza("koszt-kwota", "Wpisz poprawną kwotę kosztu.");
     const kategoria = document.getElementById("koszt-kategoria").value;
     const opis = document.getElementById("koszt-opis").value.trim();
 
@@ -5008,39 +5134,52 @@ async function dodajKoszt() {
         return;
     }
 
-    if (isNaN(kwota) || kwota <= 0) {
-        alert("Wpisz poprawną kwotę kosztu.");
-        return;
-    }
+    if (kwota === null) return;
 
     const payload = {
-        inwestycja_id: aktywnaInwestycjaId,
         data,
         kwota,
         kategoria,
-        opis,
-        user_id: zalogowanyUser?.id
+        opis
     };
 
+    const btn = document.getElementById("btn-dodaj-koszt");
+    ustawPrzyciskZapisu(btn, true);
+
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje_koszty`, {
-            method: "POST",
+        const editingId = edytowanyKosztId;
+        const url = editingId
+            ? `${SUPABASE_URL}/rest/v1/inwestycje_koszty?id=eq.${encodeURIComponent(editingId)}&inwestycja_id=eq.${encodeURIComponent(aktywnaInwestycjaId)}`
+            : `${SUPABASE_URL}/rest/v1/inwestycje_koszty`;
+        const body = editingId
+            ? payload
+            : { ...payload, inwestycja_id: aktywnaInwestycjaId, user_id: zalogowanyUser?.id };
+
+        const res = await fetch(url, {
+            method: editingId ? "PATCH" : "POST",
             headers: headers(),
-            body: JSON.stringify(payload)
+            body: JSON.stringify(body)
         });
 
-        if (!res.ok) throw new Error(await res.text());
+        const responseText = await res.text();
+        if (!res.ok) throw new Error(responseText);
+        if (editingId) {
+            const updated = responseText ? JSON.parse(responseText) : [];
+            if (Array.isArray(updated) && !updated.length) {
+                throw new Error("Nie znaleziono kosztu do aktualizacji.");
+            }
+        }
 
-        document.getElementById("koszt-kwota").value = "";
-        document.getElementById("koszt-opis").value = "";
+        anulujEdycjeKosztu();
 
         await pobierzInwestycjeKoszty();
         renderujInwestycje();
         renderujPanelInwestycji();
-        zapiszLog("Inwestycje", "Dodano koszt", opis);
+        zapiszLog("Inwestycje", editingId ? "Zmieniono koszt" : "Dodano koszt", opis);
     } catch (err) {
-        console.error(err);
-        alert("Nie udało się zapisać kosztu.");
+        console.error("Błąd zapisu kosztu:", err);
+        alert(edytowanyKosztId ? "Nie udało się zapisać zmian." : "Nie udało się zapisać kosztu.");
+        ustawPrzyciskZapisu(btn, false);
     }
 }
 

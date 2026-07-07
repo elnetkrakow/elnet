@@ -154,6 +154,22 @@
             transition: background 0.25s ease, box-shadow 0.25s ease;
         }
 
+        #section-inwestycje #tabela-zaliczek .table-actions,
+        #section-inwestycje #tabela-kosztow .table-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            flex-wrap: nowrap;
+            white-space: nowrap;
+        }
+
+        #section-inwestycje #tabela-zaliczek .table-actions .btn,
+        #section-inwestycje #tabela-kosztow .table-actions .btn {
+            flex: 0 0 auto;
+            width: auto;
+        }
+
         @media (max-width: 900px) {
             .calendar-row-actions .small-btn {
                 white-space: normal;
@@ -774,7 +790,7 @@
 
         <div class="layout-two">
 <div class="card inner-card" id="card-zaliczka-form">
-                <h2>Dodaj zaliczkę</h2>
+                <h2 id="zaliczka-form-title">Dodaj zaliczkę</h2>
 
                 <div class="form-group">
                     <label for="zaliczka-data">Data</label>
@@ -783,7 +799,7 @@
 
                 <div class="form-group">
                     <label for="zaliczka-kwota">Kwota</label>
-                    <input type="number" id="zaliczka-kwota" step="0.01" min="0" placeholder="0.00">
+                    <input type="text" id="zaliczka-kwota" inputmode="decimal" placeholder="0.00">
                 </div>
 
                 <div class="form-group">
@@ -801,11 +817,14 @@
                     <input type="text" id="zaliczka-opis" placeholder="np. pierwsza zaliczka">
                 </div>
 
-                <button id="btn-dodaj-zaliczke" class="btn btn-main">Dodaj zaliczkę</button>
+                <div class="button-row">
+                    <button id="btn-dodaj-zaliczke" class="btn btn-main">Dodaj zaliczkę</button>
+                    <button id="btn-anuluj-zaliczke" class="btn btn-secondary small-btn hidden">Anuluj</button>
+                </div>
             </div>
 
 <div class="card inner-card" id="card-koszt-form">
-                <h2>Dodaj koszt</h2>
+                <h2 id="koszt-form-title">Dodaj koszt</h2>
 
                 <div class="form-group">
                     <label for="koszt-data">Data</label>
@@ -814,7 +833,7 @@
 
                 <div class="form-group">
                     <label for="koszt-kwota">Kwota</label>
-                    <input type="number" id="koszt-kwota" step="0.01" min="0" placeholder="0.00">
+                    <input type="text" id="koszt-kwota" inputmode="decimal" placeholder="0.00">
                 </div>
 
                 <div class="form-group">
@@ -833,7 +852,10 @@
                     <input type="text" id="koszt-opis" placeholder="np. przewody, rozdzielnica, osprzęt">
                 </div>
 
-                <button id="btn-dodaj-koszt" class="btn btn-main">Dodaj koszt</button>
+                <div class="button-row">
+                    <button id="btn-dodaj-koszt" class="btn btn-main">Dodaj koszt</button>
+                    <button id="btn-anuluj-koszt" class="btn btn-secondary small-btn hidden">Anuluj</button>
+                </div>
             </div>
         </div>
 
@@ -893,11 +915,12 @@
                                 <th>Kwota</th>
                                 <th>Płatność</th>
                                 <th>Opis</th>
+                                <th>Akcje</th>
                             </tr>
                         </thead>
                         <tbody id="tabela-zaliczek">
                             <tr>
-                                <td colspan="4" class="empty-row">Brak zaliczek.</td>
+                                <td colspan="5" class="empty-row">Brak zaliczek.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -915,11 +938,12 @@
                                 <th>Kwota</th>
                                 <th>Kategoria</th>
                                 <th>Opis</th>
+                                <th>Akcje</th>
                             </tr>
                         </thead>
                         <tbody id="tabela-kosztow">
                             <tr>
-                                <td colspan="4" class="empty-row">Brak kosztów.</td>
+                                <td colspan="5" class="empty-row">Brak kosztów.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1287,6 +1311,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260613-14"></script>
+    <script src="script.js?v=20260613-15"></script>
 </body>
 </html>
