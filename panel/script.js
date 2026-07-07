@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-15-ELNET";
+const APP_VERSION = "2026.06.13-16-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -4547,9 +4547,6 @@ function renderujInwestycje() {
         const koszty = sumaKosztowDlaInwestycji(i.id);
         const roznica = zaliczki - koszty;
         const linkedEventId = pobierzPowiazanyTerminId(i);
-        const calendarInfo = linkedEventId
-            ? `<br><small>Połączone z Terminarzem</small>`
-            : "";
         const calendarButton = linkedEventId
             ? `<button class="btn btn-secondary small-btn" onclick="pokazInwestycjeWTerminarzu('${esc(i.id)}')">Pokaż w Terminarzu</button>`
             : `<button class="btn btn-secondary small-btn" onclick="dodajInwestycjeDoTerminarza('${esc(i.id)}')">Dodaj do Terminarza</button>`;
@@ -4560,7 +4557,7 @@ function renderujInwestycje() {
 
         return `
             <tr>
-                <td><strong>${esc(i.nazwa)}</strong><br><small>${esc(i.adres || "")}</small>${calendarInfo}</td>
+                <td><strong>${esc(i.nazwa)}</strong><br><small>${esc(i.adres || "")}</small></td>
                 <td>${esc(i.klient || "-")}</td>
                 <td class="nowrap-cell">${zaliczki.toFixed(2)} PLN</td>
                 <td class="nowrap-cell">${koszty.toFixed(2)} PLN</td>
