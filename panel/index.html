@@ -262,6 +262,71 @@
             color: #cbd5e1;
         }
 
+        .settlement-sections {
+            display: grid;
+            gap: 14px;
+            margin: 16px 0;
+        }
+
+        .settlement-section {
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.48);
+            padding: 14px;
+        }
+
+        .settlement-section h3 {
+            margin: 0 0 10px;
+            color: #f8fafc;
+            font-size: 15px;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+
+        .settlement-lines {
+            display: grid;
+            gap: 7px;
+        }
+
+        .settlement-line {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 7px 0;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+            color: #cbd5e1;
+        }
+
+        .settlement-line:last-child {
+            border-bottom: 0;
+        }
+
+        .settlement-line strong {
+            color: #f8fafc;
+            white-space: nowrap;
+        }
+
+        .settlement-line.total {
+            margin-top: 4px;
+            padding: 10px 12px;
+            border: 1px solid rgba(34, 197, 94, 0.28);
+            border-radius: 8px;
+            background: rgba(22, 163, 74, 0.12);
+            color: #e5e7eb;
+            font-weight: 700;
+        }
+
+        .settlement-line.credit {
+            color: #bbf7d0;
+        }
+
+        .settlement-note {
+            margin: 10px 0 0;
+            color: #bbf7d0;
+            font-size: 12px;
+        }
+
         .print-mode-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1015,87 +1080,7 @@
             </div>
             <div id="wybrana-inwestycja-meta" class="linked-item"></div>
 
-        <div class="investment-summary-grid settlement-summary-grid">
-            <div class="summary-box">
-                <span>Robocizna netto</span>
-                <strong id="rozliczenie-robocizna-netto">0.00 PLN</strong>
-            </div>
-            <div class="summary-box">
-                <span>VAT robocizny</span>
-                <strong id="rozliczenie-robocizna-vat">0.00 PLN</strong>
-            </div>
-            <div class="summary-box">
-                <span>Robocizna brutto</span>
-                <strong id="rozliczenie-robocizna-brutto">0.00 PLN</strong>
-            </div>
-            <div class="summary-box">
-                <span>Zaliczki na robociznę</span>
-                <strong id="rozliczenie-zaliczki-robocizna">0.00 PLN</strong>
-            </div>
-            <div class="summary-box total">
-                <span>Pozostało za robociznę</span>
-                <strong id="rozliczenie-pozostalo-robocizna">0.00 PLN</strong>
-            </div>
-
-            <div class="summary-box">
-                <span>Materiały netto</span>
-                <strong id="rozliczenie-materialy-netto">0.00 PLN</strong>
-            </div>
-            <div class="summary-box">
-                <span>VAT materiałów</span>
-                <strong id="rozliczenie-materialy-vat">0.00 PLN</strong>
-            </div>
-            <div class="summary-box">
-                <span>Materiały brutto</span>
-                <strong id="rozliczenie-materialy-brutto">0.00 PLN</strong>
-            </div>
-            <div class="summary-box">
-                <span>Zaliczki na materiały</span>
-                <strong id="rozliczenie-zaliczki-materialy">0.00 PLN</strong>
-            </div>
-            <div class="summary-box total">
-                <span>Pozostało za materiały</span>
-                <strong id="rozliczenie-pozostalo-materialy">0.00 PLN</strong>
-            </div>
-
-            <div class="summary-box">
-                <span>Prace dodatkowe netto</span>
-                <strong id="rozliczenie-prace-netto">0.00 PLN</strong>
-            </div>
-            <div class="summary-box">
-                <span>VAT prac dodatkowych</span>
-                <strong id="rozliczenie-prace-vat">0.00 PLN</strong>
-            </div>
-            <div class="summary-box">
-                <span>Prace dodatkowe brutto</span>
-                <strong id="inwestycja-prace-dodatkowe-suma">0.00 PLN</strong>
-            </div>
-
-            <div class="summary-box">
-                <span>Razem netto</span>
-                <strong id="rozliczenie-razem-netto">0.00 PLN</strong>
-            </div>
-            <div class="summary-box">
-                <span>VAT razem</span>
-                <strong id="rozliczenie-vat-razem">0.00 PLN</strong>
-            </div>
-            <div class="summary-box">
-                <span>Razem brutto</span>
-                <strong id="rozliczenie-razem-brutto">0.00 PLN</strong>
-            </div>
-            <div class="summary-box">
-                <span>Zaliczki razem</span>
-                <strong id="inwestycja-suma-zaliczki">0.00 PLN</strong>
-            </div>
-            <div class="summary-box total">
-                <span>Pozostało do zapłaty</span>
-                <strong id="inwestycja-roznica">0.00 PLN</strong>
-            </div>
-            <div class="summary-box hidden">
-                <span>Suma kosztów</span>
-                <strong id="inwestycja-suma-koszty">0.00 PLN</strong>
-            </div>
-        </div>
+        <div id="rozliczenie-inwestycji" class="settlement-sections"></div>
 
         <div id="powiazane-kosztorysy" class="card inner-card"></div>
 
@@ -1678,6 +1663,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260613-21"></script>
+    <script src="script.js?v=20260613-22"></script>
 </body>
 </html>

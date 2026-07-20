@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-21-ELNET";
+const APP_VERSION = "2026.06.13-22-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -2396,6 +2396,9 @@ function wyliczRozliczenieInwestycji(inwestycjaId) {
     const razemNetto = robociznaNetto + materialyNetto + praceNetto;
     const vatRazem = robociznaVat + materialyVat + praceVat;
     const razemBrutto = robociznaBrutto + materialyBrutto + praceBrutto;
+    const nadwyzkaMaterialowa = Math.max(0, zaliczkiMaterialy - materialyBrutto);
+    const pozostaloMaterialy = Math.max(0, materialyBrutto - zaliczkiMaterialy);
+    const pokazPraceDodatkowe = praceBrutto > 0 || prace.some(p => Number(p.brutto || p.kwota || 0) > 0);
 
     return {
         powiazaneKosztorysy,
@@ -2411,16 +2414,82 @@ function wyliczRozliczenieInwestycji(inwestycjaId) {
         materialyVat,
         materialyBrutto,
         zaliczkiMaterialy,
-        pozostaloMaterialy: materialyBrutto - zaliczkiMaterialy,
+        pozostaloMaterialy,
+        nadwyzkaMaterialowa,
         praceNetto,
         praceVat,
         praceBrutto,
+        pokazPraceDodatkowe,
         razemNetto,
         vatRazem,
         razemBrutto,
         zaliczkiRazem,
         pozostaloDoZaplaty: razemBrutto - zaliczkiRazem
     };
+}
+
+function renderujRozliczenieInwestycjiWidok(rozliczenie) {
+    const container = document.getElementById("rozliczenie-inwestycji");
+    if (!container) return;
+
+    const materialyBalanceLabel = rozliczenie.nadwyzkaMaterialowa > 0
+        ? "Zostało z zaliczki na materiały"
+        : "Pozostało za materiały";
+    const materialyBalanceValue = rozliczenie.nadwyzkaMaterialowa > 0
+        ? rozliczenie.nadwyzkaMaterialowa
+        : rozliczenie.pozostaloMaterialy;
+    const praceHtml = rozliczenie.pokazPraceDodatkowe ? `
+        <section class="settlement-section">
+            <h3>Prace dodatkowe</h3>
+            <div class="settlement-lines">
+                <div class="settlement-line"><span>Prace dodatkowe netto</span><strong>${kwotaPanel(rozliczenie.praceNetto)}</strong></div>
+                <div class="settlement-line"><span>VAT prac dodatkowych</span><strong>${kwotaPanel(rozliczenie.praceVat)}</strong></div>
+                <div class="settlement-line total"><span>Prace dodatkowe brutto</span><strong>${kwotaPanel(rozliczenie.praceBrutto)}</strong></div>
+            </div>
+        </section>
+    ` : "";
+
+    container.innerHTML = `
+        <section class="settlement-section">
+            <h3>Robocizna</h3>
+            <div class="settlement-lines">
+                <div class="settlement-line"><span>Robocizna netto</span><strong>${kwotaPanel(rozliczenie.robociznaNetto)}</strong></div>
+                <div class="settlement-line"><span>VAT robocizny</span><strong>${kwotaPanel(rozliczenie.robociznaVat)}</strong></div>
+                <div class="settlement-line"><span>Robocizna brutto</span><strong>${kwotaPanel(rozliczenie.robociznaBrutto)}</strong></div>
+                <div class="settlement-line"><span>Zaliczki na robociznę</span><strong>${kwotaPanel(rozliczenie.zaliczkiRobocizna)}</strong></div>
+                <div class="settlement-line total"><span>Pozostało za robociznę</span><strong>${kwotaPanel(rozliczenie.pozostaloRobocizna)}</strong></div>
+            </div>
+        </section>
+
+        <section class="settlement-section">
+            <h3>Materiały</h3>
+            <div class="settlement-lines">
+                <div class="settlement-line"><span>Materiały netto</span><strong>${kwotaPanel(rozliczenie.materialyNetto)}</strong></div>
+                <div class="settlement-line"><span>VAT materiałów</span><strong>${kwotaPanel(rozliczenie.materialyVat)}</strong></div>
+                <div class="settlement-line"><span>Materiały brutto</span><strong>${kwotaPanel(rozliczenie.materialyBrutto)}</strong></div>
+                <div class="settlement-line"><span>Zaliczki na materiały</span><strong>${kwotaPanel(rozliczenie.zaliczkiMaterialy)}</strong></div>
+                <div class="settlement-line total ${rozliczenie.nadwyzkaMaterialowa > 0 ? "credit" : ""}">
+                    <span>${materialyBalanceLabel}</span><strong>${kwotaPanel(materialyBalanceValue)}</strong>
+                </div>
+            </div>
+        </section>
+
+        ${praceHtml}
+
+        <section class="settlement-section">
+            <h3>Podsumowanie końcowe</h3>
+            <div class="settlement-lines">
+                <div class="settlement-line"><span>Razem netto</span><strong>${kwotaPanel(rozliczenie.razemNetto)}</strong></div>
+                <div class="settlement-line"><span>VAT razem</span><strong>${kwotaPanel(rozliczenie.vatRazem)}</strong></div>
+                <div class="settlement-line"><span>Razem brutto</span><strong>${kwotaPanel(rozliczenie.razemBrutto)}</strong></div>
+                <div class="settlement-line"><span>Zaliczki razem</span><strong>${kwotaPanel(rozliczenie.zaliczkiRazem)}</strong></div>
+                <div class="settlement-line"><span>Robocizna do zapłaty</span><strong>${kwotaPanel(rozliczenie.pozostaloRobocizna)}</strong></div>
+                <div class="settlement-line credit"><span>Zostało z zaliczki na materiały</span><strong>-${kwotaPanel(rozliczenie.nadwyzkaMaterialowa)}</strong></div>
+                <div class="settlement-line total"><span>Pozostało do zapłaty</span><strong>${kwotaPanel(rozliczenie.pozostaloDoZaplaty)}</strong></div>
+            </div>
+            ${rozliczenie.nadwyzkaMaterialowa > 0 ? `<p class="settlement-note">Nadwyżka z zaliczki materiałowej obniża końcową kwotę do zapłaty.</p>` : ""}
+        </section>
+    `;
 }
 
 async function zapiszPowiazanieKosztorysuZInwestycja(kosztorysId, investmentId) {
@@ -4452,6 +4521,67 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
         `).join("")
         : `<tr><td colspan="6">Brak prac dodatkowych.</td></tr>`;
 
+    const materialyBalanceLabel = rozliczenie.nadwyzkaMaterialowa > 0
+        ? "Zostało z zaliczki na materiały"
+        : "Pozostało za materiały";
+    const materialyBalanceValue = rozliczenie.nadwyzkaMaterialowa > 0
+        ? rozliczenie.nadwyzkaMaterialowa
+        : rozliczenie.pozostaloMaterialy;
+    const praceSummaryHtml = rozliczenie.pokazPraceDodatkowe ? `
+        <section class="print-section avoid-break">
+            <h2>Prace dodatkowe</h2>
+            <table class="summary-table">
+                <tbody>
+                    <tr><td>Netto</td><td class="num">${kwota(rozliczenie.praceNetto)}</td></tr>
+                    <tr><td>VAT</td><td class="num">${kwota(rozliczenie.praceVat)}</td></tr>
+                    <tr class="total"><td>Brutto</td><td class="num">${kwota(rozliczenie.praceBrutto)}</td></tr>
+                </tbody>
+            </table>
+        </section>
+    ` : "";
+    const rozliczeniePrintHtml = `
+        <section class="print-section avoid-break">
+            <h2>Rozliczenie robocizny</h2>
+            <table class="summary-table">
+                <tbody>
+                    <tr><td>Netto</td><td class="num">${kwota(rozliczenie.robociznaNetto)}</td></tr>
+                    <tr><td>VAT</td><td class="num">${kwota(rozliczenie.robociznaVat)}</td></tr>
+                    <tr><td>Brutto</td><td class="num">${kwota(rozliczenie.robociznaBrutto)}</td></tr>
+                    <tr><td>Zaliczki na robociznę</td><td class="num">${kwota(rozliczenie.zaliczkiRobocizna)}</td></tr>
+                    <tr class="total"><td>Pozostało za robociznę</td><td class="num">${kwota(rozliczenie.pozostaloRobocizna)}</td></tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="print-section avoid-break">
+            <h2>Rozliczenie materiałów</h2>
+            <table class="summary-table">
+                <tbody>
+                    <tr><td>Netto</td><td class="num">${kwota(rozliczenie.materialyNetto)}</td></tr>
+                    <tr><td>VAT</td><td class="num">${kwota(rozliczenie.materialyVat)}</td></tr>
+                    <tr><td>Brutto</td><td class="num">${kwota(rozliczenie.materialyBrutto)}</td></tr>
+                    <tr><td>Zaliczki na materiały</td><td class="num">${kwota(rozliczenie.zaliczkiMaterialy)}</td></tr>
+                    <tr class="total"><td>${materialyBalanceLabel}</td><td class="num">${kwota(materialyBalanceValue)}</td></tr>
+                </tbody>
+            </table>
+        </section>
+        ${praceSummaryHtml}
+        <section class="print-section avoid-break final-summary">
+            <h2>Podsumowanie końcowe</h2>
+            <table class="summary-table">
+                <tbody>
+                    <tr><td>Razem netto</td><td class="num">${kwota(rozliczenie.razemNetto)}</td></tr>
+                    <tr><td>VAT razem</td><td class="num">${kwota(rozliczenie.vatRazem)}</td></tr>
+                    <tr><td>Razem brutto</td><td class="num">${kwota(rozliczenie.razemBrutto)}</td></tr>
+                    <tr><td>Zaliczki razem</td><td class="num">${kwota(rozliczenie.zaliczkiRazem)}</td></tr>
+                    <tr><td>Robocizna do zapłaty</td><td class="num">${kwota(rozliczenie.pozostaloRobocizna)}</td></tr>
+                    <tr><td>Zostało z zaliczki na materiały</td><td class="num">-${kwota(rozliczenie.nadwyzkaMaterialowa)}</td></tr>
+                    <tr class="total"><td>Pozostało do zapłaty</td><td class="num">${kwota(rozliczenie.pozostaloDoZaplaty)}</td></tr>
+                </tbody>
+            </table>
+            ${rozliczenie.nadwyzkaMaterialowa > 0 ? `<p class="print-note">Nadwyżka z zaliczki materiałowej pomniejsza końcową kwotę do zapłaty.</p>` : ""}
+        </section>
+    `;
+
     const szczegolyHtml = szczegolowy ? `
         <section class="print-section">
             <h2>Pozycje kosztorysów</h2>
@@ -4474,13 +4604,13 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
             </table>
         </section>
 
-        <section class="print-section avoid-break">
+        ${rozliczenie.pokazPraceDodatkowe ? `<section class="print-section avoid-break">
             <h2>Prace dodatkowe</h2>
             <table>
                 <thead><tr><th>Data</th><th>Nazwa</th><th>Netto</th><th>VAT</th><th>Brutto</th><th>Opis</th></tr></thead>
                 <tbody>${praceRows}</tbody>
             </table>
-        </section>
+        </section>` : ""}
     ` : "";
 
     const html = `
@@ -4493,10 +4623,10 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
                 @page { size: A4 portrait; margin: 12mm; @bottom-right { content: "Strona " counter(page); } }
                 * { box-sizing: border-box; }
                 body { margin: 0; color: #111827; background: #fff; font-family: Arial, sans-serif; font-size: 11px; line-height: 1.45; }
-                .print-header { border-bottom: 2px solid #111827; padding-bottom: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; gap: 24px; }
-                .brand { font-size: 22px; font-weight: 800; letter-spacing: 0; }
-                .doc-title { margin: 4px 0 0; font-size: 18px; }
-                .print-meta { text-align: right; color: #4b5563; font-size: 10px; }
+                .print-header { display: grid; grid-template-columns: 1fr 1.4fr 1fr; align-items: start; gap: 14px; border-bottom: 2px solid #111827; padding: 0 0 12px; margin-bottom: 18px; }
+                .brand { font-size: 22px; font-weight: 800; letter-spacing: 0; line-height: 1.1; }
+                .doc-title { margin: 0; text-align: center; font-size: 18px; line-height: 1.2; font-weight: 800; }
+                .print-meta { text-align: right; color: #4b5563; font-size: 10px; line-height: 1.45; }
                 .print-section { margin-top: 16px; break-inside: avoid; page-break-inside: avoid; }
                 .print-section h2 { margin: 0 0 8px; padding-bottom: 4px; border-bottom: 1px solid #d1d5db; font-size: 14px; }
                 .print-section h3 { margin: 10px 0 6px; font-size: 12px; }
@@ -4510,21 +4640,20 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
                 .num { text-align: right; white-space: nowrap; }
                 .summary-table td { border-color: #cbd5e1; }
                 .summary-table .total td { background: #eef2ff; font-weight: 800; font-size: 12px; }
+                .final-summary { border: 1px solid #c7d2fe; padding: 8px; background: #f8fafc; }
+                .print-note { margin: 8px 0 0; color: #166534; font-weight: 700; }
                 .avoid-break { break-inside: avoid; page-break-inside: avoid; }
-                .footer-note { position: fixed; bottom: -7mm; left: 0; color: #6b7280; font-size: 9px; }
+                .footer-note { margin-top: 18px; color: #6b7280; font-size: 9px; }
                 @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
             </style>
         </head>
         <body>
-            <div class="footer-note">EL-Net — data wydruku: ${esc(dataWydruku)}</div>
             <header class="print-header">
-                <div>
-                    <div class="brand">EL-Net</div>
-                    <div class="doc-title">Rozliczenie inwestycji</div>
-                </div>
+                <div class="brand">EL-Net</div>
+                <div class="doc-title">Rozliczenie inwestycji</div>
                 <div class="print-meta">
                     <div>${szczegolowy ? "Wydruk szczegółowy" : "Wydruk bez szczegółów"}</div>
-                    <div>${esc(dataWydruku)}</div>
+                    <div>Data: ${esc(dataWydruku)}</div>
                 </div>
             </header>
 
@@ -4548,37 +4677,10 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
                 </table>
             </section>
 
-            <section class="print-section avoid-break">
-                <h2>Podsumowanie finansowe</h2>
-                <table class="summary-table">
-                    <tbody>
-                        <tr class="total"><td colspan="2">ROBOCIZNA</td></tr>
-                        <tr><td>Netto</td><td class="num">${kwota(rozliczenie.robociznaNetto)}</td></tr>
-                        <tr><td>VAT</td><td class="num">${kwota(rozliczenie.robociznaVat)}</td></tr>
-                        <tr><td>Brutto</td><td class="num">${kwota(rozliczenie.robociznaBrutto)}</td></tr>
-                        <tr><td>Zaliczki na robociznę</td><td class="num">${kwota(rozliczenie.zaliczkiRobocizna)}</td></tr>
-                        <tr><td>Pozostało za robociznę</td><td class="num">${kwota(rozliczenie.pozostaloRobocizna)}</td></tr>
-                        <tr class="total"><td colspan="2">MATERIAŁY</td></tr>
-                        <tr><td>Netto</td><td class="num">${kwota(rozliczenie.materialyNetto)}</td></tr>
-                        <tr><td>VAT</td><td class="num">${kwota(rozliczenie.materialyVat)}</td></tr>
-                        <tr><td>Brutto</td><td class="num">${kwota(rozliczenie.materialyBrutto)}</td></tr>
-                        <tr><td>Zaliczki na materiały</td><td class="num">${kwota(rozliczenie.zaliczkiMaterialy)}</td></tr>
-                        <tr><td>Pozostało za materiały</td><td class="num">${kwota(rozliczenie.pozostaloMaterialy)}</td></tr>
-                        <tr class="total"><td colspan="2">PRACE DODATKOWE</td></tr>
-                        <tr><td>Netto</td><td class="num">${kwota(rozliczenie.praceNetto)}</td></tr>
-                        <tr><td>VAT</td><td class="num">${kwota(rozliczenie.praceVat)}</td></tr>
-                        <tr><td>Brutto</td><td class="num">${kwota(rozliczenie.praceBrutto)}</td></tr>
-                        <tr class="total"><td colspan="2">PODSUMOWANIE KOŃCOWE</td></tr>
-                        <tr><td>Razem netto</td><td class="num">${kwota(rozliczenie.razemNetto)}</td></tr>
-                        <tr><td>VAT razem</td><td class="num">${kwota(rozliczenie.vatRazem)}</td></tr>
-                        <tr><td>Razem brutto</td><td class="num">${kwota(rozliczenie.razemBrutto)}</td></tr>
-                        <tr><td>Zaliczki razem</td><td class="num">${kwota(rozliczenie.zaliczkiRazem)}</td></tr>
-                        <tr class="total"><td>Pozostało do zapłaty</td><td class="num">${kwota(rozliczenie.pozostaloDoZaplaty)}</td></tr>
-                    </tbody>
-                </table>
-            </section>
+            ${rozliczeniePrintHtml}
 
             ${szczegolyHtml}
+            <div class="footer-note">EL-Net — data wydruku: ${esc(dataWydruku)}</div>
         </body>
         </html>
     `;
@@ -5643,31 +5745,7 @@ function renderujPanelInwestycji() {
     }
 
     const rozliczenie = wyliczRozliczenieInwestycji(aktywnaInwestycjaId);
-
-    const setText = (id, value) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = kwotaPanel(value);
-    };
-
-    setText("rozliczenie-robocizna-netto", rozliczenie.robociznaNetto);
-    setText("rozliczenie-robocizna-vat", rozliczenie.robociznaVat);
-    setText("rozliczenie-robocizna-brutto", rozliczenie.robociznaBrutto);
-    setText("rozliczenie-zaliczki-robocizna", rozliczenie.zaliczkiRobocizna);
-    setText("rozliczenie-pozostalo-robocizna", rozliczenie.pozostaloRobocizna);
-    setText("rozliczenie-materialy-netto", rozliczenie.materialyNetto);
-    setText("rozliczenie-materialy-vat", rozliczenie.materialyVat);
-    setText("rozliczenie-materialy-brutto", rozliczenie.materialyBrutto);
-    setText("rozliczenie-zaliczki-materialy", rozliczenie.zaliczkiMaterialy);
-    setText("rozliczenie-pozostalo-materialy", rozliczenie.pozostaloMaterialy);
-    setText("rozliczenie-prace-netto", rozliczenie.praceNetto);
-    setText("rozliczenie-prace-vat", rozliczenie.praceVat);
-    setText("inwestycja-prace-dodatkowe-suma", rozliczenie.praceBrutto);
-    setText("rozliczenie-razem-netto", rozliczenie.razemNetto);
-    setText("rozliczenie-vat-razem", rozliczenie.vatRazem);
-    setText("rozliczenie-razem-brutto", rozliczenie.razemBrutto);
-    setText("inwestycja-suma-zaliczki", rozliczenie.zaliczkiRazem);
-    setText("inwestycja-suma-koszty", rozliczenie.materialyBrutto);
-    setText("inwestycja-roznica", rozliczenie.pozostaloDoZaplaty);
+    renderujRozliczenieInwestycjiWidok(rozliczenie);
 
     renderujTabeleZaliczek(rozliczenie.zaliczki);
     renderujTabeleKosztow(rozliczenie.koszty);
@@ -5677,19 +5755,19 @@ function renderujPanelInwestycji() {
 }
 
 function renderujPraceDodatkoweInwestycji() {
-    const containerSum = document.getElementById("inwestycja-prace-dodatkowe-suma");
     const tbody = document.getElementById("tabela-prace-dodatkowe");
-    if (!containerSum || !tbody) return;
+    if (!tbody) return;
+    const section = tbody.closest(".full-row");
 
     const related = inwestycjePraceDodatkowe.filter(p => String(p.inwestycja_id) === String(aktywnaInwestycjaId));
-    if (!related.length) {
-        containerSum.textContent = `0.00 PLN`;
+    const sumBrutto = related.reduce((s, p) => s + Number(p.brutto || p.kwota || 0), 0);
+    if (!related.length || sumBrutto <= 0) {
+        if (section) section.classList.add("hidden");
         tbody.innerHTML = `<tr><td colspan="8" class="empty-row">Brak prac dodatkowych.</td></tr>`;
         return;
     }
 
-    const sumBrutto = related.reduce((s, p) => s + Number(p.brutto || p.kwota || 0), 0);
-    containerSum.textContent = `${sumBrutto.toFixed(2)} PLN`;
+    if (section) section.classList.remove("hidden");
 
     tbody.innerHTML = related.map(p => {
         const akcja = rolaUsera === "admin"
