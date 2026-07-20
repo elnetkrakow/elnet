@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-20-ELNET";
+const APP_VERSION = "2026.06.13-21-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -454,6 +454,18 @@ function podepnijZdarzenia() {
 
     const kosztData = document.getElementById("koszt-data");
     if (kosztData) kosztData.value = dzisiaj;
+
+    const kosztNetto = document.getElementById("koszt-netto");
+    if (kosztNetto) kosztNetto.addEventListener("input", () => przeliczFormularzKosztu("netto"));
+
+    const kosztBrutto = document.getElementById("koszt-brutto");
+    if (kosztBrutto) kosztBrutto.addEventListener("input", () => przeliczFormularzKosztu("brutto"));
+
+    const kosztVatRate = document.getElementById("koszt-vat-rate");
+    if (kosztVatRate) kosztVatRate.addEventListener("change", () => {
+        const source = document.getElementById("koszt-brutto")?.value ? "brutto" : "netto";
+        przeliczFormularzKosztu(source);
+    });
 
     const btnZapiszMagazyn = document.getElementById("btn-zapisz-magazyn");
     if (btnZapiszMagazyn) btnZapiszMagazyn.addEventListener("click", zapiszMagazyn);
@@ -2301,6 +2313,114 @@ function pozycjeKosztorysu(kosztorys) {
         console.error("Błąd odczytu pozycji kosztorysu:", err);
         return [];
     }
+}
+
+function kwotaPanel(value) {
+    return `${Number(value || 0).toFixed(2)} PLN`;
+}
+
+function normalizujPrzeznaczenieZaliczki(value) {
+    const raw = String(value || "").toLowerCase().trim();
+    if (["materialy", "materiały", "material", "materiały"].includes(raw)) return "materialy";
+    if (["robocizna", "praca"].includes(raw)) return "robocizna";
+    return "";
+}
+
+function etykietaPrzeznaczeniaZaliczki(value) {
+    const purpose = normalizujPrzeznaczenieZaliczki(value);
+    if (purpose === "materialy") return "Materiały";
+    if (purpose === "robocizna") return "Robocizna";
+    return "Nieprzypisana";
+}
+
+function pobierzPrzeznaczenieZaliczki(zaliczka) {
+    return normalizujPrzeznaczenieZaliczki(zaliczka?.purpose || zaliczka?.typ_zaliczki || zaliczka?.przeznaczenie);
+}
+
+function pobierzVatKosztu(value) {
+    const raw = String(value ?? "").toLowerCase().trim();
+    if (!raw || raw === "zw" || raw === "zwolniony" || raw === "nie dotyczy" || raw === "nieustalony") return null;
+    const parsed = Number(raw.replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function wyliczKosztMaterialowy(koszt) {
+    const vatRate = pobierzVatKosztu(koszt?.vat_rate);
+    const hasBrutto = koszt?.brutto !== undefined && koszt?.brutto !== null && koszt?.brutto !== "";
+    const hasNetto = koszt?.netto !== undefined && koszt?.netto !== null && koszt?.netto !== "";
+    const brutto = hasBrutto ? Number(koszt.brutto || 0) : Number(koszt?.kwota || 0);
+    const netto = hasNetto ? Number(koszt.netto || 0) : (vatRate === null ? null : brutto / (1 + vatRate / 100));
+    const vatAmount = koszt?.vat_amount !== undefined && koszt?.vat_amount !== null && koszt?.vat_amount !== ""
+        ? Number(koszt.vat_amount || 0)
+        : (netto === null ? null : brutto - netto);
+
+    return {
+        netto,
+        vatRate,
+        vatAmount,
+        brutto,
+        vatLabel: vatRate === null ? "Nieustalony" : `${vatRate}%`
+    };
+}
+
+function wyliczRozliczenieInwestycji(inwestycjaId) {
+    const powiazaneKosztorysy = kosztorysy.filter(k => kosztorysPasujeDoInwestycji(k, inwestycjaId));
+    const zaliczki = inwestycjeZaliczki.filter(z => String(z.inwestycja_id) === String(inwestycjaId));
+    const koszty = inwestycjeKoszty.filter(k => String(k.inwestycja_id) === String(inwestycjaId));
+    const prace = inwestycjePraceDodatkowe.filter(p => String(p.inwestycja_id) === String(inwestycjaId));
+
+    const robociznaNetto = powiazaneKosztorysy.reduce((sum, k) => sum + Number(k.netto || 0), 0);
+    const robociznaBrutto = powiazaneKosztorysy.reduce((sum, k) => sum + Number(k.brutto || 0), 0);
+    const robociznaVat = Math.max(0, robociznaBrutto - robociznaNetto);
+
+    const kosztyWyliczone = koszty.map(k => ({ ...k, _kwoty: wyliczKosztMaterialowy(k) }));
+    const materialyNetto = kosztyWyliczone.reduce((sum, k) => sum + Number(k._kwoty.netto || 0), 0);
+    const materialyVat = kosztyWyliczone.reduce((sum, k) => sum + Number(k._kwoty.vatAmount || 0), 0);
+    const materialyBrutto = kosztyWyliczone.reduce((sum, k) => sum + Number(k._kwoty.brutto || 0), 0);
+
+    const praceNetto = prace.reduce((sum, p) => sum + Number(p.netto || 0), 0);
+    const praceBrutto = prace.reduce((sum, p) => sum + Number(p.brutto || p.kwota || 0), 0);
+    const praceVat = prace.reduce((sum, p) => {
+        if (p.vat_amount !== undefined && p.vat_amount !== null && p.vat_amount !== "") return sum + Number(p.vat_amount || 0);
+        return sum + Math.max(0, Number(p.brutto || 0) - Number(p.netto || 0));
+    }, 0);
+
+    const zaliczkiMaterialy = zaliczki
+        .filter(z => pobierzPrzeznaczenieZaliczki(z) === "materialy")
+        .reduce((sum, z) => sum + Number(z.kwota || 0), 0);
+    const zaliczkiRobocizna = zaliczki
+        .filter(z => pobierzPrzeznaczenieZaliczki(z) === "robocizna")
+        .reduce((sum, z) => sum + Number(z.kwota || 0), 0);
+    const zaliczkiRazem = zaliczki.reduce((sum, z) => sum + Number(z.kwota || 0), 0);
+
+    const razemNetto = robociznaNetto + materialyNetto + praceNetto;
+    const vatRazem = robociznaVat + materialyVat + praceVat;
+    const razemBrutto = robociznaBrutto + materialyBrutto + praceBrutto;
+
+    return {
+        powiazaneKosztorysy,
+        zaliczki,
+        koszty: kosztyWyliczone,
+        prace,
+        robociznaNetto,
+        robociznaVat,
+        robociznaBrutto,
+        zaliczkiRobocizna,
+        pozostaloRobocizna: robociznaBrutto - zaliczkiRobocizna,
+        materialyNetto,
+        materialyVat,
+        materialyBrutto,
+        zaliczkiMaterialy,
+        pozostaloMaterialy: materialyBrutto - zaliczkiMaterialy,
+        praceNetto,
+        praceVat,
+        praceBrutto,
+        razemNetto,
+        vatRazem,
+        razemBrutto,
+        zaliczkiRazem,
+        pozostaloDoZaplaty: razemBrutto - zaliczkiRazem
+    };
 }
 
 async function zapiszPowiazanieKosztorysuZInwestycja(kosztorysId, investmentId) {
@@ -4236,32 +4356,27 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
 
     const szczegolowy = tryb === "szczegolowy";
     const { dataStart, dataKoniec } = pobierzDatyInwestycji(inwestycja);
-    const powiazaneKosztorysy = kosztorysy.filter(k => kosztorysPasujeDoInwestycji(k, aktywnaInwestycjaId));
-    const zaliczki = inwestycjeZaliczki.filter(z => String(z.inwestycja_id) === String(aktywnaInwestycjaId));
-    const koszty = inwestycjeKoszty.filter(k => String(k.inwestycja_id) === String(aktywnaInwestycjaId));
-    const prace = inwestycjePraceDodatkowe.filter(p => String(p.inwestycja_id) === String(aktywnaInwestycjaId));
+    const rozliczenie = wyliczRozliczenieInwestycji(aktywnaInwestycjaId);
+    const powiazaneKosztorysy = rozliczenie.powiazaneKosztorysy;
+    const zaliczki = rozliczenie.zaliczki;
+    const koszty = rozliczenie.koszty;
+    const prace = rozliczenie.prace;
 
     const kwota = value => `${Number(value || 0).toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN`;
     const dataWydruku = new Date().toLocaleString("pl-PL");
     const termin = dataStart && dataKoniec && dataKoniec !== dataStart ? `${dataStart} – ${dataKoniec}` : (dataStart || "-");
-    const robociznaBrutto = powiazaneKosztorysy.reduce((sum, k) => sum + Number(k.brutto || 0), 0);
-    const sumaKosztow = koszty.reduce((sum, k) => sum + Number(k.kwota || 0), 0);
-    const sumaPraceBrutto = prace.reduce((sum, p) => sum + Number(p.brutto || p.kwota || 0), 0);
-    const sumaZaliczek = zaliczki.reduce((sum, z) => sum + Number(z.kwota || 0), 0);
-    const razemDoRozliczenia = robociznaBrutto + sumaKosztow + sumaPraceBrutto;
-    const pozostaloDoZaplaty = razemDoRozliczenia - sumaZaliczek;
-    const bilansGotowki = sumaZaliczek - sumaKosztow;
-
     const kosztorysyRows = powiazaneKosztorysy.length
         ? powiazaneKosztorysy.map(k => `
             <tr>
                 <td>${esc(k.nazwa || "Kosztorys")}</td>
                 <td>${esc(k.data || "-")}</td>
+                <td class="num">${kwota(k.netto)}</td>
+                <td class="num">${kwota(Math.max(0, Number(k.brutto || 0) - Number(k.netto || 0)))}</td>
                 <td class="num">${kwota(k.brutto)}</td>
                 <td>${esc(statusKosztorysuLabel(k.status))}</td>
             </tr>
         `).join("")
-        : `<tr><td colspan="4">Brak powiązanych kosztorysów.</td></tr>`;
+        : `<tr><td colspan="6">Brak powiązanych kosztorysów.</td></tr>`;
 
     const pozycjeKosztorysowHtml = szczegolowy
         ? powiazaneKosztorysy.map(k => {
@@ -4297,15 +4412,20 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
         : "";
 
     const kosztyRows = koszty.length
-        ? koszty.map(k => `
-            <tr>
-                <td>${esc(k.data || "-")}</td>
-                <td class="num">${kwota(k.kwota)}</td>
-                <td>${esc(k.kategoria || "-")}</td>
-                <td>${esc(k.opis || "")}</td>
-            </tr>
-        `).join("")
-        : `<tr><td colspan="4">Brak kosztów materiałowych.</td></tr>`;
+        ? koszty.map(k => {
+            const kwoty = k._kwoty || wyliczKosztMaterialowy(k);
+            return `
+                <tr>
+                    <td>${esc(k.data || "-")}</td>
+                    <td class="num">${kwoty.netto === null ? "Nieustalone" : kwota(kwoty.netto)}</td>
+                    <td class="num">${kwoty.vatAmount === null ? "Nieustalony" : `${esc(kwoty.vatLabel)} / ${kwota(kwoty.vatAmount)}`}</td>
+                    <td class="num">${kwota(kwoty.brutto)}</td>
+                    <td>${esc(k.kategoria || "-")}</td>
+                    <td>${esc(k.opis || "")}</td>
+                </tr>
+            `;
+        }).join("")
+        : `<tr><td colspan="6">Brak kosztów materiałowych.</td></tr>`;
 
     const zaliczkiRows = zaliczki.length
         ? zaliczki.map(z => `
@@ -4313,21 +4433,24 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
                 <td>${esc(z.data || "-")}</td>
                 <td class="num">${kwota(z.kwota)}</td>
                 <td>${esc(z.sposob_platnosci || z.platnosc || "-")}</td>
+                <td>${esc(etykietaPrzeznaczeniaZaliczki(pobierzPrzeznaczenieZaliczki(z)))}</td>
                 <td>${esc(z.opis || "")}</td>
             </tr>
         `).join("")
-        : `<tr><td colspan="4">Brak zaliczek.</td></tr>`;
+        : `<tr><td colspan="5">Brak zaliczek.</td></tr>`;
 
     const praceRows = prace.length
         ? prace.map(p => `
             <tr>
                 <td>${esc(p.data || "-")}</td>
                 <td>${esc(p.nazwa || "-")}</td>
+                <td class="num">${kwota(p.netto)}</td>
+                <td class="num">${kwota(p.vat_amount ?? (Number(p.brutto || 0) - Number(p.netto || 0)))}</td>
                 <td class="num">${kwota(p.brutto || p.kwota)}</td>
                 <td>${esc(p.opis || "")}</td>
             </tr>
         `).join("")
-        : `<tr><td colspan="4">Brak prac dodatkowych.</td></tr>`;
+        : `<tr><td colspan="6">Brak prac dodatkowych.</td></tr>`;
 
     const szczegolyHtml = szczegolowy ? `
         <section class="print-section">
@@ -4338,7 +4461,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
         <section class="print-section avoid-break">
             <h2>Koszty materiałowe</h2>
             <table>
-                <thead><tr><th>Data</th><th>Kwota</th><th>Kategoria</th><th>Opis</th></tr></thead>
+                <thead><tr><th>Data</th><th>Netto</th><th>VAT</th><th>Brutto</th><th>Kategoria</th><th>Opis</th></tr></thead>
                 <tbody>${kosztyRows}</tbody>
             </table>
         </section>
@@ -4346,7 +4469,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
         <section class="print-section avoid-break">
             <h2>Zaliczki</h2>
             <table>
-                <thead><tr><th>Data</th><th>Kwota</th><th>Płatność</th><th>Opis</th></tr></thead>
+                <thead><tr><th>Data</th><th>Kwota</th><th>Płatność</th><th>Przeznaczenie</th><th>Opis</th></tr></thead>
                 <tbody>${zaliczkiRows}</tbody>
             </table>
         </section>
@@ -4354,7 +4477,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
         <section class="print-section avoid-break">
             <h2>Prace dodatkowe</h2>
             <table>
-                <thead><tr><th>Data</th><th>Nazwa</th><th>Kwota</th><th>Opis</th></tr></thead>
+                <thead><tr><th>Data</th><th>Nazwa</th><th>Netto</th><th>VAT</th><th>Brutto</th><th>Opis</th></tr></thead>
                 <tbody>${praceRows}</tbody>
             </table>
         </section>
@@ -4420,7 +4543,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
             <section class="print-section avoid-break">
                 <h2>Powiązane kosztorysy</h2>
                 <table>
-                    <thead><tr><th>Nazwa</th><th>Data</th><th>Brutto</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Nazwa</th><th>Data</th><th>Netto</th><th>VAT</th><th>Brutto</th><th>Status</th></tr></thead>
                     <tbody>${kosztorysyRows}</tbody>
                 </table>
             </section>
@@ -4429,13 +4552,28 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
                 <h2>Podsumowanie finansowe</h2>
                 <table class="summary-table">
                     <tbody>
-                        <tr><td>Robocizna brutto</td><td class="num">${kwota(robociznaBrutto)}</td></tr>
-                        <tr><td>Koszty materiałowe</td><td class="num">${kwota(sumaKosztow)}</td></tr>
-                        <tr><td>Prace dodatkowe</td><td class="num">${kwota(sumaPraceBrutto)}</td></tr>
-                        <tr class="total"><td>Razem do rozliczenia</td><td class="num">${kwota(razemDoRozliczenia)}</td></tr>
-                        <tr><td>Zaliczki</td><td class="num">${kwota(sumaZaliczek)}</td></tr>
-                        <tr class="total"><td>Pozostało do zapłaty</td><td class="num">${kwota(pozostaloDoZaplaty)}</td></tr>
-                        <tr><td>Bilans gotówki</td><td class="num">${kwota(bilansGotowki)}</td></tr>
+                        <tr class="total"><td colspan="2">ROBOCIZNA</td></tr>
+                        <tr><td>Netto</td><td class="num">${kwota(rozliczenie.robociznaNetto)}</td></tr>
+                        <tr><td>VAT</td><td class="num">${kwota(rozliczenie.robociznaVat)}</td></tr>
+                        <tr><td>Brutto</td><td class="num">${kwota(rozliczenie.robociznaBrutto)}</td></tr>
+                        <tr><td>Zaliczki na robociznę</td><td class="num">${kwota(rozliczenie.zaliczkiRobocizna)}</td></tr>
+                        <tr><td>Pozostało za robociznę</td><td class="num">${kwota(rozliczenie.pozostaloRobocizna)}</td></tr>
+                        <tr class="total"><td colspan="2">MATERIAŁY</td></tr>
+                        <tr><td>Netto</td><td class="num">${kwota(rozliczenie.materialyNetto)}</td></tr>
+                        <tr><td>VAT</td><td class="num">${kwota(rozliczenie.materialyVat)}</td></tr>
+                        <tr><td>Brutto</td><td class="num">${kwota(rozliczenie.materialyBrutto)}</td></tr>
+                        <tr><td>Zaliczki na materiały</td><td class="num">${kwota(rozliczenie.zaliczkiMaterialy)}</td></tr>
+                        <tr><td>Pozostało za materiały</td><td class="num">${kwota(rozliczenie.pozostaloMaterialy)}</td></tr>
+                        <tr class="total"><td colspan="2">PRACE DODATKOWE</td></tr>
+                        <tr><td>Netto</td><td class="num">${kwota(rozliczenie.praceNetto)}</td></tr>
+                        <tr><td>VAT</td><td class="num">${kwota(rozliczenie.praceVat)}</td></tr>
+                        <tr><td>Brutto</td><td class="num">${kwota(rozliczenie.praceBrutto)}</td></tr>
+                        <tr class="total"><td colspan="2">PODSUMOWANIE KOŃCOWE</td></tr>
+                        <tr><td>Razem netto</td><td class="num">${kwota(rozliczenie.razemNetto)}</td></tr>
+                        <tr><td>VAT razem</td><td class="num">${kwota(rozliczenie.vatRazem)}</td></tr>
+                        <tr><td>Razem brutto</td><td class="num">${kwota(rozliczenie.razemBrutto)}</td></tr>
+                        <tr><td>Zaliczki razem</td><td class="num">${kwota(rozliczenie.zaliczkiRazem)}</td></tr>
+                        <tr class="total"><td>Pozostało do zapłaty</td><td class="num">${kwota(rozliczenie.pozostaloDoZaplaty)}</td></tr>
                     </tbody>
                 </table>
             </section>
@@ -5504,19 +5642,35 @@ function renderujPanelInwestycji() {
         `;
     }
 
-    const zaliczkiLista = inwestycjeZaliczki.filter(z => String(z.inwestycja_id) === String(aktywnaInwestycjaId));
-    const kosztyLista = inwestycjeKoszty.filter(k => String(k.inwestycja_id) === String(aktywnaInwestycjaId));
+    const rozliczenie = wyliczRozliczenieInwestycji(aktywnaInwestycjaId);
 
-    const sumaZaliczek = zaliczkiLista.reduce((s, z) => s + Number(z.kwota || 0), 0);
-    const sumaKosztow = kosztyLista.reduce((s, k) => s + Number(k.kwota || 0), 0);
-    const roznica = sumaZaliczek - sumaKosztow;
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = kwotaPanel(value);
+    };
 
-    document.getElementById("inwestycja-suma-zaliczki").textContent = `${sumaZaliczek.toFixed(2)} PLN`;
-    document.getElementById("inwestycja-suma-koszty").textContent = `${sumaKosztow.toFixed(2)} PLN`;
-    document.getElementById("inwestycja-roznica").textContent = `${roznica.toFixed(2)} PLN`;
+    setText("rozliczenie-robocizna-netto", rozliczenie.robociznaNetto);
+    setText("rozliczenie-robocizna-vat", rozliczenie.robociznaVat);
+    setText("rozliczenie-robocizna-brutto", rozliczenie.robociznaBrutto);
+    setText("rozliczenie-zaliczki-robocizna", rozliczenie.zaliczkiRobocizna);
+    setText("rozliczenie-pozostalo-robocizna", rozliczenie.pozostaloRobocizna);
+    setText("rozliczenie-materialy-netto", rozliczenie.materialyNetto);
+    setText("rozliczenie-materialy-vat", rozliczenie.materialyVat);
+    setText("rozliczenie-materialy-brutto", rozliczenie.materialyBrutto);
+    setText("rozliczenie-zaliczki-materialy", rozliczenie.zaliczkiMaterialy);
+    setText("rozliczenie-pozostalo-materialy", rozliczenie.pozostaloMaterialy);
+    setText("rozliczenie-prace-netto", rozliczenie.praceNetto);
+    setText("rozliczenie-prace-vat", rozliczenie.praceVat);
+    setText("inwestycja-prace-dodatkowe-suma", rozliczenie.praceBrutto);
+    setText("rozliczenie-razem-netto", rozliczenie.razemNetto);
+    setText("rozliczenie-vat-razem", rozliczenie.vatRazem);
+    setText("rozliczenie-razem-brutto", rozliczenie.razemBrutto);
+    setText("inwestycja-suma-zaliczki", rozliczenie.zaliczkiRazem);
+    setText("inwestycja-suma-koszty", rozliczenie.materialyBrutto);
+    setText("inwestycja-roznica", rozliczenie.pozostaloDoZaplaty);
 
-    renderujTabeleZaliczek(zaliczkiLista);
-    renderujTabeleKosztow(kosztyLista);
+    renderujTabeleZaliczek(rozliczenie.zaliczki);
+    renderujTabeleKosztow(rozliczenie.koszty);
     renderujPowiazaneKosztorysyInwestycji();
     renderujPraceDodatkoweInwestycji();
     renderujSelectPracDodatkowych();
@@ -5534,7 +5688,7 @@ function renderujPraceDodatkoweInwestycji() {
         return;
     }
 
-    const sumBrutto = related.reduce((s, p) => s + Number(p.brutto || 0), 0);
+    const sumBrutto = related.reduce((s, p) => s + Number(p.brutto || p.kwota || 0), 0);
     containerSum.textContent = `${sumBrutto.toFixed(2)} PLN`;
 
     tbody.innerHTML = related.map(p => {
@@ -5547,7 +5701,7 @@ function renderujPraceDodatkoweInwestycji() {
                 <td>${esc(p.nazwa || "")}</td>
                 <td>${Number(p.ilosc || 0)}</td>
                 <td>${Number(p.cena_netto || 0).toFixed(2)} PLN</td>
-                <td>${Number(p.vat || 0)}%</td>
+                <td>${Number(p.vat || 0)}% / ${Number((p.vat_amount ?? (Number(p.brutto || 0) - Number(p.netto || 0))) || 0).toFixed(2)} PLN</td>
                 <td>${Number(p.netto || 0).toFixed(2)} PLN</td>
                 <td>${Number(p.brutto || 0).toFixed(2)} PLN</td>
                 <td>${esc(p.opis || "")}</td>
@@ -5749,10 +5903,12 @@ function anulujEdycjeZaliczki() {
     if (cancel) cancel.classList.add("hidden");
     const data = document.getElementById("zaliczka-data");
     const kwota = document.getElementById("zaliczka-kwota");
+    const purpose = document.getElementById("zaliczka-purpose");
     const platnosc = document.getElementById("zaliczka-platnosc");
     const opis = document.getElementById("zaliczka-opis");
     if (data) data.value = today;
     if (kwota) kwota.value = "";
+    if (purpose) purpose.value = "";
     if (platnosc) platnosc.selectedIndex = 0;
     if (opis) opis.value = "";
 }
@@ -5771,10 +5927,16 @@ function anulujEdycjeKosztu() {
     if (cancel) cancel.classList.add("hidden");
     const data = document.getElementById("koszt-data");
     const kwota = document.getElementById("koszt-kwota");
+    const netto = document.getElementById("koszt-netto");
+    const vatRate = document.getElementById("koszt-vat-rate");
+    const brutto = document.getElementById("koszt-brutto");
     const kategoria = document.getElementById("koszt-kategoria");
     const opis = document.getElementById("koszt-opis");
     if (data) data.value = today;
     if (kwota) kwota.value = "";
+    if (netto) netto.value = "";
+    if (vatRate) vatRate.value = "23";
+    if (brutto) brutto.value = "";
     if (kategoria) kategoria.selectedIndex = 0;
     if (opis) opis.value = "";
 }
@@ -5797,6 +5959,7 @@ window.edytujZaliczke = function(id) {
     if (cancel) cancel.classList.remove("hidden");
     document.getElementById("zaliczka-data").value = zaliczka.data || "";
     document.getElementById("zaliczka-kwota").value = Number(zaliczka.kwota || 0);
+    document.getElementById("zaliczka-purpose").value = pobierzPrzeznaczenieZaliczki(zaliczka) || "";
     document.getElementById("zaliczka-platnosc").value = zaliczka.sposob_platnosci || "gotówka";
     document.getElementById("zaliczka-opis").value = zaliczka.opis || "";
     document.getElementById("card-zaliczka-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -5818,8 +5981,12 @@ window.edytujKoszt = function(id) {
     if (title) title.textContent = "Edytuj koszt";
     if (btn) btn.textContent = "Zapisz zmiany";
     if (cancel) cancel.classList.remove("hidden");
+    const kwoty = wyliczKosztMaterialowy(koszt);
     document.getElementById("koszt-data").value = koszt.data || "";
-    document.getElementById("koszt-kwota").value = Number(koszt.kwota || 0);
+    document.getElementById("koszt-kwota").value = Number(kwoty.brutto || 0);
+    document.getElementById("koszt-netto").value = kwoty.netto === null ? "" : Number(kwoty.netto || 0).toFixed(2);
+    document.getElementById("koszt-vat-rate").value = kwoty.vatRate === null ? "zw" : String(kwoty.vatRate);
+    document.getElementById("koszt-brutto").value = Number(kwoty.brutto || 0).toFixed(2);
     document.getElementById("koszt-kategoria").value = koszt.kategoria || "materiały";
     document.getElementById("koszt-opis").value = koszt.opis || "";
     document.getElementById("card-koszt-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -5830,7 +5997,7 @@ function renderujTabeleZaliczek(lista) {
     if (!tbody) return;
 
     if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Brak zaliczek.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Brak zaliczek.</td></tr>`;
         return;
     }
 
@@ -5844,6 +6011,7 @@ function renderujTabeleZaliczek(lista) {
                 <td>${esc(z.data)}</td>
                 <td><strong>${Number(z.kwota || 0).toFixed(2)} PLN</strong></td>
                 <td>${esc(z.sposob_platnosci || "-")}</td>
+                <td>${esc(etykietaPrzeznaczeniaZaliczki(pobierzPrzeznaczenieZaliczki(z)))}</td>
                 <td>${esc(z.opis || "")}</td>
                 <td>${akcja}</td>
             </tr>
@@ -5856,7 +6024,7 @@ function renderujTabeleKosztow(lista) {
     if (!tbody) return;
 
     if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Brak kosztów.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Brak kosztów.</td></tr>`;
         return;
     }
 
@@ -5865,16 +6033,49 @@ function renderujTabeleKosztow(lista) {
             ? `<div class="table-actions"><button class="btn btn-secondary small-btn" onclick="edytujKoszt('${esc(k.id)}')">Edytuj</button><button class="btn btn-danger small-btn" onclick="usunKoszt('${esc(k.id)}')">Usuń</button></div>`
             : "";
 
+        const kwoty = k._kwoty || wyliczKosztMaterialowy(k);
+        const nettoText = kwoty.netto === null ? "Nieustalone" : `${Number(kwoty.netto || 0).toFixed(2)} PLN`;
+        const vatText = kwoty.vatAmount === null ? "Nieustalony" : `${kwoty.vatLabel} / ${Number(kwoty.vatAmount || 0).toFixed(2)} PLN`;
+
         return `
             <tr>
                 <td>${esc(k.data)}</td>
-                <td><strong>${Number(k.kwota || 0).toFixed(2)} PLN</strong></td>
+                <td>${esc(nettoText)}</td>
+                <td>${esc(vatText)}</td>
+                <td><strong>${Number(kwoty.brutto || 0).toFixed(2)} PLN</strong></td>
                 <td>${esc(k.kategoria || "-")}</td>
                 <td>${esc(k.opis || "")}</td>
                 <td>${akcja}</td>
             </tr>
         `;
     }).join("");
+}
+
+function przeliczFormularzKosztu(source = "netto") {
+    const nettoInput = document.getElementById("koszt-netto");
+    const bruttoInput = document.getElementById("koszt-brutto");
+    const vatSelect = document.getElementById("koszt-vat-rate");
+    const kwotaInput = document.getElementById("koszt-kwota");
+    if (!nettoInput || !bruttoInput || !vatSelect) return;
+
+    const vatRate = pobierzVatKosztu(vatSelect.value);
+    const multiplier = vatRate === null ? 1 : 1 + vatRate / 100;
+
+    if (source === "brutto") {
+        const brutto = parseKwota(bruttoInput.value);
+        if (Number.isFinite(brutto)) {
+            nettoInput.value = (brutto / multiplier).toFixed(2);
+            if (kwotaInput) kwotaInput.value = brutto.toFixed(2);
+        }
+        return;
+    }
+
+    const netto = parseKwota(nettoInput.value);
+    if (Number.isFinite(netto)) {
+        const brutto = netto * multiplier;
+        bruttoInput.value = brutto.toFixed(2);
+        if (kwotaInput) kwotaInput.value = brutto.toFixed(2);
+    }
 }
 
 async function dodajZaliczke() {
@@ -5890,6 +6091,7 @@ async function dodajZaliczke() {
 
     const data = document.getElementById("zaliczka-data").value;
     const kwota = pobierzKwoteFormularza("zaliczka-kwota", "Wpisz poprawną kwotę zaliczki.");
+    const purpose = document.getElementById("zaliczka-purpose")?.value || "";
     const sposob_platnosci = document.getElementById("zaliczka-platnosc").value;
     const opis = document.getElementById("zaliczka-opis").value.trim();
 
@@ -5899,10 +6101,15 @@ async function dodajZaliczke() {
     }
 
     if (kwota === null) return;
+    if (!purpose) {
+        alert("Wybierz przeznaczenie zaliczki.");
+        return;
+    }
 
     const payload = {
         data,
         kwota,
+        purpose,
         sposob_platnosci,
         opis
     };
@@ -5959,7 +6166,11 @@ async function dodajKoszt() {
     }
 
     const data = document.getElementById("koszt-data").value;
-    const kwota = pobierzKwoteFormularza("koszt-kwota", "Wpisz poprawną kwotę kosztu.");
+    przeliczFormularzKosztu(document.getElementById("koszt-brutto")?.value ? "brutto" : "netto");
+    const netto = parseKwota(document.getElementById("koszt-netto")?.value);
+    const brutto = parseKwota(document.getElementById("koszt-brutto")?.value);
+    const vat_rate = document.getElementById("koszt-vat-rate")?.value || "zw";
+    const vatRateNumber = pobierzVatKosztu(vat_rate);
     const kategoria = document.getElementById("koszt-kategoria").value;
     const opis = document.getElementById("koszt-opis").value.trim();
 
@@ -5968,11 +6179,21 @@ async function dodajKoszt() {
         return;
     }
 
-    if (kwota === null) return;
+    if (!Number.isFinite(netto) || netto < 0 || !Number.isFinite(brutto) || brutto < 0) {
+        alert("Wpisz poprawną kwotę netto albo brutto kosztu.");
+        return;
+    }
+
+    const vat_amount = Math.max(0, brutto - netto);
+    const kwota = brutto;
 
     const payload = {
         data,
         kwota,
+        netto,
+        vat_rate,
+        vat_amount,
+        brutto,
         kategoria,
         opis
     };
@@ -6098,7 +6319,8 @@ async function dodajPraceDodatkowa() {
     }
 
     const netto = ilosc * cena_netto;
-    const brutto = netto * (1 + (vat || 0) / 100);
+    const vat_amount = netto * ((vat || 0) / 100);
+    const brutto = netto + vat_amount;
 
     const payload = {
         inwestycja_id: aktywnaInwestycjaId,
@@ -6107,6 +6329,7 @@ async function dodajPraceDodatkowa() {
         ilosc,
         cena_netto,
         vat,
+        vat_amount,
         netto,
         brutto,
         user_id: zalogowanyUser?.id

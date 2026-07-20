@@ -1015,24 +1015,85 @@
             </div>
             <div id="wybrana-inwestycja-meta" class="linked-item"></div>
 
-        <div class="investment-summary-grid">
+        <div class="investment-summary-grid settlement-summary-grid">
             <div class="summary-box">
-                <span>Suma zaliczek</span>
+                <span>Robocizna netto</span>
+                <strong id="rozliczenie-robocizna-netto">0.00 PLN</strong>
+            </div>
+            <div class="summary-box">
+                <span>VAT robocizny</span>
+                <strong id="rozliczenie-robocizna-vat">0.00 PLN</strong>
+            </div>
+            <div class="summary-box">
+                <span>Robocizna brutto</span>
+                <strong id="rozliczenie-robocizna-brutto">0.00 PLN</strong>
+            </div>
+            <div class="summary-box">
+                <span>Zaliczki na robociznę</span>
+                <strong id="rozliczenie-zaliczki-robocizna">0.00 PLN</strong>
+            </div>
+            <div class="summary-box total">
+                <span>Pozostało za robociznę</span>
+                <strong id="rozliczenie-pozostalo-robocizna">0.00 PLN</strong>
+            </div>
+
+            <div class="summary-box">
+                <span>Materiały netto</span>
+                <strong id="rozliczenie-materialy-netto">0.00 PLN</strong>
+            </div>
+            <div class="summary-box">
+                <span>VAT materiałów</span>
+                <strong id="rozliczenie-materialy-vat">0.00 PLN</strong>
+            </div>
+            <div class="summary-box">
+                <span>Materiały brutto</span>
+                <strong id="rozliczenie-materialy-brutto">0.00 PLN</strong>
+            </div>
+            <div class="summary-box">
+                <span>Zaliczki na materiały</span>
+                <strong id="rozliczenie-zaliczki-materialy">0.00 PLN</strong>
+            </div>
+            <div class="summary-box total">
+                <span>Pozostało za materiały</span>
+                <strong id="rozliczenie-pozostalo-materialy">0.00 PLN</strong>
+            </div>
+
+            <div class="summary-box">
+                <span>Prace dodatkowe netto</span>
+                <strong id="rozliczenie-prace-netto">0.00 PLN</strong>
+            </div>
+            <div class="summary-box">
+                <span>VAT prac dodatkowych</span>
+                <strong id="rozliczenie-prace-vat">0.00 PLN</strong>
+            </div>
+            <div class="summary-box">
+                <span>Prace dodatkowe brutto</span>
+                <strong id="inwestycja-prace-dodatkowe-suma">0.00 PLN</strong>
+            </div>
+
+            <div class="summary-box">
+                <span>Razem netto</span>
+                <strong id="rozliczenie-razem-netto">0.00 PLN</strong>
+            </div>
+            <div class="summary-box">
+                <span>VAT razem</span>
+                <strong id="rozliczenie-vat-razem">0.00 PLN</strong>
+            </div>
+            <div class="summary-box">
+                <span>Razem brutto</span>
+                <strong id="rozliczenie-razem-brutto">0.00 PLN</strong>
+            </div>
+            <div class="summary-box">
+                <span>Zaliczki razem</span>
                 <strong id="inwestycja-suma-zaliczki">0.00 PLN</strong>
             </div>
-
-            <div class="summary-box">
-                <span>Suma kosztów</span>
-                <strong id="inwestycja-suma-koszty">0.00 PLN</strong>
-            </div>
-
             <div class="summary-box total">
-                <span>Różnica</span>
+                <span>Pozostało do zapłaty</span>
                 <strong id="inwestycja-roznica">0.00 PLN</strong>
             </div>
-            <div class="summary-box">
-                <span>Prace dodatkowe</span>
-                <strong id="inwestycja-prace-dodatkowe-suma">0.00 PLN</strong>
+            <div class="summary-box hidden">
+                <span>Suma kosztów</span>
+                <strong id="inwestycja-suma-koszty">0.00 PLN</strong>
             </div>
         </div>
 
@@ -1050,6 +1111,15 @@
                 <div class="form-group">
                     <label for="zaliczka-kwota">Kwota</label>
                     <input type="text" id="zaliczka-kwota" inputmode="decimal" placeholder="0.00">
+                </div>
+
+                <div class="form-group">
+                    <label for="zaliczka-purpose">Przeznaczenie zaliczki</label>
+                    <select id="zaliczka-purpose" required>
+                        <option value="">Wybierz przeznaczenie</option>
+                        <option value="materialy">Materiały</option>
+                        <option value="robocizna">Robocizna</option>
+                    </select>
                 </div>
 
                 <div class="form-group">
@@ -1082,9 +1152,27 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="koszt-kwota">Kwota</label>
-                    <input type="text" id="koszt-kwota" inputmode="decimal" placeholder="0.00">
+                    <label for="koszt-netto">Kwota netto</label>
+                    <input type="text" id="koszt-netto" inputmode="decimal" placeholder="0.00">
                 </div>
+
+                <div class="form-group">
+                    <label for="koszt-vat-rate">VAT</label>
+                    <select id="koszt-vat-rate">
+                        <option value="23">23%</option>
+                        <option value="8">8%</option>
+                        <option value="5">5%</option>
+                        <option value="0">0%</option>
+                        <option value="zw">Zwolniony / nie dotyczy</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="koszt-brutto">Kwota brutto</label>
+                    <input type="text" id="koszt-brutto" inputmode="decimal" placeholder="0.00">
+                </div>
+
+                <input type="hidden" id="koszt-kwota">
 
                 <div class="form-group">
                     <label for="koszt-kategoria">Kategoria</label>
@@ -1164,13 +1252,14 @@
                                 <th>Data</th>
                                 <th>Kwota</th>
                                 <th>Płatność</th>
+                                <th>Przeznaczenie</th>
                                 <th>Opis</th>
                                 <th>Akcje</th>
                             </tr>
                         </thead>
                         <tbody id="tabela-zaliczek">
                             <tr>
-                                <td colspan="5" class="empty-row">Brak zaliczek.</td>
+                                <td colspan="6" class="empty-row">Brak zaliczek.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1185,7 +1274,9 @@
                         <thead>
                             <tr>
                                 <th>Data</th>
-                                <th>Kwota</th>
+                                <th>Netto</th>
+                                <th>VAT</th>
+                                <th>Brutto</th>
                                 <th>Kategoria</th>
                                 <th>Opis</th>
                                 <th>Akcje</th>
@@ -1193,7 +1284,7 @@
                         </thead>
                         <tbody id="tabela-kosztow">
                             <tr>
-                                <td colspan="5" class="empty-row">Brak kosztów.</td>
+                                <td colspan="7" class="empty-row">Brak kosztów.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1587,6 +1678,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260613-20"></script>
+    <script src="script.js?v=20260613-21"></script>
 </body>
 </html>
