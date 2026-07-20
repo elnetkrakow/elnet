@@ -1900,7 +1900,16 @@ async function zapiszMagazyn() {
             body: JSON.stringify(payload)
         });
 
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("Błąd zapisu magazynu Supabase:", {
+                status: res.status,
+                statusText: res.statusText,
+                response: errorText,
+                payload
+            });
+            throw new Error(errorText);
+        }
 
         alert('Sprzęt dodany do magazynu.');
         zapiszLog('Magazyn', 'Dodano wpis', nazwa);
@@ -1934,7 +1943,16 @@ window.usunMagazyn = async function(id) {
             headers: headers()
         });
 
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("Błąd usuwania wpisu magazynu Supabase:", {
+                status: res.status,
+                statusText: res.statusText,
+                response: errorText,
+                payload
+            });
+            throw new Error(errorText);
+        }
 
         await pobierzMagazyn();
         renderujMagazyn();
@@ -2163,6 +2181,47 @@ function renderujLogi() {
 
 function cenaUslugi(u) {
     return Number(u.cena_netto ?? u.cena ?? 0);
+}
+
+function parseKwota(value) {
+    const raw = String(value ?? "").replace(",", ".").trim();
+    if (!raw) return NaN;
+    return Number(raw);
+}
+
+function cenaPozycji(p) {
+    const cena = parseKwota(p?.cenaNetto ?? p?.cena_netto ?? p?.cena ?? p?.price);
+    return Number.isFinite(cena) ? cena : 0;
+}
+
+function iloscPozycji(p) {
+    const ilosc = parseKwota(p?.ilosc ?? p?.quantity ?? p?.qty);
+    return Number.isFinite(ilosc) ? ilosc : 0;
+}
+
+function ustawCenePozycji(p, cena) {
+    p.cenaNetto = cena;
+    p.cena_netto = cena;
+    p.cena = cena;
+    p.price = cena;
+}
+
+function normalizujPozycjeKosztorysu(lista) {
+    return (lista || []).map(p => {
+        const ilosc = iloscPozycji(p);
+        const cena = cenaPozycji(p);
+        const vat = pobierzVatProcent(p);
+        return {
+            ...p,
+            ilosc,
+            quantity: ilosc,
+            cenaNetto: cena,
+            cena_netto: cena,
+            cena,
+            price: cena,
+            vatProcent: Number.isFinite(vat) ? vat : 23
+        };
+    });
 }
 
 function jednostkaUslugi(u) {
@@ -2667,8 +2726,8 @@ function pobierzVatProcent(p) {
 
 function zapewnijCenyBazowePozycji() {
     wycenaPozycje.forEach((p) => {
-        const aktualnaCena = Number(p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0);
-        if (p.cenaBazowa === undefined || p.cenaBazowa === null || Number.isNaN(Number(p.cenaBazowa))) {
+        const aktualnaCena = cenaPozycji(p);
+        if (p.cenaBazowa === undefined || p.cenaBazowa === null || Number.isNaN(parseKwota(p.cenaBazowa))) {
             p.cenaBazowa = aktualnaCena;
         }
     });
@@ -3214,8 +3273,8 @@ function dodajPozycjeRecznieDoWyceny() {
     const u = uslugi.find(x => String(x.id) === String(selectedId));
     const nazwaInput = document.getElementById("wycena-usluga-search").value.trim();
 
-    const ilosc = Number(document.getElementById("wycena-ilosc").value);
-    const cena = Number(document.getElementById("wycena-cena").value);
+    const ilosc = parseKwota(document.getElementById("wycena-ilosc").value);
+    const cena = parseKwota(document.getElementById("wycena-cena").value);
     const jednostka = document.getElementById("wycena-jednostka").value;
     const vatProcent = Number(document.getElementById("wycena-vat").value);
 
@@ -3224,8 +3283,8 @@ function dodajPozycjeRecznieDoWyceny() {
         return;
     }
 
-    if (isNaN(cena) || cena < 0) {
-        alert("Wpisz poprawną cenę.");
+    if (!Number.isFinite(cena) || cena < 0) {
+        alert("Cena jednostkowa nie może być pusta ani ujemna.");
         return;
     }
 
@@ -3244,6 +3303,9 @@ function dodajPozycjeRecznieDoWyceny() {
                 jednostka,
                 ilosc,
                 cenaNetto: cena,
+                cena_netto: cena,
+                cena: cena,
+                price: cena,
                 vatProcent
             };
         });
@@ -3258,6 +3320,9 @@ function dodajPozycjeRecznieDoWyceny() {
             jednostka,
             ilosc,
             cenaNetto: cena,
+            cena_netto: cena,
+            cena: cena,
+            price: cena,
             vatProcent
         });
 
@@ -3279,8 +3344,12 @@ function renderujWycene() {
         return;
     }
 
+    wycenaPozycje = normalizujPozycjeKosztorysu(wycenaPozycje);
+
     tbody.innerHTML = wycenaPozycje.map(p => {
-        const netto = p.ilosc * p.cenaNetto;
+        const ilosc = iloscPozycji(p);
+        const cena = cenaPozycji(p);
+        const netto = ilosc * cena;
         const vatProcent = pobierzVatProcent(p);
         const vat = netto * (vatProcent / 100);
         const brutto = netto + vat;
@@ -3292,8 +3361,8 @@ function renderujWycene() {
             <tr>
                 <td>${esc(p.nazwa)}</td>
                 <td>${esc(p.jednostka)}</td>
-                <td>${p.ilosc}</td>
-                <td>${p.cenaNetto.toFixed(2)} PLN</td>
+                <td>${ilosc}</td>
+                <td><input class="wycena-price-input" type="text" inputmode="decimal" data-position-id="${esc(p.id)}" value="${cena.toFixed(2)}" onchange="zmienCenePozycjiWyceny('${esc(p.id)}', this.value, false, this)" oninput="zmienCenePozycjiWyceny('${esc(p.id)}', this.value, true, this)"></td>
                 <td>${netto.toFixed(2)} PLN</td>
                 <td>${vatProcent}%</td>
                 <td>${brutto.toFixed(2)} PLN</td>
@@ -3304,6 +3373,40 @@ function renderujWycene() {
 
     przeliczWycene();
 }
+
+window.zmienCenePozycjiWyceny = function(id, value, silent = false, inputEl = null) {
+    const cena = parseKwota(value);
+    if (!Number.isFinite(cena) || cena < 0) {
+        if (!silent) alert("Cena jednostkowa nie może być pusta ani ujemna.");
+        return;
+    }
+
+    let updatedPosition = null;
+    wycenaPozycje = wycenaPozycje.map(p => {
+        if (String(p.id) !== String(id)) return p;
+        const updated = { ...p };
+        ustawCenePozycji(updated, cena);
+        updatedPosition = updated;
+        return updated;
+    });
+
+    if (silent && inputEl && updatedPosition) {
+        const row = inputEl.closest("tr");
+        if (row) {
+            const ilosc = iloscPozycji(updatedPosition);
+            const vatProcent = pobierzVatProcent(updatedPosition);
+            const netto = ilosc * cena;
+            const vat = netto * (vatProcent / 100);
+            const brutto = netto + vat;
+            if (row.cells[4]) row.cells[4].textContent = `${netto.toFixed(2)} PLN`;
+            if (row.cells[6]) row.cells[6].textContent = `${brutto.toFixed(2)} PLN`;
+        }
+        przeliczWycene();
+        return;
+    }
+
+    renderujWycene();
+};
 
 function pokazPanelEdycjiPozycji(id) {
     if (rolaUsera === "guest") {
@@ -3331,8 +3434,8 @@ function zapiszPanelEdycjiPozycji() {
 
     const nazwa = document.getElementById("edycja-nazwa").value.trim();
     const jednostka = document.getElementById("edycja-jednostka").value;
-    const ilosc = Number(document.getElementById("edycja-ilosc").value);
-    const cena = Number(document.getElementById("edycja-cena").value);
+    const ilosc = parseKwota(document.getElementById("edycja-ilosc").value);
+    const cena = parseKwota(document.getElementById("edycja-cena").value);
     const vatProcent = Number(document.getElementById("edycja-vat").value);
     const uwagi = document.getElementById("edycja-uwagi").value.trim();
 
@@ -3346,8 +3449,8 @@ function zapiszPanelEdycjiPozycji() {
         return;
     }
 
-    if (isNaN(cena) || cena < 0) {
-        alert("Wpisz poprawną cenę.");
+    if (!Number.isFinite(cena) || cena < 0) {
+        alert("Cena jednostkowa nie może być pusta ani ujemna.");
         return;
     }
 
@@ -3359,6 +3462,9 @@ function zapiszPanelEdycjiPozycji() {
             jednostka,
             ilosc,
             cenaNetto: cena,
+            cena_netto: cena,
+            cena: cena,
+            price: cena,
             vatProcent,
             uwaga: uwagi
         };
@@ -3498,7 +3604,7 @@ function przeliczWycene() {
     wycenaPozycje.forEach(p => {
         const vatProcent = pobierzVatProcent(p);
         const vatStawka = Number.isFinite(vatProcent) ? vatProcent : 23;
-        const nettoPoKorekcie = p.ilosc * p.cenaNetto * mnoznikKorekty;
+        const nettoPoKorekcie = iloscPozycji(p) * cenaPozycji(p) * mnoznikKorekty;
         const vat = nettoPoKorekcie * (vatStawka / 100);
 
         sumaNettoPoKorekcie += nettoPoKorekcie;
@@ -3572,7 +3678,7 @@ function zastosujKorekteCenPozycji() {
     const mnoznik = 1 + procent / 100;
 
     wycenaPozycje = wycenaPozycje.map(p => {
-        const cenaBazowa = Number(p.cenaBazowa ?? p.cenaNetto ?? p.cena_netto ?? p.cena ?? p.price ?? 0) || 0;
+        const cenaBazowa = parseKwota(p.cenaBazowa ?? cenaPozycji(p)) || 0;
         const nowaCena = Math.round(cenaBazowa * mnoznik * 100) / 100;
 
         return {
@@ -3643,13 +3749,17 @@ async function zapiszKosztorys() {
         return;
     }
 
+    const pozycjeDoZapisu = walidujPozycjeKosztorysu();
+    if (!pozycjeDoZapisu) return;
+    wycenaPozycje = pozycjeDoZapisu;
+
     const korekta = Number(document.getElementById("wycena-korekta").value || 0);
     const mnoznikKorekty = 1 + korekta / 100;
 
     let netto = 0;
     let sumaVAT = 0;
 
-    wycenaPozycje.forEach(p => {
+    pozycjeDoZapisu.forEach(p => {
         const vatProcent = pobierzVatProcent(p);
         const nettoPoKorekcie = p.ilosc * p.cenaNetto * mnoznikKorekty;
         const vat = nettoPoKorekcie * (vatProcent / 100);
@@ -3662,7 +3772,7 @@ async function zapiszKosztorys() {
 
     const payload = {
         nazwa,
-        pozycje: wycenaPozycje,
+        pozycje: pozycjeDoZapisu,
         korekta,
         netto,
         brutto,
@@ -3686,7 +3796,16 @@ async function zapiszKosztorys() {
             body: JSON.stringify(payload)
         });
 
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("Błąd zapisu kosztorysu Supabase:", {
+                status: res.status,
+                statusText: res.statusText,
+                response: errorText,
+                payload
+            });
+            throw new Error(errorText);
+        }
 
         alert(edytowanyKosztorysId ? "Kosztorys zaktualizowany." : "Kosztorys zapisany.");
         const nazwaLogu = edytowanyKosztorysId ? "Zaktualizowano kosztorys" : "Zapisano kosztorys";
@@ -3697,8 +3816,8 @@ async function zapiszKosztorys() {
         pokazSekcje("kosztorysy");
         zapiszLog("Kosztorysy", nazwaLogu, nazwa);
     } catch (err) {
-        console.error(err);
-        alert("Nie udało się zapisać kosztorysu. Sprawdź tabelę kosztorysy i RLS.");
+        console.error("Błąd zapisu kosztorysu:", err);
+        alert("Nie udało się zapisać kosztorysu. Szczegóły błędu są w konsoli.");
     }
 }
 
@@ -4493,7 +4612,8 @@ window.wczytajKosztorys = function(id) {
     if (!k) return;
 
     try {
-        wycenaPozycje = typeof k.pozycje === "string" ? JSON.parse(k.pozycje) : k.pozycje || [];
+        const zapisanePozycje = typeof k.pozycje === "string" ? JSON.parse(k.pozycje) : k.pozycje || [];
+        wycenaPozycje = normalizujPozycjeKosztorysu(zapisanePozycje);
     } catch {
         wycenaPozycje = [];
     }
@@ -4659,6 +4779,46 @@ function pobierzPolaFormularzaInwestycji() {
     };
 }
 
+function walidujPozycjeKosztorysu() {
+    document.querySelectorAll(".wycena-price-input[data-position-id]").forEach(input => {
+        const id = input.dataset.positionId;
+        const cena = parseKwota(input.value);
+        if (!Number.isFinite(cena)) return;
+        wycenaPozycje = wycenaPozycje.map(p => {
+            if (String(p.id) !== String(id)) return p;
+            const updated = { ...p };
+            ustawCenePozycji(updated, cena);
+            return updated;
+        });
+    });
+
+    const normalized = normalizujPozycjeKosztorysu(wycenaPozycje);
+    for (const [index, p] of normalized.entries()) {
+        const input = Array.from(document.querySelectorAll(".wycena-price-input[data-position-id]"))
+            .find(el => String(el.dataset.positionId) === String(p.id));
+        if (input && !String(input.value || "").trim()) {
+            alert(`Cena jednostkowa w pozycji ${index + 1} nie może być pusta ani ujemna.`);
+            return null;
+        }
+        if (input) {
+            const inputCena = parseKwota(input.value);
+            if (!Number.isFinite(inputCena) || inputCena < 0) {
+                alert(`Cena jednostkowa w pozycji ${index + 1} nie może być pusta ani ujemna.`);
+                return null;
+            }
+        }
+        if (!Number.isFinite(p.ilosc) || p.ilosc <= 0) {
+            alert(`Ilość w pozycji ${index + 1} musi być większa od zera.`);
+            return null;
+        }
+        if (!Number.isFinite(p.cenaNetto) || p.cenaNetto < 0) {
+            alert(`Cena jednostkowa w pozycji ${index + 1} nie może być pusta ani ujemna.`);
+            return null;
+        }
+    }
+    return normalized;
+}
+
 function ustawTrybFormularzaInwestycji({ editing = false, source = "inwestycje" } = {}) {
     const title = document.getElementById("inwestycja-form-title");
     const btnDodaj = document.getElementById("btn-dodaj-inwestycje");
@@ -4751,7 +4911,16 @@ async function dodajInwestycje() {
             });
         }
 
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("Błąd zapisu inwestycji Supabase:", {
+                status: res.status,
+                statusText: res.statusText,
+                response: errorText,
+                payload
+            });
+            throw new Error(errorText);
+        }
 
         const zapisane = await res.json();
         const zapisanaInwestycja = Array.isArray(zapisane) ? zapisane[0] : zapisane;
