@@ -182,6 +182,116 @@
             text-align: right;
         }
 
+        .investment-estimates-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .investment-estimates-header h2 {
+            margin: 0;
+        }
+
+        .investment-estimates-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .investment-estimates-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .investment-estimate-card {
+            display: grid;
+            grid-template-columns: minmax(220px, 1fr) minmax(120px, auto) minmax(300px, auto);
+            align-items: center;
+            gap: 16px;
+            padding: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.52);
+        }
+
+        .investment-estimate-title {
+            margin: 0 0 7px;
+            color: #f8fafc;
+            font-size: 16px;
+            line-height: 1.25;
+        }
+
+        .investment-estimate-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px 14px;
+            flex-wrap: wrap;
+            color: #cbd5e1;
+            font-size: 12px;
+        }
+
+        .investment-estimate-money {
+            font-weight: 700;
+            color: #e5e7eb;
+        }
+
+        .status-tag-danger {
+            color: #fecaca;
+            background: rgba(127, 29, 29, 0.55);
+            border-color: rgba(248, 113, 113, 0.45);
+        }
+
+        .investment-estimate-status {
+            justify-self: center;
+        }
+
+        .investment-estimate-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .investment-estimate-empty {
+            margin: 0 0 12px;
+            color: #cbd5e1;
+        }
+
+        .print-mode-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin: 18px 0 6px;
+        }
+
+        .print-mode-grid .btn {
+            min-height: 48px;
+            justify-content: center;
+        }
+
+        @media (max-width: 980px) {
+            .investment-estimate-card {
+                grid-template-columns: 1fr;
+                align-items: start;
+            }
+
+            .investment-estimate-status,
+            .investment-estimate-actions {
+                justify-self: start;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .print-mode-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .delete-investment-modal {
             width: min(620px, calc(100% - 32px));
             border-color: rgba(34, 197, 94, 0.35);
@@ -1443,19 +1553,13 @@
     <div id="drukuj-inwestycje-modal" class="modal hidden">
         <div class="modal-backdrop"></div>
         <div class="modal-content">
-            <h2>Wybierz elementy rozliczenia</h2>
-            <div class="checkbox-grid two-columns">
-                <label><input type="checkbox" id="drukuj-inw-dane" checked> Dane inwestycji</label>
-                <label><input type="checkbox" id="drukuj-inw-kosztorys" checked> Kosztorys robocizny</label>
-                <label><input type="checkbox" id="drukuj-inw-prace" checked> Prace dodatkowe</label>
-                <label><input type="checkbox" id="drukuj-inw-zaliczki" checked> Zaliczki</label>
-                <label><input type="checkbox" id="drukuj-inw-koszty" checked> Koszty materiałowe</label>
-                <label><input type="checkbox" id="drukuj-inw-podsumowanie" checked> Podsumowanie końcowe</label>
-                <label><input type="checkbox" id="drukuj-inw-uwagi" checked> Uwagi / opis</label>
+            <h2>Wybierz typ wydruku</h2>
+            <div class="print-mode-grid">
+                <button id="btn-drukuj-inwestycje-szczegolowy" class="btn btn-main" type="button">Wydruk szczegółowy</button>
+                <button id="btn-drukuj-inwestycje-skrocony" class="btn btn-secondary" type="button">Wydruk bez szczegółów</button>
             </div>
             <div class="modal-actions">
                 <button id="btn-zamknij-drukuj-inwestycje" class="btn btn-secondary small-btn">Anuluj</button>
-                <button id="btn-podglad-drukuj-inwestycje" class="btn btn-main">Drukuj</button>
             </div>
         </div>
     </div>
@@ -1483,6 +1587,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260613-19"></script>
+    <script src="script.js?v=20260613-20"></script>
 </body>
 </html>

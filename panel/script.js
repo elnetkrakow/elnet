@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-19-ELNET";
+const APP_VERSION = "2026.06.13-20-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -2272,6 +2272,37 @@ function kosztorysPasujeDoInwestycji(kosztorys, inwestycjaId) {
     return String(pobierzPowiazanaInwestycjeKosztorysu(kosztorys) || "") === String(inwestycjaId || "");
 }
 
+function statusKosztorysuLabel(status) {
+    const raw = String(status || "do_akceptacji").toLowerCase();
+    if (raw === "do_akceptacji" || raw === "do-akceptacji") return "Do akceptacji";
+    if (raw === "zaakceptowany" || raw === "akceptacja" || raw === "zaakceptowana") return "Akceptacja";
+    if (raw === "odrzucony" || raw === "odrzucona") return "Odrzucony";
+    return status || "Nieznany";
+}
+
+function statusKosztorysuClass(status) {
+    const raw = String(status || "do_akceptacji").toLowerCase();
+    if (raw === "zaakceptowany" || raw === "akceptacja" || raw === "zaakceptowana") return "status-tag-success";
+    if (raw === "do_akceptacji" || raw === "do-akceptacji") return "status-tag-warning";
+    if (raw === "odrzucony" || raw === "odrzucona") return "status-tag-danger";
+    return "";
+}
+
+function statusKosztorysuBadge(status) {
+    const className = statusKosztorysuClass(status);
+    return `<span class="status-tag ${className}">${esc(statusKosztorysuLabel(status))}</span>`;
+}
+
+function pozycjeKosztorysu(kosztorys) {
+    try {
+        const raw = typeof kosztorys?.pozycje === "string" ? JSON.parse(kosztorys.pozycje) : kosztorys?.pozycje || [];
+        return Array.isArray(raw) ? normalizujPozycjeKosztorysu(raw) : [];
+    } catch (err) {
+        console.error("Błąd odczytu pozycji kosztorysu:", err);
+        return [];
+    }
+}
+
 async function zapiszPowiazanieKosztorysuZInwestycja(kosztorysId, investmentId) {
     const payload = { investment_id: investmentId || null };
     const res = await fetch(`${SUPABASE_URL}/rest/v1/kosztorysy?id=eq.${encodeURIComponent(kosztorysId)}`, {
@@ -4154,16 +4185,13 @@ function zamknijModalDrukuKosztorysu() {
 function pokazModalDrukuInwestycji() {
     const modal = document.getElementById("drukuj-inwestycje-modal");
     if (!modal) return;
-    // default all checked
-    modal.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = true);
     modal.classList.remove("hidden");
 
-    const btnPreview = document.getElementById("btn-podglad-drukuj-inwestycje");
-    if (btnPreview) btnPreview.onclick = () => {
-        const options = pobierzOpcjeDrukuInwestycji();
-        if (!options) return;
-        drukujInwestycjeDoOkna(options);
-    };
+    const btnDetailed = document.getElementById("btn-drukuj-inwestycje-szczegolowy");
+    if (btnDetailed) btnDetailed.onclick = () => drukujRozliczenieInwestycji({ tryb: "szczegolowy" });
+
+    const btnCompact = document.getElementById("btn-drukuj-inwestycje-skrocony");
+    if (btnCompact) btnCompact.onclick = () => drukujRozliczenieInwestycji({ tryb: "skrocony" });
 
     const btnClose = document.getElementById("btn-zamknij-drukuj-inwestycje");
     if (btnClose) btnClose.onclick = zamknijModalDrukuInwestycji;
@@ -4191,6 +4219,248 @@ function pobierzOpcjeDrukuInwestycji() {
     }
 
     return options;
+}
+
+function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
+    zamknijModalDrukuInwestycji();
+    if (!aktywnaInwestycjaId) {
+        alert("Brak otwartej inwestycji do wydruku.");
+        return;
+    }
+
+    const inwestycja = inwestycje.find(i => String(i.id) === String(aktywnaInwestycjaId));
+    if (!inwestycja) {
+        alert("Nie znaleziono inwestycji do wydruku.");
+        return;
+    }
+
+    const szczegolowy = tryb === "szczegolowy";
+    const { dataStart, dataKoniec } = pobierzDatyInwestycji(inwestycja);
+    const powiazaneKosztorysy = kosztorysy.filter(k => kosztorysPasujeDoInwestycji(k, aktywnaInwestycjaId));
+    const zaliczki = inwestycjeZaliczki.filter(z => String(z.inwestycja_id) === String(aktywnaInwestycjaId));
+    const koszty = inwestycjeKoszty.filter(k => String(k.inwestycja_id) === String(aktywnaInwestycjaId));
+    const prace = inwestycjePraceDodatkowe.filter(p => String(p.inwestycja_id) === String(aktywnaInwestycjaId));
+
+    const kwota = value => `${Number(value || 0).toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN`;
+    const dataWydruku = new Date().toLocaleString("pl-PL");
+    const termin = dataStart && dataKoniec && dataKoniec !== dataStart ? `${dataStart} – ${dataKoniec}` : (dataStart || "-");
+    const robociznaBrutto = powiazaneKosztorysy.reduce((sum, k) => sum + Number(k.brutto || 0), 0);
+    const sumaKosztow = koszty.reduce((sum, k) => sum + Number(k.kwota || 0), 0);
+    const sumaPraceBrutto = prace.reduce((sum, p) => sum + Number(p.brutto || p.kwota || 0), 0);
+    const sumaZaliczek = zaliczki.reduce((sum, z) => sum + Number(z.kwota || 0), 0);
+    const razemDoRozliczenia = robociznaBrutto + sumaKosztow + sumaPraceBrutto;
+    const pozostaloDoZaplaty = razemDoRozliczenia - sumaZaliczek;
+    const bilansGotowki = sumaZaliczek - sumaKosztow;
+
+    const kosztorysyRows = powiazaneKosztorysy.length
+        ? powiazaneKosztorysy.map(k => `
+            <tr>
+                <td>${esc(k.nazwa || "Kosztorys")}</td>
+                <td>${esc(k.data || "-")}</td>
+                <td class="num">${kwota(k.brutto)}</td>
+                <td>${esc(statusKosztorysuLabel(k.status))}</td>
+            </tr>
+        `).join("")
+        : `<tr><td colspan="4">Brak powiązanych kosztorysów.</td></tr>`;
+
+    const pozycjeKosztorysowHtml = szczegolowy
+        ? powiazaneKosztorysy.map(k => {
+            const rows = pozycjeKosztorysu(k).map(p => {
+                const ilosc = iloscPozycji(p);
+                const cena = cenaPozycji(p);
+                const vat = pobierzVatProcent(p);
+                const brutto = ilosc * cena * (1 + vat / 100);
+                return `
+                    <tr>
+                        <td>${esc(p.nazwa || p.opis || "-")}</td>
+                        <td class="num">${Number(ilosc || 0).toLocaleString("pl-PL")}</td>
+                        <td>${esc(p.jednostka || p.jm || "-")}</td>
+                        <td class="num">${kwota(cena)}</td>
+                        <td class="num">${Number(vat || 0).toFixed(0)}%</td>
+                        <td class="num">${kwota(brutto)}</td>
+                    </tr>
+                `;
+            }).join("") || `<tr><td colspan="6">Brak pozycji kosztorysu.</td></tr>`;
+
+            return `
+                <section class="print-section avoid-break">
+                    <h3>${esc(k.nazwa || "Kosztorys")}</h3>
+                    <table>
+                        <thead>
+                            <tr><th>Pozycja</th><th>Ilość</th><th>Jm</th><th>Cena netto</th><th>VAT</th><th>Brutto</th></tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </section>
+            `;
+        }).join("")
+        : "";
+
+    const kosztyRows = koszty.length
+        ? koszty.map(k => `
+            <tr>
+                <td>${esc(k.data || "-")}</td>
+                <td class="num">${kwota(k.kwota)}</td>
+                <td>${esc(k.kategoria || "-")}</td>
+                <td>${esc(k.opis || "")}</td>
+            </tr>
+        `).join("")
+        : `<tr><td colspan="4">Brak kosztów materiałowych.</td></tr>`;
+
+    const zaliczkiRows = zaliczki.length
+        ? zaliczki.map(z => `
+            <tr>
+                <td>${esc(z.data || "-")}</td>
+                <td class="num">${kwota(z.kwota)}</td>
+                <td>${esc(z.sposob_platnosci || z.platnosc || "-")}</td>
+                <td>${esc(z.opis || "")}</td>
+            </tr>
+        `).join("")
+        : `<tr><td colspan="4">Brak zaliczek.</td></tr>`;
+
+    const praceRows = prace.length
+        ? prace.map(p => `
+            <tr>
+                <td>${esc(p.data || "-")}</td>
+                <td>${esc(p.nazwa || "-")}</td>
+                <td class="num">${kwota(p.brutto || p.kwota)}</td>
+                <td>${esc(p.opis || "")}</td>
+            </tr>
+        `).join("")
+        : `<tr><td colspan="4">Brak prac dodatkowych.</td></tr>`;
+
+    const szczegolyHtml = szczegolowy ? `
+        <section class="print-section">
+            <h2>Pozycje kosztorysów</h2>
+            ${pozycjeKosztorysowHtml || "<p>Brak powiązanych kosztorysów.</p>"}
+        </section>
+
+        <section class="print-section avoid-break">
+            <h2>Koszty materiałowe</h2>
+            <table>
+                <thead><tr><th>Data</th><th>Kwota</th><th>Kategoria</th><th>Opis</th></tr></thead>
+                <tbody>${kosztyRows}</tbody>
+            </table>
+        </section>
+
+        <section class="print-section avoid-break">
+            <h2>Zaliczki</h2>
+            <table>
+                <thead><tr><th>Data</th><th>Kwota</th><th>Płatność</th><th>Opis</th></tr></thead>
+                <tbody>${zaliczkiRows}</tbody>
+            </table>
+        </section>
+
+        <section class="print-section avoid-break">
+            <h2>Prace dodatkowe</h2>
+            <table>
+                <thead><tr><th>Data</th><th>Nazwa</th><th>Kwota</th><th>Opis</th></tr></thead>
+                <tbody>${praceRows}</tbody>
+            </table>
+        </section>
+    ` : "";
+
+    const html = `
+        <!doctype html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>EL-Net — Rozliczenie inwestycji</title>
+            <style>
+                @page { size: A4 portrait; margin: 12mm; @bottom-right { content: "Strona " counter(page); } }
+                * { box-sizing: border-box; }
+                body { margin: 0; color: #111827; background: #fff; font-family: Arial, sans-serif; font-size: 11px; line-height: 1.45; }
+                .print-header { border-bottom: 2px solid #111827; padding-bottom: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; gap: 24px; }
+                .brand { font-size: 22px; font-weight: 800; letter-spacing: 0; }
+                .doc-title { margin: 4px 0 0; font-size: 18px; }
+                .print-meta { text-align: right; color: #4b5563; font-size: 10px; }
+                .print-section { margin-top: 16px; break-inside: avoid; page-break-inside: avoid; }
+                .print-section h2 { margin: 0 0 8px; padding-bottom: 4px; border-bottom: 1px solid #d1d5db; font-size: 14px; }
+                .print-section h3 { margin: 10px 0 6px; font-size: 12px; }
+                .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 18px; }
+                .info-grid p { margin: 0; }
+                table { width: 100%; border-collapse: collapse; margin-top: 8px; table-layout: fixed; }
+                thead { display: table-header-group; }
+                th, td { border: 1px solid #d1d5db; padding: 5px 6px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+                th { background: #f3f4f6; font-weight: 700; }
+                tr { break-inside: avoid; page-break-inside: avoid; }
+                .num { text-align: right; white-space: nowrap; }
+                .summary-table td { border-color: #cbd5e1; }
+                .summary-table .total td { background: #eef2ff; font-weight: 800; font-size: 12px; }
+                .avoid-break { break-inside: avoid; page-break-inside: avoid; }
+                .footer-note { position: fixed; bottom: -7mm; left: 0; color: #6b7280; font-size: 9px; }
+                @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+            </style>
+        </head>
+        <body>
+            <div class="footer-note">EL-Net — data wydruku: ${esc(dataWydruku)}</div>
+            <header class="print-header">
+                <div>
+                    <div class="brand">EL-Net</div>
+                    <div class="doc-title">Rozliczenie inwestycji</div>
+                </div>
+                <div class="print-meta">
+                    <div>${szczegolowy ? "Wydruk szczegółowy" : "Wydruk bez szczegółów"}</div>
+                    <div>${esc(dataWydruku)}</div>
+                </div>
+            </header>
+
+            <section class="print-section avoid-break">
+                <h2>Dane inwestycji</h2>
+                <div class="info-grid">
+                    <p><strong>Nazwa:</strong> ${esc(inwestycja.nazwa || "-")}</p>
+                    <p><strong>Klient:</strong> ${esc(inwestycja.klient || "-")}</p>
+                    <p><strong>Adres:</strong> ${esc(inwestycja.adres || "-")}</p>
+                    <p><strong>Telefon:</strong> ${esc(inwestycja.telefon || "-")}</p>
+                    <p><strong>Termin:</strong> ${esc(termin)}</p>
+                    <p><strong>Status:</strong> ${esc(inwestycja.status || "-")}</p>
+                </div>
+            </section>
+
+            <section class="print-section avoid-break">
+                <h2>Powiązane kosztorysy</h2>
+                <table>
+                    <thead><tr><th>Nazwa</th><th>Data</th><th>Brutto</th><th>Status</th></tr></thead>
+                    <tbody>${kosztorysyRows}</tbody>
+                </table>
+            </section>
+
+            <section class="print-section avoid-break">
+                <h2>Podsumowanie finansowe</h2>
+                <table class="summary-table">
+                    <tbody>
+                        <tr><td>Robocizna brutto</td><td class="num">${kwota(robociznaBrutto)}</td></tr>
+                        <tr><td>Koszty materiałowe</td><td class="num">${kwota(sumaKosztow)}</td></tr>
+                        <tr><td>Prace dodatkowe</td><td class="num">${kwota(sumaPraceBrutto)}</td></tr>
+                        <tr class="total"><td>Razem do rozliczenia</td><td class="num">${kwota(razemDoRozliczenia)}</td></tr>
+                        <tr><td>Zaliczki</td><td class="num">${kwota(sumaZaliczek)}</td></tr>
+                        <tr class="total"><td>Pozostało do zapłaty</td><td class="num">${kwota(pozostaloDoZaplaty)}</td></tr>
+                        <tr><td>Bilans gotówki</td><td class="num">${kwota(bilansGotowki)}</td></tr>
+                    </tbody>
+                </table>
+            </section>
+
+            ${szczegolyHtml}
+        </body>
+        </html>
+    `;
+
+    if (window.AndroidPrint && window.AndroidPrint.printHtml) {
+        window.AndroidPrint.printHtml(html);
+        return;
+    }
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+        alert("Nie udało się otworzyć okna drukowania.");
+        return;
+    }
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    zapiszLog("Inwestycje", szczegolowy ? "Druk rozliczenia szczegółowego" : "Druk rozliczenia bez szczegółów", inwestycja.nazwa);
 }
 
 function drukujInwestycjeDoOkna(options) {
@@ -5293,7 +5563,7 @@ function renderujPowiazaneKosztorysyInwestycji() {
 
     const related = kosztorysy.filter(k => kosztorysPasujeDoInwestycji(k, aktywnaInwestycjaId));
     const actionsHtml = `
-        <div class="button-row">
+        <div class="investment-estimates-actions">
             <button class="btn btn-main small-btn" onclick="utworzKosztorysDlaInwestycji('${esc(aktywnaInwestycjaId)}')">Nowy kosztorys</button>
             <button class="btn btn-secondary small-btn" onclick="polaczIstniejacyKosztorysZInwestycja('${esc(aktywnaInwestycjaId)}')">Połącz istniejący</button>
         </div>
@@ -5301,19 +5571,17 @@ function renderujPowiazaneKosztorysyInwestycji() {
 
     if (!related.length) {
         container.innerHTML = `
-            <h2>Kosztorysy</h2>
-            <p>Brak powiązanych kosztorysów dla tej inwestycji.</p>
-            ${actionsHtml}
+            <div class="investment-estimates-header">
+                <h2>Kosztorysy</h2>
+                ${actionsHtml}
+            </div>
+            <p class="investment-estimate-empty">Brak powiązanych kosztorysów dla tej inwestycji.</p>
         `;
         return;
     }
 
     const itemsHtml = related.map(k => {
-        const statusLabel = k.status === "zaakceptowany"
-            ? `<span class="status-tag status-tag-success">zaakceptowany</span>`
-            : k.status === "do_akceptacji"
-                ? `<span class="status-tag status-tag-warning">do akceptacji</span>`
-                : `<span class="status-tag">${esc(k.status || "nieznany")}</span>`;
+        const statusLabel = statusKosztorysuBadge(k.status);
         const openButton = `<button class="btn btn-secondary small-btn" onclick="otworzKosztorysNaLiscie('${esc(k.id)}')">Otwórz</button>`;
         const editButton = rolaUsera !== "guest"
             ? `<button class="btn btn-secondary small-btn" onclick="wczytajKosztorys('${esc(k.id)}')">Edytuj</button>`
@@ -5324,21 +5592,27 @@ function renderujPowiazaneKosztorysyInwestycji() {
             : "";
 
         return `
-            <div class="linked-item">
-                <h3>${esc(k.nazwa || "Kosztorys robocizny")}</h3>
-                <p><strong>Data:</strong> ${esc(k.data || "-")}</p>
-                <p><strong>Netto:</strong> ${Number(k.netto || 0).toFixed(2)} PLN</p>
-                <p><strong>Brutto:</strong> ${Number(k.brutto || 0).toFixed(2)} PLN</p>
-                <p><strong>Status:</strong> ${statusLabel}</p>
-                <div class="button-row">${openButton}${editButton}${printButton}${detachButton}</div>
+            <div class="investment-estimate-card">
+                <div>
+                    <h3 class="investment-estimate-title">${esc(k.nazwa || "Kosztorys robocizny")}</h3>
+                    <div class="investment-estimate-meta">
+                        <span>Data: ${esc(k.data || "-")}</span>
+                        <span>Netto: <span class="investment-estimate-money">${Number(k.netto || 0).toFixed(2)} PLN</span></span>
+                        <span>Brutto: <span class="investment-estimate-money">${Number(k.brutto || 0).toFixed(2)} PLN</span></span>
+                    </div>
+                </div>
+                <div class="investment-estimate-status">${statusLabel}</div>
+                <div class="investment-estimate-actions">${openButton}${editButton}${printButton}${detachButton}</div>
             </div>
         `;
     }).join("");
 
     container.innerHTML = `
-        <h2>Kosztorysy</h2>
-        ${actionsHtml}
-        ${itemsHtml}
+        <div class="investment-estimates-header">
+            <h2>Kosztorysy</h2>
+            ${actionsHtml}
+        </div>
+        <div class="investment-estimates-list">${itemsHtml}</div>
     `;
 }
 
