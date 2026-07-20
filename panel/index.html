@@ -666,6 +666,12 @@
                                 <button id="btn-anuluj-edycje-kosztorysu" class="btn btn-danger small-btn">Anuluj edycję</button>
                             </div>
                             <h2>Zapisz kosztorys</h2>
+                            <div class="form-group">
+                                <label for="kosztorys-inwestycja">Powiązana inwestycja</label>
+                                <select id="kosztorys-inwestycja">
+                                    <option value="">Brak powiązania</option>
+                                </select>
+                            </div>
                             <div class="save-row">
                                 <input type="text" id="kosztorys-nazwa" placeholder="np. Jan Kowalski - domek pod lasem">
                                 <button id="btn-zapisz-kosztorys" class="btn btn-main">Zapisz</button>
@@ -700,6 +706,7 @@
                                 <tr>
                                     <th>Data</th>
                                     <th>Nazwa</th>
+                                    <th>Inwestycja</th>
                                     <th>Netto</th>
                                     <th>Brutto</th>
                                     <th>Status</th>
@@ -708,7 +715,7 @@
                             </thead>
                             <tbody id="tabela-kosztorysow">
                                 <tr>
-                                    <td colspan="6" class="empty-row">Brak zapisanych kosztorysów.</td>
+                                    <td colspan="7" class="empty-row">Brak zapisanych kosztorysów.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1476,6 +1483,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260613-18"></script>
+    <script src="script.js?v=20260613-19"></script>
 </body>
 </html>

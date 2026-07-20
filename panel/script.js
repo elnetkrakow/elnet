@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-18-ELNET";
+const APP_VERSION = "2026.06.13-19-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -1971,6 +1971,7 @@ function renderujWszystko() {
     const renderTasks = [
         ["Pulpit", renderujPulpit],
         ["Select usług", renderujSelectUslug],
+        ["Select inwestycji kosztorysu", wypelnijSelectInwestycjiKosztorysu],
         ["Wycena", renderujWycene],
         ["Kosztorysy", renderujKosztorysy],
         ["Usługi", renderujUslugi],
@@ -2235,6 +2236,64 @@ function esc(v) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
+}
+
+function pobierzPowiazanaInwestycjeKosztorysu(kosztorys) {
+    return kosztorys?.investment_id || kosztorys?.inwestycja_id || null;
+}
+
+function znajdzInwestycjeKosztorysu(kosztorys) {
+    const investmentId = pobierzPowiazanaInwestycjeKosztorysu(kosztorys);
+    return investmentId ? inwestycje.find(i => String(i.id) === String(investmentId)) || null : null;
+}
+
+function etykietaInwestycji(inwestycja) {
+    if (!inwestycja) return "";
+    return [inwestycja.nazwa || "Inwestycja", inwestycja.klient || "-", inwestycja.adres || "-"].join(" — ");
+}
+
+function wypelnijSelectInwestycjiKosztorysu(selectedId = "") {
+    const select = document.getElementById("kosztorys-inwestycja");
+    if (!select) return;
+
+    const current = selectedId || select.value || "";
+    const options = [`<option value="">Brak powiązania</option>`]
+        .concat((inwestycje || []).map(i => `<option value="${esc(i.id)}">${esc(etykietaInwestycji(i))}</option>`));
+
+    select.innerHTML = options.join("");
+    select.value = current && (inwestycje || []).some(i => String(i.id) === String(current)) ? String(current) : "";
+}
+
+function ustawPowiazanaInwestycjeKosztorysu(investmentId = "") {
+    wypelnijSelectInwestycjiKosztorysu(investmentId || "");
+}
+
+function kosztorysPasujeDoInwestycji(kosztorys, inwestycjaId) {
+    return String(pobierzPowiazanaInwestycjeKosztorysu(kosztorys) || "") === String(inwestycjaId || "");
+}
+
+async function zapiszPowiazanieKosztorysuZInwestycja(kosztorysId, investmentId) {
+    const payload = { investment_id: investmentId || null };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/kosztorysy?id=eq.${encodeURIComponent(kosztorysId)}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Błąd zapisu powiązania kosztorysu z inwestycją:", {
+            status: res.status,
+            statusText: res.statusText,
+            response: errorText,
+            payload
+        });
+        throw new Error(errorText);
+    }
+
+    await pobierzKosztorysy();
+    renderujKosztorysy();
+    if (aktywnaInwestycjaId) renderujPanelInwestycji();
 }
 
 // ==========================================
@@ -3703,6 +3762,7 @@ function wyczyscWycene() {
     trybEdycjiKosztorysu = false;
     document.getElementById("kosztorys-nazwa").value = "";
     document.getElementById("wycena-korekta").value = 0;
+    ustawPowiazanaInwestycjeKosztorysu("");
     aktualizujTrybEdycjiKosztorysuWidok();
     renderujWycene();
 }
@@ -3712,6 +3772,7 @@ function anulujTrybEdycjiKosztorysu() {
     trybEdycjiKosztorysu = false;
     document.getElementById("kosztorys-nazwa").value = "";
     document.getElementById("wycena-korekta").value = 0;
+    ustawPowiazanaInwestycjeKosztorysu("");
     wycenaPozycje = [];
     aktualizujTrybEdycjiKosztorysuWidok();
     renderujWycene();
@@ -3777,6 +3838,7 @@ async function zapiszKosztorys() {
         netto,
         brutto,
         data: new Date().toLocaleDateString("pl-PL"),
+        investment_id: document.getElementById("kosztorys-inwestycja")?.value || null,
         user_id: zalogowanyUser?.id
     };
 
@@ -3837,7 +3899,8 @@ function renderujKosztorysy() {
     if (szukaj) {
         lista = lista.filter(k =>
             String(k.nazwa || "").toLowerCase().includes(szukaj) ||
-            String(k.data || "").toLowerCase().includes(szukaj)
+            String(k.data || "").toLowerCase().includes(szukaj) ||
+            String(etykietaInwestycji(znajdzInwestycjeKosztorysu(k)) || "").toLowerCase().includes(szukaj)
         );
     }
 
@@ -3846,11 +3909,17 @@ function renderujKosztorysy() {
     if (sort === "brutto-rosnaco") lista.sort((a, b) => Number(a.brutto || 0) - Number(b.brutto || 0));
 
     if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Brak zapisanych kosztorysów.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Brak zapisanych kosztorysów.</td></tr>`;
         return;
     }
 
     tbody.innerHTML = lista.map(k => {
+        const powiazanaInwestycja = znajdzInwestycjeKosztorysu(k);
+        const inwestycjaLabel = powiazanaInwestycja
+            ? esc(powiazanaInwestycja.nazwa || "Inwestycja")
+            : pobierzPowiazanaInwestycjeKosztorysu(k)
+                ? `<span class="orphaned-warning">Inwestycja nie istnieje</span>`
+                : "-";
         const edytuj = rolaUsera !== "guest"
             ? `<button class="btn btn-secondary" onclick="wczytajKosztorys('${esc(k.id)}')">Edytuj</button>`
             : "";
@@ -3870,9 +3939,10 @@ function renderujKosztorysy() {
         }
 
         return `
-            <tr>
+            <tr data-kosztorys-id="${esc(k.id)}">
                 <td>${esc(k.data)}</td>
                 <td><strong>${esc(k.nazwa)}</strong></td>
+                <td>${inwestycjaLabel}</td>
                 <td>${Number(k.netto || 0).toFixed(2)} PLN</td>
                 <td>${Number(k.brutto || 0).toFixed(2)} PLN</td>
                 <td>${statusButton}</td>
@@ -3966,7 +4036,7 @@ window.akcjaKosztorysu = async function(id) {
     if (opcja === '2') {
         const inwestycja = await utworzNowaInwestycjaZKosztorysu(kosztorys);
         if (inwestycja && inwestycja.id) {
-            await zaakceptujKosztorys(id, { inwestycja_id: inwestycja.id });
+            await zaakceptujKosztorys(id, { investment_id: inwestycja.id });
             zapiszLog('Kosztorysy', 'Połączono kosztorys z nową inwestycją', id);
         }
         return;
@@ -4049,7 +4119,7 @@ async function polaczZIstniejacaInwestycja(kosztorys) {
     }
 
     // Prepare extra data: set inwestycja_id and ensure zaakceptowany_at if missing
-    const extra = { inwestycja_id: chosen.id };
+    const extra = { investment_id: chosen.id };
     if (!kosztorys.zaakceptowany_at) extra.zaakceptowany_at = formatDateTimeLocal(new Date());
 
     await zaakceptujKosztorys(kosztorys.id, extra);
@@ -4140,7 +4210,7 @@ function drukujInwestycjeDoOkna(options) {
     const zaliczki = inwestycjeZaliczki.filter(z => String(z.inwestycja_id) === String(aktywnaInwestycjaId));
     const koszty = inwestycjeKoszty.filter(k => String(k.inwestycja_id) === String(aktywnaInwestycjaId));
     const prace = inwestycjePraceDodatkowe.filter(p => String(p.inwestycja_id) === String(aktywnaInwestycjaId));
-    const kosztorys = kosztorysy.find(k => String(k.inwestycja_id) === String(aktywnaInwestycjaId));
+    const kosztorys = kosztorysy.find(k => kosztorysPasujeDoInwestycji(k, aktywnaInwestycjaId));
 
     const sumaZaliczek = zaliczki.reduce((sum, z) => sum + Number(z.kwota || 0), 0);
     const sumaKosztow = koszty.reduce((sum, k) => sum + Number(k.kwota || 0), 0);
@@ -4620,6 +4690,7 @@ window.wczytajKosztorys = function(id) {
 
     document.getElementById("kosztorys-nazwa").value = k.nazwa || "";
     document.getElementById("wycena-korekta").value = k.korekta || 0;
+    ustawPowiazanaInwestycjeKosztorysu(pobierzPowiazanaInwestycjeKosztorysu(k) || "");
     edytowanyKosztorysId = k.id;
     trybEdycjiKosztorysu = true;
     aktualizujTrybEdycjiKosztorysuWidok();
@@ -5220,11 +5291,19 @@ function renderujPowiazaneKosztorysyInwestycji() {
     const container = document.getElementById("powiazane-kosztorysy");
     if (!container) return;
 
-    const related = kosztorysy.filter(k => String(k.inwestycja_id) === String(aktywnaInwestycjaId));
+    const related = kosztorysy.filter(k => kosztorysPasujeDoInwestycji(k, aktywnaInwestycjaId));
+    const actionsHtml = `
+        <div class="button-row">
+            <button class="btn btn-main small-btn" onclick="utworzKosztorysDlaInwestycji('${esc(aktywnaInwestycjaId)}')">Nowy kosztorys</button>
+            <button class="btn btn-secondary small-btn" onclick="polaczIstniejacyKosztorysZInwestycja('${esc(aktywnaInwestycjaId)}')">Połącz istniejący</button>
+        </div>
+    `;
+
     if (!related.length) {
         container.innerHTML = `
-            <h2>Powiązany kosztorys robocizny</h2>
-            <p>Brak powiązanego kosztorysu robocizny dla tej inwestycji.</p>
+            <h2>Kosztorysy</h2>
+            <p>Brak powiązanych kosztorysów dla tej inwestycji.</p>
+            ${actionsHtml}
         `;
         return;
     }
@@ -5235,27 +5314,137 @@ function renderujPowiazaneKosztorysyInwestycji() {
             : k.status === "do_akceptacji"
                 ? `<span class="status-tag status-tag-warning">do akceptacji</span>`
                 : `<span class="status-tag">${esc(k.status || "nieznany")}</span>`;
-
+        const openButton = `<button class="btn btn-secondary small-btn" onclick="otworzKosztorysNaLiscie('${esc(k.id)}')">Otwórz</button>`;
+        const editButton = rolaUsera !== "guest"
+            ? `<button class="btn btn-secondary small-btn" onclick="wczytajKosztorys('${esc(k.id)}')">Edytuj</button>`
+            : "";
         const printButton = `<button class="btn btn-secondary small-btn" onclick="drukujKosztorys('${esc(k.id)}')">Drukuj</button>`;
+        const detachButton = rolaUsera !== "guest"
+            ? `<button class="btn btn-danger small-btn" onclick="odlaczKosztorysOdInwestycji('${esc(k.id)}')">Odłącz</button>`
+            : "";
 
         return `
             <div class="linked-item">
                 <h3>${esc(k.nazwa || "Kosztorys robocizny")}</h3>
+                <p><strong>Data:</strong> ${esc(k.data || "-")}</p>
                 <p><strong>Netto:</strong> ${Number(k.netto || 0).toFixed(2)} PLN</p>
                 <p><strong>Brutto:</strong> ${Number(k.brutto || 0).toFixed(2)} PLN</p>
-                <p><strong>Klient:</strong> ${esc(k.klient || "nie podano")}</p>
                 <p><strong>Status:</strong> ${statusLabel}</p>
-                <p><strong>Data utworzenia:</strong> ${esc(k.data || "-")}</p>
-                <div class="button-row">${printButton}</div>
+                <div class="button-row">${openButton}${editButton}${printButton}${detachButton}</div>
             </div>
         `;
     }).join("");
 
     container.innerHTML = `
-        <h2>Powiązany kosztorys robocizny</h2>
+        <h2>Kosztorysy</h2>
+        ${actionsHtml}
         ${itemsHtml}
     `;
 }
+
+window.utworzKosztorysDlaInwestycji = function(inwestycjaId = aktywnaInwestycjaId) {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może tworzyć kosztorysów.");
+        return;
+    }
+
+    const inwestycja = inwestycje.find(i => String(i.id) === String(inwestycjaId));
+    if (!inwestycja) {
+        alert("Nie znaleziono inwestycji.");
+        return;
+    }
+
+    pokazSekcje("wycena");
+    edytowanyKosztorysId = null;
+    trybEdycjiKosztorysu = false;
+    wycenaPozycje = [];
+    document.getElementById("kosztorys-nazwa").value = inwestycja.nazwa || "";
+    document.getElementById("wycena-korekta").value = 0;
+    ustawPowiazanaInwestycjeKosztorysu(inwestycja.id);
+    aktualizujTrybEdycjiKosztorysuWidok();
+    renderujWycene();
+    document.getElementById("card-wycena-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+window.polaczIstniejacyKosztorysZInwestycja = async function(inwestycjaId = aktywnaInwestycjaId) {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może łączyć kosztorysów z inwestycją.");
+        return;
+    }
+
+    const inwestycja = inwestycje.find(i => String(i.id) === String(inwestycjaId));
+    if (!inwestycja) {
+        alert("Nie znaleziono inwestycji.");
+        return;
+    }
+
+    const lista = (kosztorysy || []).filter(k => !kosztorysPasujeDoInwestycji(k, inwestycjaId));
+    if (!lista.length) {
+        alert("Brak kosztorysów do połączenia.");
+        return;
+    }
+
+    const lines = lista.map((k, idx) => {
+        const linked = znajdzInwestycjeKosztorysu(k);
+        const suffix = linked ? ` (obecnie: ${linked.nazwa || "inna inwestycja"})` : "";
+        return `${idx + 1} - ${k.nazwa || "Kosztorys"} - ${k.data || "-"}${suffix}`;
+    });
+    const wybor = prompt(`Wybierz numer kosztorysu do połączenia z inwestycją:\n${lines.join("\n")}`, "1");
+    if (!wybor) return;
+
+    const num = Number(wybor.trim());
+    if (!Number.isInteger(num) || num < 1 || num > lista.length) {
+        alert("Nieprawidłowy wybór kosztorysu.");
+        return;
+    }
+
+    const kosztorys = lista[num - 1];
+    const currentInvestment = znajdzInwestycjeKosztorysu(kosztorys);
+    if (currentInvestment && !confirm(`Ten kosztorys jest już połączony z inwestycją "${currentInvestment.nazwa || "-"}". Zmienić powiązanie?`)) {
+        return;
+    }
+
+    try {
+        await zapiszPowiazanieKosztorysuZInwestycja(kosztorys.id, inwestycjaId);
+        alert("Kosztorys połączony z inwestycją.");
+        zapiszLog("Kosztorysy", "Połączono kosztorys z inwestycją", kosztorys.id);
+    } catch (err) {
+        console.error("Błąd połączenia kosztorysu z inwestycją:", err);
+        alert("Nie udało się połączyć kosztorysu z inwestycją. Szczegóły są w konsoli.");
+    }
+};
+
+window.odlaczKosztorysOdInwestycji = async function(kosztorysId) {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może odłączać kosztorysów.");
+        return;
+    }
+
+    if (!confirm("Odłączyć kosztorys od inwestycji?")) return;
+
+    try {
+        await zapiszPowiazanieKosztorysuZInwestycja(kosztorysId, null);
+        alert("Kosztorys odłączony od inwestycji.");
+        zapiszLog("Kosztorysy", "Odłączono kosztorys od inwestycji", kosztorysId);
+    } catch (err) {
+        console.error("Błąd odłączenia kosztorysu od inwestycji:", err);
+        alert("Nie udało się odłączyć kosztorysu. Szczegóły są w konsoli.");
+    }
+};
+
+window.otworzKosztorysNaLiscie = function(kosztorysId) {
+    pokazSekcje("kosztorysy");
+    const search = document.getElementById("szukaj-kosztorys");
+    if (search) search.value = "";
+    renderujKosztorysy();
+    const safeId = typeof CSS !== "undefined" && CSS.escape ? CSS.escape(String(kosztorysId)) : String(kosztorysId).replace(/"/g, '\\"');
+    const row = document.querySelector(`[data-kosztorys-id="${safeId}"]`);
+    if (row) {
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+        row.classList.add("calendar-row-highlight");
+        setTimeout(() => row.classList.remove("calendar-row-highlight"), 2500);
+    }
+};
 
 function pobierzKwoteFormularza(inputId, komunikat) {
     const raw = String(document.getElementById(inputId)?.value || "").replace(",", ".").trim();
