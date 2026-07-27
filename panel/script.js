@@ -1,10 +1,10 @@
-// ==========================================
-// EL-NET v2 — jedna strona / panel firmowy
+﻿// ==========================================
+// EL-NET v2 â€” jedna strona / panel firmowy
 // ==========================================
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-22-ELNET";
+const APP_VERSION = "2026.06.13-25-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -45,6 +45,7 @@ let edytowanaZaliczkaId = null;
 let edytowanyKosztId = null;
 let usunInwestycjeModalResolve = null;
 let usunInwestycjeModalWybor = null;
+let zakonczInwestycjeModalResolve = null;
 let trybEdycjiKosztorysu = false;
 let edytowanyKosztorysId = null;
 let aktualnyDrukowanyKosztorysId = null;
@@ -139,11 +140,11 @@ async function zapiszLog(modul, akcja, opis = "", szczegoly = {}) {
 
         if (!res.ok) {
             const warningText = await res.text();
-            console.warn("Nie udało się zapisać logu:", warningText);
+            console.warn("Nie udaĹ‚o siÄ™ zapisaÄ‡ logu:", warningText);
             return;
         }
     } catch (err) {
-        console.warn("Nie udało się zapisać logu:", err);
+        console.warn("Nie udaĹ‚o siÄ™ zapisaÄ‡ logu:", err);
     }
 }
 
@@ -161,13 +162,13 @@ async function pobierzLogi() {
 
         logi = await res.json();
     } catch (err) {
-        console.error("Błąd logów:", err);
+        console.error("BĹ‚Ä…d logĂłw:", err);
         logi = [];
     }
 }
 
 function obsluzBladAutoryzacji(errorText) {
-    // Zabezpieczenie: jeśli błąd autoryzacji już został obsłużony, wyjść
+    // Zabezpieczenie: jeĹ›li bĹ‚Ä…d autoryzacji juĹĽ zostaĹ‚ obsĹ‚uĹĽony, wyjĹ›Ä‡
     if (authErrorHandled === true) return;
     
     if (!errorText || typeof errorText !== 'string') return;
@@ -177,13 +178,13 @@ function obsluzBladAutoryzacji(errorText) {
     const expired = lower.includes('jwt expired') || lower.includes('pgrst301') || lower.includes('401');
     if (!expired) return;
 
-    // Sprawdzić czy jesteśmy na ekranie logowania
+    // SprawdziÄ‡ czy jesteĹ›my na ekranie logowania
     const login = document.getElementById('login-screen');
     const app = document.getElementById('app-screen');
     const isOnLoginScreen = login && !login.classList.contains('hidden');
 
     if (isOnLoginScreen) {
-        // Jeśli już na ekranie logowania, tylko wyczyść storage
+        // JeĹ›li juĹĽ na ekranie logowania, tylko wyczyĹ›Ä‡ storage
         wyczyscTylkoSesje();
         accessToken = null;
         zalogowanyUser = null;
@@ -192,7 +193,7 @@ function obsluzBladAutoryzacji(errorText) {
         return;
     }
 
-    // Ustaw flagę aby uniknąć wielu alertów
+    // Ustaw flagÄ™ aby uniknÄ…Ä‡ wielu alertĂłw
     authErrorHandled = true;
 
     // Clear session and reset state
@@ -201,8 +202,8 @@ function obsluzBladAutoryzacji(errorText) {
     zalogowanyUser = null;
     rolaUsera = 'guest';
 
-    // Pokaż alert maksymalnie raz
-    alert('Sesja wygasła. Zaloguj się ponownie.');
+    // PokaĹĽ alert maksymalnie raz
+    alert('Sesja wygasĹ‚a. Zaloguj siÄ™ ponownie.');
 
     // Show login screen (or reload as fallback)
     try {
@@ -400,10 +401,26 @@ function podepnijZdarzenia() {
         btn.addEventListener("click", () => wybierzOpcjeUsuwaniaInwestycji(btn.dataset.deleteInvestmentChoice));
     });
 
+    const btnZamknijZakonczInwestycje = document.getElementById("btn-zamknij-zakoncz-inwestycje-modal");
+    if (btnZamknijZakonczInwestycje) btnZamknijZakonczInwestycje.addEventListener("click", () => zamknijModalZakonczeniaInwestycji(null));
+
+    const btnAnulujZakonczInwestycje = document.getElementById("btn-anuluj-zakoncz-inwestycje");
+    if (btnAnulujZakonczInwestycje) btnAnulujZakonczInwestycje.addEventListener("click", () => zamknijModalZakonczeniaInwestycji(null));
+
+    const btnPotwierdzZakonczInwestycje = document.getElementById("btn-potwierdz-zakoncz-inwestycje");
+    if (btnPotwierdzZakonczInwestycje) btnPotwierdzZakonczInwestycje.addEventListener("click", potwierdzModalZakonczeniaInwestycji);
+
+    const zakonczInwestycjeBackdrop = document.querySelector("#zakoncz-inwestycje-modal .modal-backdrop");
+    if (zakonczInwestycjeBackdrop) zakonczInwestycjeBackdrop.addEventListener("click", () => zamknijModalZakonczeniaInwestycji(null));
+
     document.addEventListener("keydown", event => {
         const modal = document.getElementById("usun-inwestycje-modal");
         if (event.key === "Escape" && modal && !modal.classList.contains("hidden")) {
             zamknijModalUsuwaniaInwestycji(null);
+        }
+        const finishModal = document.getElementById("zakoncz-inwestycje-modal");
+        if (event.key === "Escape" && finishModal && !finishModal.classList.contains("hidden")) {
+            zamknijModalZakonczeniaInwestycji(null);
         }
     });
 
@@ -522,7 +539,7 @@ async function zaloguj() {
     if (error) error.style.display = "none";
 
     if (!email || !password) {
-        alert("Wpisz e-mail i hasło.");
+        alert("Wpisz e-mail i hasĹ‚o.");
         return;
     }
 
@@ -536,7 +553,7 @@ async function zaloguj() {
             body: JSON.stringify({ email, password })
         });
 
-        if (!authResponse.ok) throw new Error("Błędne dane logowania.");
+        if (!authResponse.ok) throw new Error("BĹ‚Ä™dne dane logowania.");
 
         const authData = await authResponse.json();
         accessToken = authData.access_token;
@@ -561,7 +578,7 @@ async function zaloguj() {
             rola: rolaUsera
         }));
 
-        // Zresetuj flagę błędu autoryzacji po poprawnym logowaniu
+        // Zresetuj flagÄ™ bĹ‚Ä™du autoryzacji po poprawnym logowaniu
         authErrorHandled = false;
 
         pokazAplikacje();
@@ -620,8 +637,8 @@ function aktualizujWidokPoRoli() {
     const cardKosztForm = document.getElementById("card-koszt-form");
     const btnWyczyscWycene = document.getElementById("btn-wyczysc-wycene");
 
-    // Formularz usług widoczny dla zalogowanych ról (admin, staff, user)
-    // oraz dla konkretnego konta n.norbud@gmail.com niezależnie od roli
+    // Formularz usĹ‚ug widoczny dla zalogowanych rĂłl (admin, staff, user)
+    // oraz dla konkretnego konta n.norbud@gmail.com niezaleĹĽnie od roli
     const allowUslugiForm = (rolaUsera && rolaUsera !== 'guest') || (zalogowanyUser && String(zalogowanyUser.email || '').toLowerCase() === 'n.norbud@gmail.com');
     if (cardUslugiForm) cardUslugiForm.classList.toggle("hidden", !allowUslugiForm);
     if (cardWycenaForm) cardWycenaForm.classList.toggle("hidden", rolaUsera === "guest");
@@ -664,7 +681,7 @@ function pokazSekcje(nazwa) {
 }
 
 // ==========================================
-// SUPABASE — POBIERANIE
+// SUPABASE â€” POBIERANIE
 // ==========================================
 
 async function odswiezDane() {
@@ -694,7 +711,7 @@ async function odswiezDane() {
 async function pobierzUslugi() {
     try {
         const url = `${SUPABASE_URL}/rest/v1/uslugi?select=*&order=nazwa.asc`;
-        console.log("ELNET LOAD DEBUG: pobieram tabelę", "uslugi", "userId", zalogowanyUser?.id || null);
+        console.log("ELNET LOAD DEBUG: pobieram tabelÄ™", "uslugi", "userId", zalogowanyUser?.id || null);
         console.log("ELNET LOAD DEBUG: fetch url", url);
         const res = await fetch(url, {
             headers: headers()
@@ -703,7 +720,7 @@ async function pobierzUslugi() {
 
         if (!res.ok) {
             const errorText = await res.text();
-            console.error("ELNET LOAD DEBUG: błąd", "uslugi", errorText);
+            console.error("ELNET LOAD DEBUG: bĹ‚Ä…d", "uslugi", errorText);
             obsluzBladAutoryzacji(errorText);
             throw new Error(errorText);
         }
@@ -711,7 +728,7 @@ async function pobierzUslugi() {
         uslugi = await res.json();
         console.log("ELNET LOAD DEBUG: wynik", "uslugi", uslugi);
     } catch (err) {
-        console.error("Błąd usług:", err);
+        console.error("BĹ‚Ä…d usĹ‚ug:", err);
         uslugi = [];
     }
 }
@@ -730,7 +747,7 @@ async function pobierzKosztorysy() {
 
         kosztorysy = await res.json();
     } catch (err) {
-        console.error("Błąd kosztorysów:", err);
+        console.error("BĹ‚Ä…d kosztorysĂłw:", err);
         kosztorysy = [];
     }
 }
@@ -738,7 +755,7 @@ async function pobierzKosztorysy() {
 async function pobierzInwestycje() {
     try {
         const url = `${SUPABASE_URL}/rest/v1/inwestycje?select=*&order=created_at.desc`;
-        console.log("ELNET LOAD DEBUG: pobieram tabelę", "inwestycje", "userId", zalogowanyUser?.id || null);
+        console.log("ELNET LOAD DEBUG: pobieram tabelÄ™", "inwestycje", "userId", zalogowanyUser?.id || null);
         console.log("ELNET LOAD DEBUG: fetch url", url);
         const res = await fetch(url, {
             headers: headers()
@@ -747,7 +764,7 @@ async function pobierzInwestycje() {
 
         if (!res.ok) {
             const errorText = await res.text();
-            console.error("ELNET LOAD DEBUG: błąd", "inwestycje", errorText);
+            console.error("ELNET LOAD DEBUG: bĹ‚Ä…d", "inwestycje", errorText);
             obsluzBladAutoryzacji(errorText);
             throw new Error(errorText);
         }
@@ -755,7 +772,7 @@ async function pobierzInwestycje() {
         inwestycje = await res.json();
         console.log("ELNET LOAD DEBUG: wynik", "inwestycje", inwestycje);
     } catch (err) {
-        console.error("Błąd inwestycji:", err);
+        console.error("BĹ‚Ä…d inwestycji:", err);
         inwestycje = [];
     }
 }
@@ -774,7 +791,7 @@ async function pobierzInwestycjeZaliczki() {
 
         inwestycjeZaliczki = await res.json();
     } catch (err) {
-        console.error("Błąd zaliczek:", err);
+        console.error("BĹ‚Ä…d zaliczek:", err);
         inwestycjeZaliczki = [];
     }
 }
@@ -793,7 +810,7 @@ async function pobierzInwestycjeKoszty() {
 
         inwestycjeKoszty = await res.json();
     } catch (err) {
-        console.error("Błąd kosztów:", err);
+        console.error("BĹ‚Ä…d kosztĂłw:", err);
         inwestycjeKoszty = [];
     }
 }
@@ -812,7 +829,7 @@ async function pobierzInwestycjePraceDodatkowe() {
 
         inwestycjePraceDodatkowe = await res.json();
     } catch (err) {
-        console.error("Błąd prac dodatkowych:", err);
+        console.error("BĹ‚Ä…d prac dodatkowych:", err);
         inwestycjePraceDodatkowe = [];
     }
 }
@@ -832,7 +849,7 @@ async function pobierzMagazyn() {
 
         magazyn = await res.json();
     } catch (err) {
-        console.error("Błąd pobierania magazynu:", err);
+        console.error("BĹ‚Ä…d pobierania magazynu:", err);
         magazyn = [];
     }
 }
@@ -840,7 +857,7 @@ async function pobierzMagazyn() {
 async function pobierzTerminarz() {
     try {
         const url = `${SUPABASE_URL}/rest/v1/terminarz?select=*&order=data_start.asc`;
-        console.log("ELNET LOAD DEBUG: pobieram tabelę", "terminarz", "userId", zalogowanyUser?.id || null);
+        console.log("ELNET LOAD DEBUG: pobieram tabelÄ™", "terminarz", "userId", zalogowanyUser?.id || null);
         console.log("ELNET LOAD DEBUG: fetch url", url);
         const res = await fetch(url, {
             headers: headers()
@@ -849,7 +866,7 @@ async function pobierzTerminarz() {
 
         if (!res.ok) {
             const errorText = await res.text();
-            console.error("ELNET LOAD DEBUG: błąd", "terminarz", errorText);
+            console.error("ELNET LOAD DEBUG: bĹ‚Ä…d", "terminarz", errorText);
             obsluzBladAutoryzacji(errorText);
             throw new Error(errorText);
         }
@@ -857,14 +874,14 @@ async function pobierzTerminarz() {
         terminarz = await res.json();
         console.log("ELNET LOAD DEBUG: wynik", "terminarz", terminarz);
     } catch (err) {
-        console.error("Błąd pobierania terminarza:", err);
+        console.error("BĹ‚Ä…d pobierania terminarza:", err);
         terminarz = [];
     }
 }
 
 async function dodajTermin() {
     if (rolaUsera === 'guest') {
-        alert('Musisz być zalogowany, aby dodać termin.');
+        alert('Musisz byÄ‡ zalogowany, aby dodaÄ‡ termin.');
         return;
     }
 
@@ -878,7 +895,7 @@ async function dodajTermin() {
     const type = document.getElementById('terminarz-type')?.value || 'Zadanie';
 
     if (!dataStart || !dataKoniec) {
-        alert('Podaj datę rozpoczęcia i zakończenia.');
+        alert('Podaj datÄ™ rozpoczÄ™cia i zakoĹ„czenia.');
         return;
     }
 
@@ -886,7 +903,7 @@ async function dodajTermin() {
     const nowyKoniec = new Date(dataKoniec);
 
     if (nowyKoniec < nowyStart) {
-        alert('Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.');
+        alert('Data zakoĹ„czenia nie moĹĽe byÄ‡ wczeĹ›niejsza niĹĽ data rozpoczÄ™cia.');
         return;
     }
 
@@ -935,7 +952,7 @@ async function dodajTermin() {
         await pobierzTerminarz();
         renderujTerminarz();
         renderujKalendarzTerminarza();
-        zapiszLog('Terminarz', logAkcja, `${klient} ${dataStart}–${dataKoniec}`);
+        zapiszLog('Terminarz', logAkcja, `${klient} ${dataStart}â€“${dataKoniec}`);
 
         edytowanyTerminId = null;
         const btnDodajTermin = document.getElementById('btn-dodaj-termin');
@@ -953,15 +970,15 @@ async function dodajTermin() {
         const typeEl = document.getElementById('terminarz-type');
         if (typeEl) typeEl.value = 'Zadanie';
     } catch (err) {
-        console.error('Błąd zapisu terminarza:', err);
+        console.error('BĹ‚Ä…d zapisu terminarza:', err);
         const msg = err?.message || String(err);
-        alert('Nie udało się zapisać terminu:\n\n' + msg);
+        alert('Nie udaĹ‚o siÄ™ zapisaÄ‡ terminu:\n\n' + msg);
     }
 }
 
 window.edytujTermin = function(id) {
     if (rolaUsera === 'guest') {
-        alert('Tylko zalogowany użytkownik może edytować termin.');
+        alert('Tylko zalogowany uĹĽytkownik moĹĽe edytowaÄ‡ termin.');
         return;
     }
 
@@ -1011,7 +1028,7 @@ function anulujEdycjeTerminu() {
 
 window.usunTermin = async function(id) {
     if (rolaUsera === "guest") {
-        alert("Tylko zalogowany użytkownik może usuwać terminy.");
+        alert("Tylko zalogowany uĹĽytkownik moĹĽe usuwaÄ‡ terminy.");
         return;
     }
 
@@ -1020,8 +1037,8 @@ window.usunTermin = async function(id) {
     const inwestycja = investmentId ? znajdzInwestycjePoId(investmentId) : null;
 
     if (investmentId && inwestycja) {
-        if (!confirm("Ten wpis jest połączony z inwestycją. Czy usunąć tylko wpis z Terminarza i odłączyć inwestycję?")) return;
-    } else if (!confirm("Usunąć termin?")) {
+        if (!confirm("Ten wpis jest poĹ‚Ä…czony z inwestycjÄ…. Czy usunÄ…Ä‡ tylko wpis z Terminarza i odĹ‚Ä…czyÄ‡ inwestycjÄ™?")) return;
+    } else if (!confirm("UsunÄ…Ä‡ termin?")) {
         return;
     }
 
@@ -1042,10 +1059,10 @@ window.usunTermin = async function(id) {
         zapiszLokalnePowiazaniaPanelu();
 
         await odswiezWidokiPoZmianieTerminarza();
-        zapiszLog("Terminarz", "Usunięto termin", id);
+        zapiszLog("Terminarz", "UsuniÄ™to termin", id);
     } catch (err) {
-        console.error("Błąd usuwania terminarza:", err);
-        alert("Nie udało się usunąć terminu.");
+        console.error("BĹ‚Ä…d usuwania terminarza:", err);
+        alert("Nie udaĹ‚o siÄ™ usunÄ…Ä‡ terminu.");
     }
 };
 
@@ -1070,14 +1087,14 @@ function renderujTerminarz() {
         const filtrowanaData = parseDateLocal(dateFilter);
         lista = lista.filter(item => {
             const start = item.data_start ? parseDateLocal(item.data_start) : null;
-            const end = item.data_koniec ? parseDateLocal(item.data_koniec) : null;
+            const end = wyswietlanaDataKoncaTerminu(item) ? parseDateLocal(wyswietlanaDataKoncaTerminu(item)) : null;
             if (!start || !end || !filtrowanaData) return false;
             return filtrowanaData >= start && filtrowanaData <= end;
         });
     }
 
     function statusOrder(item) {
-        const order = ['zaplanowane', 'w trakcie', 'zakończone', 'przesunięte', 'odwołane'];
+        const order = ['zaplanowane', 'w trakcie', 'zakoĹ„czone', 'przesuniÄ™te', 'odwoĹ‚ane'];
         return order.indexOf((item.status || '').toLowerCase());
     }
 
@@ -1089,7 +1106,7 @@ function renderujTerminarz() {
             return (parseDateLocal(b.data_start) || 0) - (parseDateLocal(a.data_start) || 0);
         }
         if (sort === 'end-asc') {
-            return (parseDateLocal(a.data_koniec) || 0) - (parseDateLocal(b.data_koniec) || 0);
+            return (parseDateLocal(wyswietlanaDataKoncaTerminu(a)) || 0) - (parseDateLocal(wyswietlanaDataKoncaTerminu(b)) || 0);
         }
         if (sort === 'client-az') {
             return String(a.klient || '').localeCompare(String(b.klient || ''), 'pl');
@@ -1101,27 +1118,43 @@ function renderujTerminarz() {
     });
 
     if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="8" class="empty-row">Brak terminów w terminarzu.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-row">Brak terminĂłw w terminarzu.</td></tr>`;
         return;
     }
 
     const today = new Date();
     tbody.innerHTML = lista.map(item => {
         const start = item.data_start ? parseDateLocal(item.data_start) : null;
-        const end = item.data_koniec ? parseDateLocal(item.data_koniec) : null;
+        const end = wyswietlanaDataKoncaTerminu(item) ? parseDateLocal(wyswietlanaDataKoncaTerminu(item)) : null;
+        const plannedEnd = item.data_koniec ? parseDateLocal(item.data_koniec) : null;
         const startStr = start ? start.toLocaleDateString('pl-PL') : '-';
-        const endStr = end ? end.toLocaleDateString('pl-PL') : '-';
+        const endStr = plannedEnd ? plannedEnd.toLocaleDateString('pl-PL') : (end ? end.toLocaleDateString('pl-PL') : '-');
         const days = start && end ? Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1) : '-';
         const status = String(item.status || '').toLowerCase();
         const itemType = typTerminu(item);
         const investmentId = pobierzPowiazanaInwestycjeId(item);
         const linkedInvestment = investmentId ? znajdzInwestycjePoId(investmentId) : null;
         const orphanInvestmentLink = Boolean(investmentId && !linkedInvestment);
-        const statusText = linkedInvestment ? `${status || '-'} · PI` : (status || '-');
-        const statusTitle = linkedInvestment ? 'PI — powiązana inwestycja' : '';
+        const isCompletedInvestmentEvent = Boolean(linkedInvestment && czyTerminLubInwestycjaZakonczona(item));
+        const statusText = isCompletedInvestmentEvent ? "Zakończona · PI" : (linkedInvestment ? `${status || '-'} · PI` : (status || '-'));
+        const statusTitle = linkedInvestment ? 'PI â€” powiÄ…zana inwestycja' : '';
         const statusLabel = `<span class="status-tag status-${status.replace(/\s/g, '-')}" title="${esc(statusTitle)}">${esc(statusText)}</span>`;
+        const historicalEnd = linkedInvestment && !isCompletedInvestmentEvent
+            ? (rzeczywistaDataZakonczeniaTerminu(item) || rzeczywistaDataZakonczenia(linkedInvestment))
+            : "";
+        const planInfo = linkedInvestment && isCompletedInvestmentEvent
+            ? (() => {
+                const { dataStart: planStart, dataKoniec: planEnd } = pobierzDatyInwestycji(linkedInvestment);
+                const actualEnd = rzeczywistaDataZakonczeniaTerminu(item) || rzeczywistaDataZakonczenia(linkedInvestment) || "-";
+                return `<span class="linked-event-note">Rzeczywiste zakończenie: ${esc(actualEnd)}</span><span class="linked-event-note">Planowany termin: od ${esc(item.data_start || planStart || "-")} do ${esc(item.data_koniec || planEnd || planStart || "-")}</span>`;
+            })()
+            : historicalEnd
+                ? `<span class="linked-event-note">Poprzednio zakończono: ${esc(historicalEnd)}</span>`
+            : "";
         const investmentInfo = orphanInvestmentLink
-            ? `<span class="orphaned-warning">Powiązana inwestycja nie istnieje</span>`
+            ? `<span class="orphaned-warning">PowiÄ…zana inwestycja nie istnieje</span>`
+            : planInfo
+                ? planInfo
             : itemType === "Inwestycja" && !linkedInvestment
                 ? `<span class="linked-event-note">Typ: Inwestycja</span>`
                 : "";
@@ -1130,14 +1163,14 @@ function renderujTerminarz() {
             ? `<button class="btn btn-secondary small-btn" onclick="edytujTermin('${esc(item.id)}')">Edytuj</button>`
             : '';
         const deleteButton = canEdit && !orphanInvestmentLink
-            ? `<button class="btn btn-danger small-btn" onclick="usunTermin('${esc(item.id)}')">Usuń</button>`
+            ? `<button class="btn btn-danger small-btn" onclick="usunTermin('${esc(item.id)}')">UsuĹ„</button>`
             : '';
         const investmentButton = orphanInvestmentLink
-            ? `<button class="btn btn-danger small-btn" onclick="usunTermin('${esc(item.id)}')">Usuń wpis</button> <button class="btn btn-secondary small-btn" onclick="odlaczTermin('${esc(item.id)}')">Odłącz</button> <button class="btn btn-secondary small-btn" onclick="polaczTerminZInnaInwestycja('${esc(item.id)}')">Połącz z inną</button>`
+            ? `<button class="btn btn-danger small-btn" onclick="usunTermin('${esc(item.id)}')">UsuĹ„ wpis</button> <button class="btn btn-secondary small-btn" onclick="odlaczTermin('${esc(item.id)}')">OdĹ‚Ä…cz</button> <button class="btn btn-secondary small-btn" onclick="polaczTerminZInnaInwestycja('${esc(item.id)}')">PoĹ‚Ä…cz z innÄ…</button>`
             : investmentId
                 ? `<button class="btn btn-secondary small-btn" onclick="przejdzDoInwestycjiZTerminu('${esc(item.id)}')">Do inwestycji</button>`
                 : itemType === "Inwestycja"
-                    ? `<button class="btn btn-secondary small-btn" onclick="obsluzTerminInwestycji('${esc(item.id)}')">Obsłuż inwestycję</button>`
+                    ? `<button class="btn btn-secondary small-btn" onclick="obsluzTerminInwestycji('${esc(item.id)}')">ObsĹ‚uĹĽ inwestycjÄ™</button>`
                     : '';
         const actionClass = orphanInvestmentLink ? "calendar-row-actions orphaned-actions" : "calendar-row-actions";
         const rowClass = orphanInvestmentLink ? ' class="orphaned-event"' : '';
@@ -1146,7 +1179,7 @@ function renderujTerminarz() {
 
         return `
             <tr${rowClass}${rowIdAttr}>
-                <td>${esc(startStr)} – ${esc(endStr)}</td>
+                <td>${esc(startStr)} â€“ ${esc(endStr)}</td>
                 <td>${esc(item.klient || '')}</td>
                 <td>${esc(item.adres || '')}</td>
                 <td>${esc(item.telefon || '')}</td>
@@ -1173,7 +1206,7 @@ function renderujKalendarzTerminarza() {
     const startOffset = (firstDay.getDay() + 6) % 7;
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-    const weekdays = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'];
+    const weekdays = ['Pon', 'Wt', 'Ĺšr', 'Czw', 'Pt', 'Sob', 'Nd'];
 
     const cells = weekdays.map(d => `<div class="calendar-weekday">${d}</div>`);
 
@@ -1253,7 +1286,7 @@ async function zapiszPowiazanieInwestycjaTermin(investmentId, eventId) {
     });
     const inwestycjaText = await inwestycjaRes.text();
     if (!inwestycjaRes.ok) {
-        console.error("Błąd aktualizacji powiązania inwestycji:", {
+        console.error("BĹ‚Ä…d aktualizacji powiÄ…zania inwestycji:", {
             status: inwestycjaRes.status,
             text: inwestycjaText,
             payload: updatePayload
@@ -1269,7 +1302,7 @@ async function zapiszPowiazanieInwestycjaTermin(investmentId, eventId) {
     });
     const terminarzText = await terminarzRes.text();
     if (!terminarzRes.ok) {
-        console.error("Błąd aktualizacji powiązania terminarza:", {
+        console.error("BĹ‚Ä…d aktualizacji powiÄ…zania terminarza:", {
             status: terminarzRes.status,
             text: terminarzText,
             payload: terminarzUpdatePayload
@@ -1356,6 +1389,50 @@ function pobierzDatyInwestycji(inwestycja) {
     return { dataStart, dataKoniec };
 }
 
+function normalizujStatusTekst(status) {
+    return String(status || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim();
+}
+
+function czyStatusInwestycjiZakonczony(status) {
+    const normalized = normalizujStatusTekst(status);
+    return normalized === "zakonczona" || (normalized.includes("zako") && normalized.includes("czona"));
+}
+
+function czyStatusTerminuZakonczony(status) {
+    const normalized = normalizujStatusTekst(status);
+    return normalized === "zakonczone" || (normalized.includes("zako") && normalized.includes("czone"));
+}
+
+function rzeczywistaDataZakonczenia(inwestycja) {
+    return inwestycja?.completed_at || inwestycja?.completedAt || "";
+}
+
+function rzeczywistaDataZakonczeniaTerminu(termin) {
+    return termin?.actual_end_date || termin?.completed_at || "";
+}
+
+function powiazanaInwestycjaTerminu(termin) {
+    const investmentId = pobierzPowiazanaInwestycjeId(termin);
+    return investmentId ? znajdzInwestycjePoId(investmentId) : null;
+}
+
+function czyTerminLubInwestycjaZakonczona(termin) {
+    if (czyStatusTerminuZakonczony(termin?.status)) return true;
+    const linkedInvestment = powiazanaInwestycjaTerminu(termin);
+    return Boolean(linkedInvestment && czyStatusInwestycjiZakonczony(linkedInvestment.status));
+}
+
+function wyswietlanaDataKoncaTerminu(termin) {
+    const plannedEnd = termin?.data_koniec || termin?.data_start || "";
+    if (!czyTerminLubInwestycjaZakonczona(termin)) return plannedEnd;
+    const linkedInvestment = powiazanaInwestycjaTerminu(termin);
+    return rzeczywistaDataZakonczeniaTerminu(termin) || rzeczywistaDataZakonczenia(linkedInvestment) || plannedEnd;
+}
+
 function czyStatusInwestycjiDoTerminarza(status) {
     const normalized = String(status || "").toLowerCase().trim();
     return ["aktywna", "planowana", "do realizacji"].includes(normalized);
@@ -1364,14 +1441,16 @@ function czyStatusInwestycjiDoTerminarza(status) {
 function statusTerminuDlaInwestycji(status) {
     const normalized = String(status || "").toLowerCase().trim();
     if (normalized === "aktywna") return "w trakcie";
-    if (normalized === "zakończona") return "zakończone";
-    if (normalized === "anulowana") return "odwołane";
-    if (normalized === "wstrzymana") return "przesunięte";
+    if (czyStatusInwestycjiZakonczony(status)) return "zakoĹ„czone";
+    if (normalized === "anulowana") return "odwoĹ‚ane";
+    if (normalized === "wstrzymana") return "przesuniÄ™te";
     return "zaplanowane";
 }
 
 function payloadTerminuZInwestycji(inwestycja, dataStart, dataKoniec) {
-    return {
+    const completedAt = rzeczywistaDataZakonczenia(inwestycja);
+    const isCompleted = czyStatusInwestycjiZakonczony(inwestycja?.status) && completedAt;
+    const payload = {
         data_start: dataStart,
         data_koniec: dataKoniec || dataStart,
         klient: inwestycja.klient || inwestycja.nazwa || "",
@@ -1383,6 +1462,10 @@ function payloadTerminuZInwestycji(inwestycja, dataStart, dataKoniec) {
         type: "Inwestycja",
         user_id: zalogowanyUser?.id || null
     };
+    if (isCompleted) {
+        payload.actual_end_date = completedAt;
+    }
+    return payload;
 }
 
 async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
@@ -1391,9 +1474,9 @@ async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
 
     let { dataStart, dataKoniec } = pobierzDatyInwestycji(inwestycja);
     if (!dataStart && options.pytajODaty) {
-        dataStart = prompt("Podaj datę rozpoczęcia inwestycji (RRRR-MM-DD):", formatDateLocal(new Date()));
+        dataStart = prompt("Podaj datÄ™ rozpoczÄ™cia inwestycji (RRRR-MM-DD):", formatDateLocal(new Date()));
         if (!dataStart) return null;
-        dataKoniec = prompt("Podaj datę zakończenia inwestycji (RRRR-MM-DD):", dataStart) || dataStart;
+        dataKoniec = prompt("Podaj datÄ™ zakoĹ„czenia inwestycji (RRRR-MM-DD):", dataStart) || dataStart;
         zapiszDatyInwestycji(inwestycja.id, dataStart, dataKoniec);
     }
     if (!dataStart) return null;
@@ -1409,7 +1492,7 @@ async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
         });
         const text = await res.text();
         if (!res.ok) {
-            console.error("Błąd aktualizacji powiązania terminarza:", {
+            console.error("BĹ‚Ä…d aktualizacji powiÄ…zania terminarza:", {
                 status: res.status,
                 text,
                 payload
@@ -1438,11 +1521,11 @@ async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
     try {
         created = text ? JSON.parse(text) : null;
     } catch (e) {
-        console.error("Błąd parsowania odpowiedzi Supabase:", e);
+        console.error("BĹ‚Ä…d parsowania odpowiedzi Supabase:", e);
     }
 
     if (!res.ok) {
-        console.error("Błąd dodania wpisu terminarza:", {
+        console.error("BĹ‚Ä…d dodania wpisu terminarza:", {
             status: res.status,
             text,
             payload
@@ -1454,6 +1537,61 @@ async function zsynchronizujInwestycjeZTerminarzem(inwestycja, options = {}) {
         await zapiszPowiazanieInwestycjaTermin(inwestycja.id, eventId);
     }
     return eventId || null;
+}
+
+async function zsynchronizujZakonczenieInwestycjiZTerminarzem(inwestycja, completedAt) {
+    const linkedEventId = pobierzPowiazanyTerminId(inwestycja);
+    const { dataStart, dataKoniec } = pobierzDatyInwestycji(inwestycja);
+
+    if (!linkedEventId) {
+        alert("Ta inwestycja nie ma powiÄ…zanego wpisu w Terminarzu. Nowy wpis nie zostaĹ‚ utworzony automatycznie.");
+        await zapiszLog("Inwestycje", "Zakończono inwestycję bez powiązanego Terminarza", inwestycja.nazwa || inwestycja.id, {
+            old_planned_start: dataStart || null,
+            old_planned_end: dataKoniec || null,
+            completed_at: completedAt,
+            calendar_event_id: null,
+            user_id: zalogowanyUser?.id || null,
+            email: zalogowanyUser?.email || ""
+        });
+        return { linkedEventId: null, skipped: true, oldPlannedEnd: dataKoniec || null };
+    }
+
+    const payload = {
+        data_start: dataStart || completedAt,
+        data_koniec: dataKoniec || dataStart || completedAt,
+        actual_end_date: completedAt,
+        status: "zakoĹ„czone",
+        investment_id: inwestycja.id,
+        type: "Inwestycja"
+    };
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${encodeURIComponent(linkedEventId)}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify(payload)
+    });
+    const text = await res.text();
+    if (!res.ok) {
+        console.error("BĹ‚Ä…d synchronizacji zakoĹ„czenia inwestycji z Terminarzem:", {
+            status: res.status,
+            text,
+            payload,
+            investmentId: inwestycja.id,
+            linkedEventId
+        });
+        throw new Error(text);
+    }
+
+    await zapiszLog("Inwestycje", "ZakoĹ„czono inwestycjÄ™ i zaktualizowano Terminarz", inwestycja.nazwa || inwestycja.id, {
+        old_planned_start: dataStart || null,
+        old_planned_end: dataKoniec || null,
+        completed_at: completedAt,
+        calendar_event_id: linkedEventId,
+        user_id: zalogowanyUser?.id || null,
+        email: zalogowanyUser?.email || ""
+    });
+
+    return { linkedEventId, skipped: false, oldPlannedEnd: dataKoniec || null };
 }
 
 async function zsynchronizujAktywneInwestycjeZTerminarzem() {
@@ -1510,11 +1648,11 @@ async function ustawStatusInwestycji(investmentId, status) {
 function wybierzIstniejacaInwestycje() {
     const lista = (inwestycje || []).slice(0, 20);
     if (!lista.length) {
-        alert("Brak inwestycji do połączenia.");
+        alert("Brak inwestycji do poĹ‚Ä…czenia.");
         return null;
     }
     const opis = lista.map((i, index) => `${index + 1}. ${i.nazwa || i.id} - ${i.klient || "bez klienta"}`).join("\n");
-    const wybor = prompt(`Wybierz numer inwestycji do połączenia:\n${opis}`);
+    const wybor = prompt(`Wybierz numer inwestycji do poĹ‚Ä…czenia:\n${opis}`);
     const index = Number(wybor) - 1;
     return lista[index] || null;
 }
@@ -1527,7 +1665,7 @@ window.obsluzTerminInwestycji = async function(id) {
         return;
     }
 
-    const wybor = prompt("Wybierz opcję:\n1 - Utwórz inwestycję z tego wpisu\n2 - Połącz z istniejącą inwestycją\n3 - Zostaw tylko w Terminarzu", "3");
+    const wybor = prompt("Wybierz opcjÄ™:\n1 - UtwĂłrz inwestycjÄ™ z tego wpisu\n2 - PoĹ‚Ä…cz z istniejÄ…cÄ… inwestycjÄ…\n3 - Zostaw tylko w Terminarzu", "3");
     try {
         if (wybor === "1") {
             await utworzInwestycjeZTerminu(termin, "planowana");
@@ -1544,24 +1682,24 @@ window.obsluzTerminInwestycji = async function(id) {
         renderujInwestycje();
         renderujTerminarz();
         renderujKalendarzTerminarza();
-        zapiszLog("Terminarz", "Powiązano wpis z inwestycją", id);
+        zapiszLog("Terminarz", "PowiÄ…zano wpis z inwestycjÄ…", id);
     } catch (err) {
         console.error(err);
-        alert("Nie udało się obsłużyć powiązania inwestycji.");
+        alert("Nie udaĹ‚o siÄ™ obsĹ‚uĹĽyÄ‡ powiÄ…zania inwestycji.");
     }
 };
 
 window.odlaczTermin = async function(id) {
     const termin = terminarz.find(t => String(t.id) === String(id));
     if (!termin) return;
-    if (!confirm("Odłączyć ten wpis od inwestycji?")) return;
+    if (!confirm("OdĹ‚Ä…czyÄ‡ ten wpis od inwestycji?")) return;
     try {
         await odlaczTerminOdInwestycji(termin);
         await odswiezWidokiPoZmianieTerminarza();
-        zapiszLog("Terminarz", "Odłączono wpis od inwestycji", id);
+        zapiszLog("Terminarz", "OdĹ‚Ä…czono wpis od inwestycji", id);
     } catch (err) {
-        console.error("Błąd odłączania wpisu terminarza od inwestycji:", err);
-        alert("Nie udało się odłączyć wpisu od inwestycji.");
+        console.error("BĹ‚Ä…d odĹ‚Ä…czania wpisu terminarza od inwestycji:", err);
+        alert("Nie udaĹ‚o siÄ™ odĹ‚Ä…czyÄ‡ wpisu od inwestycji.");
     }
 };
 
@@ -1574,10 +1712,10 @@ window.polaczTerminZInnaInwestycja = async function(id) {
         await zapiszPowiazanieInwestycjaTermin(inwestycja.id, termin.id);
         zapiszDatyInwestycji(inwestycja.id, termin.data_start, termin.data_koniec || termin.data_start);
         await odswiezWidokiPoZmianieTerminarza();
-        zapiszLog("Terminarz", "Połączono wpis z inną inwestycją", id);
+        zapiszLog("Terminarz", "PoĹ‚Ä…czono wpis z innÄ… inwestycjÄ…", id);
     } catch (err) {
-        console.error("Błąd łączenia wpisu terminarza z inwestycją:", err);
-        alert("Nie udało się połączyć wpisu z inwestycją.");
+        console.error("BĹ‚Ä…d Ĺ‚Ä…czenia wpisu terminarza z inwestycjÄ…:", err);
+        alert("Nie udaĹ‚o siÄ™ poĹ‚Ä…czyÄ‡ wpisu z inwestycjÄ….");
     }
 };
 
@@ -1592,7 +1730,7 @@ window.przejdzDoInwestycjiZTerminu = async function(id) {
         return;
     }
 
-    const wybor = prompt("Ta inwestycja została usunięta albo nie istnieje.\n1 - Usuń wpis z Terminarza\n2 - Odłącz wpis od inwestycji\n3 - Anuluj", "3");
+    const wybor = prompt("Ta inwestycja zostaĹ‚a usuniÄ™ta albo nie istnieje.\n1 - UsuĹ„ wpis z Terminarza\n2 - OdĹ‚Ä…cz wpis od inwestycji\n3 - Anuluj", "3");
     try {
         if (wybor === "1") {
             await usunTerminZBazy(id);
@@ -1606,8 +1744,8 @@ window.przejdzDoInwestycjiZTerminu = async function(id) {
         }
         await odswiezWidokiPoZmianieTerminarza();
     } catch (err) {
-        console.error("Błąd obsługi osieroconego powiązania terminarza:", err);
-        alert("Nie udało się obsłużyć powiązania z usuniętą inwestycją.");
+        console.error("BĹ‚Ä…d obsĹ‚ugi osieroconego powiÄ…zania terminarza:", err);
+        alert("Nie udaĹ‚o siÄ™ obsĹ‚uĹĽyÄ‡ powiÄ…zania z usuniÄ™tÄ… inwestycjÄ….");
     }
 };
 
@@ -1621,11 +1759,11 @@ window.dodajInwestycjeDoTerminarza = async function(id) {
         renderujInwestycje();
         renderujTerminarz();
         renderujKalendarzTerminarza();
-        zapiszLog("Inwestycje", "Dodano inwestycję do terminarza", inwestycja.nazwa);
+        zapiszLog("Inwestycje", "Dodano inwestycjÄ™ do terminarza", inwestycja.nazwa);
     } catch (err) {
-        console.error("Błąd dodania inwestycji do terminarza:", err);
+        console.error("BĹ‚Ä…d dodania inwestycji do terminarza:", err);
         console.error("Supabase error:", err?.message, err?.details, err?.hint, err?.code);
-        alert("Nie udało się dodać inwestycji do Terminarza. Szczegóły błędu są w konsoli F12.");
+        alert("Nie udaĹ‚o siÄ™ dodaÄ‡ inwestycji do Terminarza. SzczegĂłĹ‚y bĹ‚Ä™du sÄ… w konsoli F12.");
     }
 };
 
@@ -1640,7 +1778,7 @@ window.pokazInwestycjeWTerminarzu = function(id) {
     renderujTerminarz();
 
     if (!eventId) {
-        alert("Powiązany wpis Terminarza nie istnieje.");
+        alert("PowiÄ…zany wpis Terminarza nie istnieje.");
         return;
     }
 
@@ -1657,7 +1795,7 @@ window.pokazInwestycjeWTerminarzu = function(id) {
         }
 
         if (!row) {
-            alert("Powiązany wpis Terminarza nie istnieje.");
+            alert("PowiÄ…zany wpis Terminarza nie istnieje.");
             return;
         }
 
@@ -1668,13 +1806,13 @@ window.pokazInwestycjeWTerminarzu = function(id) {
 };
 
 async function przesunTerminInwestycji(termin) {
-    const nowaData = prompt("Podaj nową datę rozpoczęcia (RRRR-MM-DD):", termin.data_start || formatDateLocal(new Date()));
+    const nowaData = prompt("Podaj nowÄ… datÄ™ rozpoczÄ™cia (RRRR-MM-DD):", termin.data_start || formatDateLocal(new Date()));
     if (!nowaData) return;
-    const nowyKoniec = prompt("Podaj nową datę zakończenia (RRRR-MM-DD):", termin.data_koniec || nowaData) || nowaData;
+    const nowyKoniec = prompt("Podaj nowÄ… datÄ™ zakoĹ„czenia (RRRR-MM-DD):", termin.data_koniec || nowaData) || nowaData;
     const res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${encodeURIComponent(termin.id)}`, {
         method: "PATCH",
         headers: headers(),
-        body: JSON.stringify({ data_start: nowaData, data_koniec: nowyKoniec, status: "przesunięte" })
+        body: JSON.stringify({ data_start: nowaData, data_koniec: nowyKoniec, status: "przesuniÄ™te" })
     });
     if (!res.ok) throw new Error(await res.text());
     const investmentId = pobierzPowiazanaInwestycjeId(termin);
@@ -1698,7 +1836,7 @@ function sprawdzDzisiejszeInwestycjeWTerminarzu() {
         panelLinks.todayPrompts[promptKey] = true;
         zapiszLokalnePowiazaniaPanelu();
         setTimeout(async () => {
-            const wybor = prompt("Czy inwestycja jest aktualna?\n1 - Tak, oznacz jako aktywną\n2 - Przesuń termin\n3 - Utwórz inwestycję\n4 - Połącz z istniejącą\n5 - Zostaw bez zmian", "5");
+            const wybor = prompt("Czy inwestycja jest aktualna?\n1 - Tak, oznacz jako aktywnÄ…\n2 - PrzesuĹ„ termin\n3 - UtwĂłrz inwestycjÄ™\n4 - PoĹ‚Ä…cz z istniejÄ…cÄ…\n5 - Zostaw bez zmian", "5");
             try {
                 if (wybor === "1") {
                     let investmentId = pobierzPowiazanaInwestycjeId(termin);
@@ -1722,7 +1860,7 @@ function sprawdzDzisiejszeInwestycjeWTerminarzu() {
                 await odswiezDane();
             } catch (err) {
                 console.error(err);
-                alert("Nie udało się wykonać wybranej akcji dla dzisiejszej inwestycji.");
+                alert("Nie udaĹ‚o siÄ™ wykonaÄ‡ wybranej akcji dla dzisiejszej inwestycji.");
             }
         }, 800);
     });
@@ -1740,7 +1878,7 @@ function getKalendarzStatus(date, precomputedCount) {
 
     (terminarz || []).forEach(item => {
         const start = item.data_start ? parseDateLocal(item.data_start) : null;
-        const end = item.data_koniec ? parseDateLocal(item.data_koniec) : null;
+        const end = wyswietlanaDataKoncaTerminu(item) ? parseDateLocal(wyswietlanaDataKoncaTerminu(item)) : null;
         if (!start || !end) return;
         start.setHours(0, 0, 0, 0);
         end.setHours(0, 0, 0, 0);
@@ -1748,7 +1886,7 @@ function getKalendarzStatus(date, precomputedCount) {
             const status = String(item.status || '').toLowerCase();
             if (status === 'rezerwacja') {
                 foundReserved = true;
-            } else if (['zaplanowane', 'w trakcie', 'zakończone', 'przesunięte'].includes(status)) {
+            } else if (['zaplanowane', 'w trakcie', 'zakoĹ„czone', 'przesuniÄ™te'].includes(status)) {
                 foundBusy = true;
             }
         }
@@ -1765,14 +1903,14 @@ function getTerminyCountForDay(date) {
     let count = 0;
     (terminarz || []).forEach(item => {
         const start = item.data_start ? parseDateLocal(item.data_start) : null;
-        const end = item.data_koniec ? parseDateLocal(item.data_koniec) : null;
+        const end = wyswietlanaDataKoncaTerminu(item) ? parseDateLocal(wyswietlanaDataKoncaTerminu(item)) : null;
         if (!start || !end) return;
         start.setHours(0, 0, 0, 0);
         end.setHours(0, 0, 0, 0);
         if (normalized >= start && normalized <= end) {
             // Ignore canceled entries
             const status = String(item.status || '').toLowerCase();
-            if (status === 'odwołane' || status === 'odwolane') return;
+            if (status === 'odwoĹ‚ane' || status === 'odwolane') return;
             count++;
         }
     });
@@ -1839,7 +1977,7 @@ function renderujMagazyn() {
     });
 
     if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Brak pasujących wpisów.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Brak pasujÄ…cych wpisĂłw.</td></tr>`;
         return;
     }
 
@@ -1860,7 +1998,7 @@ function renderujMagazyn() {
         }
 
         const akcje = rolaUsera === 'admin'
-            ? `<button class="btn btn-danger small-btn" onclick="usunMagazyn('${esc(item.id)}')">Usuń</button>`
+            ? `<button class="btn btn-danger small-btn" onclick="usunMagazyn('${esc(item.id)}')">UsuĹ„</button>`
             : '';
 
         return `
@@ -1878,7 +2016,7 @@ function renderujMagazyn() {
 
 async function zapiszMagazyn() {
     if (rolaUsera !== 'admin') {
-        alert('Tylko administrator może dodawać sprzęt do magazynu.');
+        alert('Tylko administrator moĹĽe dodawaÄ‡ sprzÄ™t do magazynu.');
         return;
     }
 
@@ -1892,7 +2030,7 @@ async function zapiszMagazyn() {
     const uwagi = document.getElementById('magazyn-uwagi')?.value.trim() || '';
 
     if (!nazwa) {
-        alert('Wpisz nazwę sprzętu.');
+        alert('Wpisz nazwÄ™ sprzÄ™tu.');
         return;
     }
 
@@ -1914,7 +2052,7 @@ async function zapiszMagazyn() {
 
         if (!res.ok) {
             const errorText = await res.text();
-            console.error("Błąd zapisu magazynu Supabase:", {
+            console.error("BĹ‚Ä…d zapisu magazynu Supabase:", {
                 status: res.status,
                 statusText: res.statusText,
                 response: errorText,
@@ -1923,7 +2061,7 @@ async function zapiszMagazyn() {
             throw new Error(errorText);
         }
 
-        alert('Sprzęt dodany do magazynu.');
+        alert('SprzÄ™t dodany do magazynu.');
         zapiszLog('Magazyn', 'Dodano wpis', nazwa);
         await pobierzMagazyn();
         renderujMagazyn();
@@ -1935,19 +2073,19 @@ async function zapiszMagazyn() {
         document.getElementById('magazyn-gwarancja').value = '';
         document.getElementById('magazyn-uwagi').value = '';
     } catch (err) {
-        console.error("Błąd zapisu magazynu:", err);
+        console.error("BĹ‚Ä…d zapisu magazynu:", err);
         const msg = err && err.message ? err.message : String(err);
-        alert("Nie udało się zapisać wpisu w magazynie:\n\n" + msg);
+        alert("Nie udaĹ‚o siÄ™ zapisaÄ‡ wpisu w magazynie:\n\n" + msg);
     }
 }
 
 window.usunMagazyn = async function(id) {
     if (rolaUsera !== 'admin') {
-        alert('Tylko administrator może usuwać wpisy magazynu.');
+        alert('Tylko administrator moĹĽe usuwaÄ‡ wpisy magazynu.');
         return;
     }
 
-    if (!confirm('Usunąć wpis z magazynu?')) return;
+    if (!confirm('UsunÄ…Ä‡ wpis z magazynu?')) return;
 
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/magazyn?id=eq.${id}`, {
@@ -1957,7 +2095,7 @@ window.usunMagazyn = async function(id) {
 
         if (!res.ok) {
             const errorText = await res.text();
-            console.error("Błąd usuwania wpisu magazynu Supabase:", {
+            console.error("BĹ‚Ä…d usuwania wpisu magazynu Supabase:", {
                 status: res.status,
                 statusText: res.statusText,
                 response: errorText,
@@ -1968,10 +2106,10 @@ window.usunMagazyn = async function(id) {
 
         await pobierzMagazyn();
         renderujMagazyn();
-        zapiszLog('Magazyn', 'Usunięto wpis', id);
+        zapiszLog('Magazyn', 'UsuniÄ™to wpis', id);
     } catch (err) {
         console.error(err);
-        alert('Nie udało się usunąć wpisu z magazynu.');
+        alert('Nie udaĹ‚o siÄ™ usunÄ…Ä‡ wpisu z magazynu.');
     }
 };
 
@@ -1982,11 +2120,11 @@ window.usunMagazyn = async function(id) {
 function renderujWszystko() {
     const renderTasks = [
         ["Pulpit", renderujPulpit],
-        ["Select usług", renderujSelectUslug],
+        ["Select usĹ‚ug", renderujSelectUslug],
         ["Select inwestycji kosztorysu", wypelnijSelectInwestycjiKosztorysu],
         ["Wycena", renderujWycene],
         ["Kosztorysy", renderujKosztorysy],
-        ["Usługi", renderujUslugi],
+        ["UsĹ‚ugi", renderujUslugi],
         ["Inwestycje", renderujInwestycje],
         ["Kalendarz terminarza", renderujKalendarzTerminarza],
         ["Terminarz", renderujTerminarz],
@@ -1998,7 +2136,7 @@ function renderujWszystko() {
         try {
             renderFn();
         } catch (err) {
-            console.error(`ELNET LOAD DEBUG: błąd renderowania modułu ${name}`, err);
+            console.error(`ELNET LOAD DEBUG: bĹ‚Ä…d renderowania moduĹ‚u ${name}`, err);
         }
     });
 }
@@ -2035,33 +2173,33 @@ function pokazAdminTab(nazwa) {
 }
 
 // ==========================================
-// OSTRZEŻENIA (ALERTS)
+// OSTRZEĹ»ENIA (ALERTS)
 // ==========================================
 
 function generujOstrzezenia() {
     const alerts = [];
 
-    // Usługi z ceną 0 lub brak ceny
+    // UsĹ‚ugi z cenÄ… 0 lub brak ceny
     (uslugi || []).forEach(u => {
         if (cenaUslugi(u) === 0) {
-            alerts.push({ type: 'warning', msg: `Usługa "${u.nazwa || u.id}" ma cenę 0 lub brak ceny.` });
+            alerts.push({ type: 'warning', msg: `UsĹ‚uga "${u.nazwa || u.id}" ma cenÄ™ 0 lub brak ceny.` });
         }
     });
 
     // Kosztorysy z brutto 0
     (kosztorysy || []).forEach(k => {
         if (Number(k.brutto || 0) === 0) {
-            alerts.push({ type: 'warning', msg: `Kosztorys "${k.nazwa || k.id}" ma wartość brutto 0.` });
+            alerts.push({ type: 'warning', msg: `Kosztorys "${k.nazwa || k.id}" ma wartoĹ›Ä‡ brutto 0.` });
         }
     });
 
-    // Inwestycje - różne warunki
+    // Inwestycje - rĂłĹĽne warunki
     (inwestycje || []).forEach(i => {
         const zal = sumaZaliczekDlaInwestycji(i.id);
         const kos = sumaKosztowDlaInwestycji(i.id);
 
         if (kos > zal && zal > 0) {
-            alerts.push({ type: 'danger', msg: `Inwestycja "${i.nazwa || i.id}" - koszty (${kos.toFixed(2)}) większe niż zaliczki (${zal.toFixed(2)}).` });
+            alerts.push({ type: 'danger', msg: `Inwestycja "${i.nazwa || i.id}" - koszty (${kos.toFixed(2)}) wiÄ™ksze niĹĽ zaliczki (${zal.toFixed(2)}).` });
         }
 
         if (kos > 0 && zal === 0) {
@@ -2089,17 +2227,17 @@ function generujOstrzezenia() {
     for (let i = 0; i < (terminarz || []).length; i++) {
         const a = terminarz[i];
         const aStart = a.data_start ? new Date(a.data_start) : null;
-        const aEnd = a.data_koniec ? new Date(a.data_koniec) : null;
+        const aEnd = wyswietlanaDataKoncaTerminu(a) ? new Date(wyswietlanaDataKoncaTerminu(a)) : null;
         if (!aStart || !aEnd) continue;
 
         for (let j = i + 1; j < (terminarz || []).length; j++) {
             const b = terminarz[j];
             const bStart = b.data_start ? new Date(b.data_start) : null;
-            const bEnd = b.data_koniec ? new Date(b.data_koniec) : null;
+            const bEnd = wyswietlanaDataKoncaTerminu(b) ? new Date(wyswietlanaDataKoncaTerminu(b)) : null;
             if (!bStart || !bEnd) continue;
 
             if (aStart <= bEnd && aEnd >= bStart) {
-                alerts.push({ type: 'warning', msg: `Terminy "${a.klient || a.id}" i "${b.klient || b.id}" się nakładają.` });
+                alerts.push({ type: 'warning', msg: `Terminy "${a.klient || a.id}" i "${b.klient || b.id}" siÄ™ nakĹ‚adajÄ….` });
             }
         }
     }
@@ -2114,7 +2252,7 @@ function renderujOstrzezenia() {
     const alerts = generujOstrzezenia();
 
     if (!alerts.length) {
-        el.innerHTML = `<div class="admin-alert success">Brak ostrzeżeń. Wszystko wygląda dobrze.</div>`;
+        el.innerHTML = `<div class="admin-alert success">Brak ostrzeĹĽeĹ„. Wszystko wyglÄ…da dobrze.</div>`;
     } else {
         el.innerHTML = alerts.map(a => {
             const cls = a.type === 'danger' ? 'danger' : 'warning';
@@ -2122,7 +2260,7 @@ function renderujOstrzezenia() {
         }).join('');
     }
 
-    // Aktualizuj etykietę w menu (tylko dla admina pokazuj liczbę)
+    // Aktualizuj etykietÄ™ w menu (tylko dla admina pokazuj liczbÄ™)
     const navAdmin = document.getElementById('nav-administrator');
     if (navAdmin) {
         if (rolaUsera === 'admin') {
@@ -2173,7 +2311,7 @@ function renderujLogi() {
     }
 
     if (!lista.length) {
-        el.innerHTML = `<div class="admin-alert success">Brak logów.</div>`;
+        el.innerHTML = `<div class="admin-alert success">Brak logĂłw.</div>`;
         return;
     }
 
@@ -2261,7 +2399,7 @@ function znajdzInwestycjeKosztorysu(kosztorys) {
 
 function etykietaInwestycji(inwestycja) {
     if (!inwestycja) return "";
-    return [inwestycja.nazwa || "Inwestycja", inwestycja.klient || "-", inwestycja.adres || "-"].join(" — ");
+    return [inwestycja.nazwa || "Inwestycja", inwestycja.klient || "-", inwestycja.adres || "-"].join(" â€” ");
 }
 
 function wypelnijSelectInwestycjiKosztorysu(selectedId = "") {
@@ -2269,7 +2407,7 @@ function wypelnijSelectInwestycjiKosztorysu(selectedId = "") {
     if (!select) return;
 
     const current = selectedId || select.value || "";
-    const options = [`<option value="">Brak powiązania</option>`]
+    const options = [`<option value="">Brak powiÄ…zania</option>`]
         .concat((inwestycje || []).map(i => `<option value="${esc(i.id)}">${esc(etykietaInwestycji(i))}</option>`));
 
     select.innerHTML = options.join("");
@@ -2310,7 +2448,7 @@ function pozycjeKosztorysu(kosztorys) {
         const raw = typeof kosztorys?.pozycje === "string" ? JSON.parse(kosztorys.pozycje) : kosztorys?.pozycje || [];
         return Array.isArray(raw) ? normalizujPozycjeKosztorysu(raw) : [];
     } catch (err) {
-        console.error("Błąd odczytu pozycji kosztorysu:", err);
+        console.error("BĹ‚Ä…d odczytu pozycji kosztorysu:", err);
         return [];
     }
 }
@@ -2321,14 +2459,14 @@ function kwotaPanel(value) {
 
 function normalizujPrzeznaczenieZaliczki(value) {
     const raw = String(value || "").toLowerCase().trim();
-    if (["materialy", "materiały", "material", "materiały"].includes(raw)) return "materialy";
+    if (["materialy", "materiaĹ‚y", "material", "materiaĹ‚y"].includes(raw)) return "materialy";
     if (["robocizna", "praca"].includes(raw)) return "robocizna";
     return "";
 }
 
 function etykietaPrzeznaczeniaZaliczki(value) {
     const purpose = normalizujPrzeznaczenieZaliczki(value);
-    if (purpose === "materialy") return "Materiały";
+    if (purpose === "materialy") return "MateriaĹ‚y";
     if (purpose === "robocizna") return "Robocizna";
     return "Nieprzypisana";
 }
@@ -2433,8 +2571,8 @@ function renderujRozliczenieInwestycjiWidok(rozliczenie) {
     if (!container) return;
 
     const materialyBalanceLabel = rozliczenie.nadwyzkaMaterialowa > 0
-        ? "Zostało z zaliczki na materiały"
-        : "Pozostało za materiały";
+        ? "ZostaĹ‚o z zaliczki na materiaĹ‚y"
+        : "PozostaĹ‚o za materiaĹ‚y";
     const materialyBalanceValue = rozliczenie.nadwyzkaMaterialowa > 0
         ? rozliczenie.nadwyzkaMaterialowa
         : rozliczenie.pozostaloMaterialy;
@@ -2456,18 +2594,18 @@ function renderujRozliczenieInwestycjiWidok(rozliczenie) {
                 <div class="settlement-line"><span>Robocizna netto</span><strong>${kwotaPanel(rozliczenie.robociznaNetto)}</strong></div>
                 <div class="settlement-line"><span>VAT robocizny</span><strong>${kwotaPanel(rozliczenie.robociznaVat)}</strong></div>
                 <div class="settlement-line"><span>Robocizna brutto</span><strong>${kwotaPanel(rozliczenie.robociznaBrutto)}</strong></div>
-                <div class="settlement-line"><span>Zaliczki na robociznę</span><strong>${kwotaPanel(rozliczenie.zaliczkiRobocizna)}</strong></div>
-                <div class="settlement-line total"><span>Pozostało za robociznę</span><strong>${kwotaPanel(rozliczenie.pozostaloRobocizna)}</strong></div>
+                <div class="settlement-line"><span>Zaliczki na robociznÄ™</span><strong>${kwotaPanel(rozliczenie.zaliczkiRobocizna)}</strong></div>
+                <div class="settlement-line total"><span>PozostaĹ‚o za robociznÄ™</span><strong>${kwotaPanel(rozliczenie.pozostaloRobocizna)}</strong></div>
             </div>
         </section>
 
         <section class="settlement-section">
-            <h3>Materiały</h3>
+            <h3>MateriaĹ‚y</h3>
             <div class="settlement-lines">
-                <div class="settlement-line"><span>Materiały netto</span><strong>${kwotaPanel(rozliczenie.materialyNetto)}</strong></div>
-                <div class="settlement-line"><span>VAT materiałów</span><strong>${kwotaPanel(rozliczenie.materialyVat)}</strong></div>
-                <div class="settlement-line"><span>Materiały brutto</span><strong>${kwotaPanel(rozliczenie.materialyBrutto)}</strong></div>
-                <div class="settlement-line"><span>Zaliczki na materiały</span><strong>${kwotaPanel(rozliczenie.zaliczkiMaterialy)}</strong></div>
+                <div class="settlement-line"><span>MateriaĹ‚y netto</span><strong>${kwotaPanel(rozliczenie.materialyNetto)}</strong></div>
+                <div class="settlement-line"><span>VAT materiaĹ‚Ăłw</span><strong>${kwotaPanel(rozliczenie.materialyVat)}</strong></div>
+                <div class="settlement-line"><span>MateriaĹ‚y brutto</span><strong>${kwotaPanel(rozliczenie.materialyBrutto)}</strong></div>
+                <div class="settlement-line"><span>Zaliczki na materiaĹ‚y</span><strong>${kwotaPanel(rozliczenie.zaliczkiMaterialy)}</strong></div>
                 <div class="settlement-line total ${rozliczenie.nadwyzkaMaterialowa > 0 ? "credit" : ""}">
                     <span>${materialyBalanceLabel}</span><strong>${kwotaPanel(materialyBalanceValue)}</strong>
                 </div>
@@ -2477,17 +2615,17 @@ function renderujRozliczenieInwestycjiWidok(rozliczenie) {
         ${praceHtml}
 
         <section class="settlement-section">
-            <h3>Podsumowanie końcowe</h3>
+            <h3>Podsumowanie koĹ„cowe</h3>
             <div class="settlement-lines">
                 <div class="settlement-line"><span>Razem netto</span><strong>${kwotaPanel(rozliczenie.razemNetto)}</strong></div>
                 <div class="settlement-line"><span>VAT razem</span><strong>${kwotaPanel(rozliczenie.vatRazem)}</strong></div>
                 <div class="settlement-line"><span>Razem brutto</span><strong>${kwotaPanel(rozliczenie.razemBrutto)}</strong></div>
                 <div class="settlement-line"><span>Zaliczki razem</span><strong>${kwotaPanel(rozliczenie.zaliczkiRazem)}</strong></div>
-                <div class="settlement-line"><span>Robocizna do zapłaty</span><strong>${kwotaPanel(rozliczenie.pozostaloRobocizna)}</strong></div>
-                <div class="settlement-line credit"><span>Zostało z zaliczki na materiały</span><strong>-${kwotaPanel(rozliczenie.nadwyzkaMaterialowa)}</strong></div>
-                <div class="settlement-line total"><span>Pozostało do zapłaty</span><strong>${kwotaPanel(rozliczenie.pozostaloDoZaplaty)}</strong></div>
+                <div class="settlement-line"><span>Robocizna do zapĹ‚aty</span><strong>${kwotaPanel(rozliczenie.pozostaloRobocizna)}</strong></div>
+                <div class="settlement-line credit"><span>ZostaĹ‚o z zaliczki na materiaĹ‚y</span><strong>-${kwotaPanel(rozliczenie.nadwyzkaMaterialowa)}</strong></div>
+                <div class="settlement-line total"><span>PozostaĹ‚o do zapĹ‚aty</span><strong>${kwotaPanel(rozliczenie.pozostaloDoZaplaty)}</strong></div>
             </div>
-            ${rozliczenie.nadwyzkaMaterialowa > 0 ? `<p class="settlement-note">Nadwyżka z zaliczki materiałowej obniża końcową kwotę do zapłaty.</p>` : ""}
+            ${rozliczenie.nadwyzkaMaterialowa > 0 ? `<p class="settlement-note">NadwyĹĽka z zaliczki materiaĹ‚owej obniĹĽa koĹ„cowÄ… kwotÄ™ do zapĹ‚aty.</p>` : ""}
         </section>
     `;
 }
@@ -2502,7 +2640,7 @@ async function zapiszPowiazanieKosztorysuZInwestycja(kosztorysId, investmentId) 
 
     if (!res.ok) {
         const errorText = await res.text();
-        console.error("Błąd zapisu powiązania kosztorysu z inwestycją:", {
+        console.error("BĹ‚Ä…d zapisu powiÄ…zania kosztorysu z inwestycjÄ…:", {
             status: res.status,
             statusText: res.statusText,
             response: errorText,
@@ -2525,7 +2663,7 @@ function renderujPulpit() {
     const sumaZaliczek = inwestycjeZaliczki.reduce((s, z) => s + Number(z.kwota || 0), 0);
     const sumaKosztow = inwestycjeKoszty.reduce((s, k) => s + Number(k.kwota || 0), 0);
 
-    // Zaplanowane terminy - liczenie przyszłych terminów
+    // Zaplanowane terminy - liczenie przyszĹ‚ych terminĂłw
     const dzisiaj = new Date();
     dzisiaj.setHours(0, 0, 0, 0);
     const planowaneTerminy = (terminarz || []).filter(t => {
@@ -2623,7 +2761,7 @@ function renderCalendarWidget() {
     const startOffset = (firstDay.getDay() + 6) % 7;
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-    const weekdays = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'];
+    const weekdays = ['Pon', 'Wt', 'Ĺšr', 'Czw', 'Pt', 'Sob', 'Nd'];
 
     let html = `
         <div class="pulpit-calendar-header">
@@ -2653,7 +2791,7 @@ function renderCalendarWidget() {
         const badge = count >= 2 ? `<span class="calendar-badge">${count}</span>` : '';
 
         html += `
-            <div class="${classNames}" onclick="switchToPulpitTerminarz('${dateStr}')" title="Kliknij aby filtrować terminy">
+            <div class="${classNames}" onclick="switchToPulpitTerminarz('${dateStr}')" title="Kliknij aby filtrowaÄ‡ terminy">
                 ${day}${badge}
             </div>
         `;
@@ -2676,7 +2814,7 @@ window.switchToPulpitTerminarz = function(dateStr) {
 };
 
 // ==========================================
-// USŁUGI
+// USĹUGI
 // ==========================================
 
 function renderujSelectUslug() {
@@ -2684,7 +2822,7 @@ function renderujSelectUslug() {
     if (!select) return;
 
     if (!uslugi.length) {
-        select.innerHTML = `<option value="">Brak usług w bazie</option>`;
+        select.innerHTML = `<option value="">Brak usĹ‚ug w bazie</option>`;
         return;
     }
 
@@ -2714,7 +2852,7 @@ function renderujUslugi() {
     if (sort === "cena-malejaco") lista.sort((a, b) => cenaUslugi(b) - cenaUslugi(a));
 
     if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="4" class="empty-row">Brak usług w bazie.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-row">Brak usĹ‚ug w bazie.</td></tr>`;
         return;
     }
 
@@ -2723,7 +2861,7 @@ function renderujUslugi() {
         const canDelete = rolaUsera === 'admin';
 
         const editButton = canEdit ? `<button class="btn btn-secondary" onclick="edytujUsluge('${esc(u.id)}')">Edytuj</button>` : '';
-        const deleteButton = canDelete ? `<button class="btn btn-danger" onclick="usunUsluge('${esc(u.id)}')">Usuń</button>` : '';
+        const deleteButton = canDelete ? `<button class="btn btn-danger" onclick="usunUsluge('${esc(u.id)}')">UsuĹ„</button>` : '';
 
         const akcje = (editButton || deleteButton)
             ? `<div class="table-actions">${editButton} ${deleteButton}</div>`
@@ -2744,7 +2882,7 @@ async function zapiszUsluge() {
     // Allow saving service for roles admin, staff, user and for specific email
     const allowSave = (rolaUsera && rolaUsera !== 'guest') || (zalogowanyUser && String(zalogowanyUser.email || '').toLowerCase() === 'n.norbud@gmail.com');
     if (!allowSave) {
-        alert("Brak uprawnień do zapisu usługi.");
+        alert("Brak uprawnieĹ„ do zapisu usĹ‚ugi.");
         return;
     }
 
@@ -2753,7 +2891,7 @@ async function zapiszUsluge() {
     const cena = Number(document.getElementById("usluga-cena").value);
 
     if (!nazwa || isNaN(cena)) {
-        alert("Wpisz nazwę i poprawną cenę.");
+        alert("Wpisz nazwÄ™ i poprawnÄ… cenÄ™.");
         return;
     }
 
@@ -2788,10 +2926,10 @@ async function zapiszUsluge() {
         renderujSelectUslug();
         renderujUslugi();
         renderujPulpit();
-        zapiszLog("Usługi", "Zapisano usługę", nazwa);
+        zapiszLog("UsĹ‚ugi", "Zapisano usĹ‚ugÄ™", nazwa);
     } catch (err) {
         console.error(err);
-        alert("Nie udało się zapisać usługi. Sprawdź kolumny tabeli uslugi i RLS.");
+        alert("Nie udaĹ‚o siÄ™ zapisaÄ‡ usĹ‚ugi. SprawdĹş kolumny tabeli uslugi i RLS.");
     }
 }
 
@@ -2799,7 +2937,7 @@ window.edytujUsluge = function(id) {
     // Allow editing for non-guest roles and specific account
     const allowEdit = (rolaUsera && rolaUsera !== 'guest') || (zalogowanyUser && String(zalogowanyUser.email || '').toLowerCase() === 'n.norbud@gmail.com');
     if (!allowEdit) {
-        alert("Brak uprawnień do edycji usługi.");
+        alert("Brak uprawnieĹ„ do edycji usĹ‚ugi.");
         return;
     }
 
@@ -2811,7 +2949,7 @@ window.edytujUsluge = function(id) {
     document.getElementById("usluga-jednostka").value = jednostkaUslugi(u);
     document.getElementById("usluga-cena").value = cenaUslugi(u);
 
-    document.getElementById("uslugi-form-title").textContent = "Edytuj usługę";
+    document.getElementById("uslugi-form-title").textContent = "Edytuj usĹ‚ugÄ™";
     document.getElementById("btn-zapisz-usluge").textContent = "Zapisz zmiany";
     document.getElementById("btn-anuluj-usluge").classList.remove("hidden");
 };
@@ -2822,18 +2960,18 @@ function anulujEdycjeUslugi() {
     document.getElementById("usluga-cena").value = "";
     document.getElementById("usluga-jednostka").value = "szt.";
 
-    document.getElementById("uslugi-form-title").textContent = "Dodaj usługę";
-    document.getElementById("btn-zapisz-usluge").textContent = "Zapisz usługę";
+    document.getElementById("uslugi-form-title").textContent = "Dodaj usĹ‚ugÄ™";
+    document.getElementById("btn-zapisz-usluge").textContent = "Zapisz usĹ‚ugÄ™";
     document.getElementById("btn-anuluj-usluge").classList.add("hidden");
 }
 
 window.usunUsluge = async function(id) {
     if (rolaUsera !== "admin") {
-        alert("Tylko administrator może usuwać usługi.");
+        alert("Tylko administrator moĹĽe usuwaÄ‡ usĹ‚ugi.");
         return;
     }
 
-    if (!confirm("Usunąć usługę?")) return;
+    if (!confirm("UsunÄ…Ä‡ usĹ‚ugÄ™?")) return;
 
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/uslugi?id=eq.${id}`, {
@@ -2847,10 +2985,10 @@ window.usunUsluge = async function(id) {
         renderujSelectUslug();
         renderujUslugi();
         renderujPulpit();
-        zapiszLog("Usługi", "Usunięto usługę", id);
+        zapiszLog("UsĹ‚ugi", "UsuniÄ™to usĹ‚ugÄ™", id);
     } catch (err) {
         console.error(err);
-        alert("Nie udało się usunąć usługi.");
+        alert("Nie udaĹ‚o siÄ™ usunÄ…Ä‡ usĹ‚ugi.");
     }
 };
 
@@ -2913,7 +3051,7 @@ function renderujPodpowiedziUslug() {
     }
 
     if (!filtered.length) {
-        suggestionsBox.innerHTML = `<div class="autocomplete-empty">Brak pasujących usług</div>`;
+        suggestionsBox.innerHTML = `<div class="autocomplete-empty">Brak pasujÄ…cych usĹ‚ug</div>`;
         suggestionsBox.classList.add("visible");
         return;
     }
@@ -2956,9 +3094,9 @@ function wybierzUslugeZWyszukiwarki(id) {
 function normalizeText(value) {
     return String(value || "")
         .toLowerCase()
-        .replace(/[ąćęłńóśźż]/g, ch => ({
-            "ą": "a", "ć": "c", "ę": "e", "ł": "l", "ń": "n",
-            "ó": "o", "ś": "s", "ź": "z", "ż": "z"
+        .replace(/[Ä…Ä‡Ä™Ĺ‚Ĺ„ĂłĹ›ĹşĹĽ]/g, ch => ({
+            "Ä…": "a", "Ä‡": "c", "Ä™": "e", "Ĺ‚": "l", "Ĺ„": "n",
+            "Ăł": "o", "Ĺ›": "s", "Ĺş": "z", "ĹĽ": "z"
         }[ch] || ch));
 }
 
@@ -2997,7 +3135,7 @@ function znajdzUslugeDoSzybkiejWyceny(slowka, unikaj = []) {
 
 /**
  * Helper do pobierania stawki VAT z pozycji.
- * Używa operatora ?? zamiast || aby prawidłowo obsługiwać VAT 0%.
+ * UĹĽywa operatora ?? zamiast || aby prawidĹ‚owo obsĹ‚ugiwaÄ‡ VAT 0%.
  */
 function pobierzVatProcent(p) {
     return Number(p?.vatProcent ?? p?.vat ?? p?.vat_rate ?? 23);
@@ -3060,13 +3198,13 @@ function dodajPropozycje(lista, config) {
         ilosc: Number(config.ilosc),
         cenaNetto: Number(cenaNetto || 0),
         vatProcent: Number(config.vatProcent ?? document.getElementById("wycena-vat")?.value ?? 23),
-        uwaga: usluga ? (config.uwaga || "Dopasowano z cennika") : (config.uwaga || "Cena szacunkowa — sprawdź w cenniku")
+        uwaga: usluga ? (config.uwaga || "Dopasowano z cennika") : (config.uwaga || "Cena szacunkowa â€” sprawdĹş w cenniku")
     });
 }
 
 function generujSzybkaWycene() {
     if (rolaUsera === "guest") {
-        alert("Gość nie może generować wyceny.");
+        alert("GoĹ›Ä‡ nie moĹĽe generowaÄ‡ wyceny.");
         return;
     }
 
@@ -3075,22 +3213,22 @@ function generujSzybkaWycene() {
     const opis = normalizeText(opisOryginalny);
 
     if (!opis) {
-        alert("Opisz zlecenie, np. mieszkanie 60 m², instalacja od zera, 55 punktów, rozdzielnica.");
+        alert("Opisz zlecenie, np. mieszkanie 60 mÂ˛, instalacja od zera, 55 punktĂłw, rozdzielnica.");
         return;
     }
 
     const metraz = pobierzLiczbeZOpisu(opis, [
-        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów|metry|metra|m powierzchni)\b/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛|metrow|metrĂłw|metry|metra|m powierzchni)\b/,
         /mieszkanie\s*(\d+(?:[.,]\d+)?)/,
         /dom\s*(\d+(?:[.,]\d+)?)/
     ]);
 
     const pokoje = pobierzLiczbeZOpisu(opis, [
-        /(\d+)\s*(?:pokoi|pokoje|pokojach|pokój|pokoj)\b/
+        /(\d+)\s*(?:pokoi|pokoje|pokojach|pokĂłj|pokoj)\b/
     ]);
 
     const punktyPodane = pobierzLiczbeZOpisu(opis, [
-        /(\d+)\s*(?:punktow|punktów|punkty|pkt|punkt)\b/
+        /(\d+)\s*(?:punktow|punktĂłw|punkty|pkt|punkt)\b/
     ]);
 
     const gniazdaPodane = pobierzLiczbeZOpisu(opis, [
@@ -3099,14 +3237,14 @@ function generujSzybkaWycene() {
     ]);
 
     const lacznikiPodane = pobierzLiczbeZOpisu(opis, [
-        /(\d+)\s*(?:lacznikow|łączników|wlacznikow|włączników|laczniki|łączniki|wlaczniki|włączniki)\b/,
-        /(\d+)\s*(?:rocznikow|roczników|roczniki)\b/,
-        /(?:lacznikow|łączników|wlacznikow|włączników|rocznikow|roczników)[^\d]{0,20}(\d+)/
+        /(\d+)\s*(?:lacznikow|Ĺ‚Ä…cznikĂłw|wlacznikow|wĹ‚Ä…cznikĂłw|laczniki|Ĺ‚Ä…czniki|wlaczniki|wĹ‚Ä…czniki)\b/,
+        /(\d+)\s*(?:rocznikow|rocznikĂłw|roczniki)\b/,
+        /(?:lacznikow|Ĺ‚Ä…cznikĂłw|wlacznikow|wĹ‚Ä…cznikĂłw|rocznikow|rocznikĂłw)[^\d]{0,20}(\d+)/
     ]);
 
     const lanPodane = pobierzLiczbeZOpisu(opis, [
         /(?:internet|lan|sieci|siec|rj45)[^\d]{0,20}(\d+)/,
-        /(\d+)\s*(?:punktow|punktów|punkty|pkt)\s*(?:lan|internet|sieci|siec|rj45)/
+        /(\d+)\s*(?:punktow|punktĂłw|punkty|pkt)\s*(?:lan|internet|sieci|siec|rj45)/
     ]);
 
     const kameraPodane = pobierzLiczbeZOpisu(opis, [
@@ -3114,23 +3252,23 @@ function generujSzybkaWycene() {
     ]);
 
     const malowanieM2 = pobierzLiczbeZOpisu(opis, [
-        /(?:malowania|malowanie|pomalowac|pomalować)[^\d]{0,40}(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów)?/,
-        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²)\s*(?:malowania|malowanie)/
+        /(?:malowania|malowanie|pomalowac|pomalowaÄ‡)[^\d]{0,40}(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛|metrow|metrĂłw)?/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛)\s*(?:malowania|malowanie)/
     ]);
 
     const sciankaM2 = pobierzLiczbeZOpisu(opis, [
-        /(?:scianka|ścianka|gk|karton gips|karton-gips|regips)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów)?/,
-        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²)\s*(?:scianka|ścianka|gk|karton gips|karton-gips|regips)/
+        /(?:scianka|Ĺ›cianka|gk|karton gips|karton-gips|regips)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛|metrow|metrĂłw)?/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛)\s*(?:scianka|Ĺ›cianka|gk|karton gips|karton-gips|regips)/
     ]);
 
     const wykladzinaM2 = pobierzLiczbeZOpisu(opis, [
-        /(?:wykladzina|wykładzina|podloge|podłoge|podłogę|podloga|podłoga)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów)?/,
-        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²)\s*(?:wykladzina|wykładzina|podloga|podłoga)/
+        /(?:wykladzina|wykĹ‚adzina|podloge|podĹ‚oge|podĹ‚ogÄ™|podloga|podĹ‚oga)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛|metrow|metrĂłw)?/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛)\s*(?:wykladzina|wykĹ‚adzina|podloga|podĹ‚oga)/
     ]);
 
     const odZera = /od zera|nowa instalacja|kompletna instalacja|stan deweloperski|generalny/.test(opis);
-    const remont = /remont|modernizacja|wymiana|przerobka|przeróbka/.test(opis);
-    const zakresElektryczny = /elektry|gniazd|gniazdek|gniazdo|lacznik|łącznik|wlacznik|włącznik|rocznik|punkt|rozdzielnica|bezpiecznik|kabel|przewod|przewód|oswietlen|oświetlen/.test(opis);
+    const remont = /remont|modernizacja|wymiana|przerobka|przerĂłbka/.test(opis);
+    const zakresElektryczny = /elektry|gniazd|gniazdek|gniazdo|lacznik|Ĺ‚Ä…cznik|wlacznik|wĹ‚Ä…cznik|rocznik|punkt|rozdzielnica|bezpiecznik|kabel|przewod|przewĂłd|oswietlen|oĹ›wietlen/.test(opis);
 
     let punktyElektryczne = null;
 
@@ -3145,65 +3283,65 @@ function generujSzybkaWycene() {
 
     if (punktyElektryczne) {
         dodajPropozycje(propozycje, {
-            nazwa: "Montaż punktu elektrycznego",
-            szukaj: ["punkt elektryczny", "montaż punktu", "montaz punktu", "punkt"],
-            unikaj: ["przemysł", "przemyslow", "siłowe", "silowe"],
+            nazwa: "MontaĹĽ punktu elektrycznego",
+            szukaj: ["punkt elektryczny", "montaĹĽ punktu", "montaz punktu", "punkt"],
+            unikaj: ["przemysĹ‚", "przemyslow", "siĹ‚owe", "silowe"],
             jednostka: "pkt",
             ilosc: punktyElektryczne,
             cena: 120,
-            uwaga: punktyPodane ? "Ilość punktów z opisu" : "Ilość punktów elektrycznych oszacowana z metrażu"
+            uwaga: punktyPodane ? "IloĹ›Ä‡ punktĂłw z opisu" : "IloĹ›Ä‡ punktĂłw elektrycznych oszacowana z metraĹĽu"
         });
     }
 
     if (gniazdaPodane) {
         dodajPropozycje(propozycje, {
             nazwa: "Wymiana gniazda elektrycznego",
-            szukaj: ["wymiana gniazda", "gniazdo elektryczne", "montaż gniazda", "montaz gniazda", "gniazdo"],
-            unikaj: ["przemysł", "przemyslow", "siłowe", "silowe", "230v przemyslowe", "400v"],
+            szukaj: ["wymiana gniazda", "gniazdo elektryczne", "montaĹĽ gniazda", "montaz gniazda", "gniazdo"],
+            unikaj: ["przemysĹ‚", "przemyslow", "siĹ‚owe", "silowe", "230v przemyslowe", "400v"],
             jednostka: "szt.",
             ilosc: gniazdaPodane,
             cena: 90,
-            uwaga: "Ilość gniazd z opisu"
+            uwaga: "IloĹ›Ä‡ gniazd z opisu"
         });
     }
 
     if (lacznikiPodane) {
         dodajPropozycje(propozycje, {
-            nazwa: "Wymiana łącznika / włącznika światła",
-            szukaj: ["łącznik", "lacznik", "włącznik", "wlacznik", "osprzęt", "osprzet"],
-            unikaj: ["przemysł", "przemyslow", "siłowe", "silowe"],
+            nazwa: "Wymiana Ĺ‚Ä…cznika / wĹ‚Ä…cznika Ĺ›wiatĹ‚a",
+            szukaj: ["Ĺ‚Ä…cznik", "lacznik", "wĹ‚Ä…cznik", "wlacznik", "osprzÄ™t", "osprzet"],
+            unikaj: ["przemysĹ‚", "przemyslow", "siĹ‚owe", "silowe"],
             jednostka: "szt.",
             ilosc: lacznikiPodane,
             cena: 80,
-            uwaga: opis.includes("rocznik") ? "Rozpoznano z dyktowania jako „roczniki” — potraktowano jako łączniki" : "Ilość łączników z opisu"
+            uwaga: opis.includes("rocznik") ? "Rozpoznano z dyktowania jako â€žrocznikiâ€ť â€” potraktowano jako Ĺ‚Ä…czniki" : "IloĹ›Ä‡ Ĺ‚Ä…cznikĂłw z opisu"
         });
     }
 
     if (/rozdzielnica|bezpieczniki|skrzynka/.test(opis) || (odZera && zakresElektryczny)) {
         dodajPropozycje(propozycje, {
-            nazwa: "Montaż / podłączenie rozdzielnicy",
+            nazwa: "MontaĹĽ / podĹ‚Ä…czenie rozdzielnicy",
             szukaj: ["rozdzielnica", "bezpiecznik", "skrzynka"],
             jednostka: "szt.",
             ilosc: 1,
             cena: 900,
-            uwaga: "Wykryto rozdzielnicę albo instalację od zera"
+            uwaga: "Wykryto rozdzielnicÄ™ albo instalacjÄ™ od zera"
         });
     }
 
-    if (/internet|lan|rj45|sieci|sieć/.test(opis)) {
+    if (/internet|lan|rj45|sieci|sieÄ‡/.test(opis)) {
         dodajPropozycje(propozycje, {
             nazwa: "Punkt internetowy LAN / RJ45",
-            szukaj: ["lan", "internet", "rj45", "sieć", "siec"],
+            szukaj: ["lan", "internet", "rj45", "sieÄ‡", "siec"],
             jednostka: "pkt",
             ilosc: lanPodane || pokoje || 4,
             cena: 130,
-            uwaga: lanPodane ? "Ilość LAN z opisu" : "Ilość LAN oszacowana z liczby pokoi"
+            uwaga: lanPodane ? "IloĹ›Ä‡ LAN z opisu" : "IloĹ›Ä‡ LAN oszacowana z liczby pokoi"
         });
     }
 
     if (/domofon|wideodomofon|video domofon|videodomofon/.test(opis)) {
         dodajPropozycje(propozycje, {
-            nazwa: "Montaż domofonu / wideodomofonu",
+            nazwa: "MontaĹĽ domofonu / wideodomofonu",
             szukaj: ["domofon", "wideodomofon", "videodomofon"],
             jednostka: "szt.",
             ilosc: 1,
@@ -3214,12 +3352,12 @@ function generujSzybkaWycene() {
 
     if (/monitoring|kamera|kamery|cctv/.test(opis)) {
         dodajPropozycje(propozycje, {
-            nazwa: "Montaż kamery / punkt monitoringu",
+            nazwa: "MontaĹĽ kamery / punkt monitoringu",
             szukaj: ["monitoring", "kamera", "cctv"],
             jednostka: "szt.",
             ilosc: kameraPodane || 4,
             cena: 250,
-            uwaga: kameraPodane ? "Ilość kamer z opisu" : "Ilość kamer oszacowana"
+            uwaga: kameraPodane ? "IloĹ›Ä‡ kamer z opisu" : "IloĹ›Ä‡ kamer oszacowana"
         });
     }
 
@@ -3234,85 +3372,85 @@ function generujSzybkaWycene() {
         });
     }
 
-    if (/bialy montaz|biały montaż|osprzet|osprzęt/.test(opis)) {
+    if (/bialy montaz|biaĹ‚y montaĹĽ|osprzet|osprzÄ™t/.test(opis)) {
         dodajPropozycje(propozycje, {
-            nazwa: "Biały montaż osprzętu",
-            szukaj: ["biały montaż", "bialy montaz", "osprzęt", "osprzet"],
+            nazwa: "BiaĹ‚y montaĹĽ osprzÄ™tu",
+            szukaj: ["biaĹ‚y montaĹĽ", "bialy montaz", "osprzÄ™t", "osprzet"],
             jednostka: "szt.",
             ilosc: punktyElektryczne || gniazdaPodane || lacznikiPodane || 30,
             cena: 35,
-            uwaga: "Wykryto biały montaż"
+            uwaga: "Wykryto biaĹ‚y montaĹĽ"
         });
     }
 
     if (/bruzd|kucie|peszel|peszle|przewody|okablowanie/.test(opis) || (odZera && zakresElektryczny)) {
         dodajPropozycje(propozycje, {
-            nazwa: "Układanie przewodów / bruzdowanie",
-            szukaj: ["bruzdowanie", "przewod", "przewód", "okablowanie", "peszel"],
+            nazwa: "UkĹ‚adanie przewodĂłw / bruzdowanie",
+            szukaj: ["bruzdowanie", "przewod", "przewĂłd", "okablowanie", "peszel"],
             jednostka: "m",
             ilosc: metraz ? Math.round(metraz * 2.2) : 120,
             cena: 18,
-            uwaga: "Szacunek długości z metrażu"
+            uwaga: "Szacunek dĹ‚ugoĹ›ci z metraĹĽu"
         });
     }
 
-    if (/pomiary|pomiar|protokol|protokół|odbior/.test(opis) || (odZera && zakresElektryczny)) {
+    if (/pomiary|pomiar|protokol|protokĂłĹ‚|odbior/.test(opis) || (odZera && zakresElektryczny)) {
         dodajPropozycje(propozycje, {
             nazwa: "Pomiary elektryczne / uruchomienie",
-            szukaj: ["pomiary", "pomiar", "protokół", "protokol", "uruchomienie"],
-            jednostka: "usługa",
+            szukaj: ["pomiary", "pomiar", "protokĂłĹ‚", "protokol", "uruchomienie"],
+            jednostka: "usĹ‚uga",
             ilosc: 1,
             cena: 500,
-            uwaga: "Wykryto pomiary albo pełną instalację"
+            uwaga: "Wykryto pomiary albo peĹ‚nÄ… instalacjÄ™"
         });
     }
 
-    if (/malowania|malowanie|pomalowac|pomalować|farba|bialy|biały|kolor|sciany|ściany|sufit/.test(opis)) {
+    if (/malowania|malowanie|pomalowac|pomalowaÄ‡|farba|bialy|biaĹ‚y|kolor|sciany|Ĺ›ciany|sufit/.test(opis)) {
         let iloscMalowania = malowanieM2 || (metraz ? Math.round(metraz * 2.6) : 100);
         dodajPropozycje(propozycje, {
-            nazwa: "Malowanie ścian i sufitu",
+            nazwa: "Malowanie Ĺ›cian i sufitu",
             szukaj: ["malowanie", "malowania", "farba"],
-            jednostka: "m²",
+            jednostka: "mÂ˛",
             ilosc: iloscMalowania,
             cena: 28,
-            uwaga: malowanieM2 ? "Metraż malowania z opisu" : "Szacunek powierzchni malowania z metrażu mieszkania"
+            uwaga: malowanieM2 ? "MetraĹĽ malowania z opisu" : "Szacunek powierzchni malowania z metraĹĽu mieszkania"
         });
     }
 
-    if (/scianka|ścianka|gk|karton gips|karton-gips|regips|dzialowa|działowa/.test(opis)) {
+    if (/scianka|Ĺ›cianka|gk|karton gips|karton-gips|regips|dzialowa|dziaĹ‚owa/.test(opis)) {
         dodajPropozycje(propozycje, {
-            nazwa: "Ścianka działowa GK",
-            szukaj: ["ścianka", "scianka", "gk", "karton gips", "karton-gips", "regips"],
-            jednostka: "m²",
+            nazwa: "Ĺšcianka dziaĹ‚owa GK",
+            szukaj: ["Ĺ›cianka", "scianka", "gk", "karton gips", "karton-gips", "regips"],
+            jednostka: "mÂ˛",
             ilosc: sciankaM2 || 10,
             cena: 180,
-            uwaga: sciankaM2 ? "Metraż ścianki z opisu" : "Metraż ścianki oszacowany"
+            uwaga: sciankaM2 ? "MetraĹĽ Ĺ›cianki z opisu" : "MetraĹĽ Ĺ›cianki oszacowany"
         });
     }
 
-    if (/wykladzina|wykładzina|podloge|podłoge|podłogę|podloga|podłoga/.test(opis)) {
+    if (/wykladzina|wykĹ‚adzina|podloge|podĹ‚oge|podĹ‚ogÄ™|podloga|podĹ‚oga/.test(opis)) {
         dodajPropozycje(propozycje, {
-            nazwa: "Ułożenie wykładziny",
-            szukaj: ["wykładzina", "wykladzina", "podłoga", "podloga"],
-            jednostka: "m²",
+            nazwa: "UĹ‚oĹĽenie wykĹ‚adziny",
+            szukaj: ["wykĹ‚adzina", "wykladzina", "podĹ‚oga", "podloga"],
+            jednostka: "mÂ˛",
             ilosc: wykladzinaM2 || metraz || 50,
             cena: 45,
-            uwaga: wykladzinaM2 ? "Metraż wykładziny z opisu" : "Przyjęto metraż mieszkania jako powierzchnię podłogi"
+            uwaga: wykladzinaM2 ? "MetraĹĽ wykĹ‚adziny z opisu" : "PrzyjÄ™to metraĹĽ mieszkania jako powierzchniÄ™ podĹ‚ogi"
         });
     }
 
     if (!propozycje.length) {
         if (metraz) {
             dodajPropozycje(propozycje, {
-                nazwa: "Robocizna — wycena szacunkowa",
+                nazwa: "Robocizna â€” wycena szacunkowa",
                 szukaj: ["robocizna", "instalacja", "prace"],
-                jednostka: "m²",
+                jednostka: "mÂ˛",
                 ilosc: metraz,
                 cena: 110,
-                uwaga: "Nie wykryto szczegółów — szacunek z metrażu"
+                uwaga: "Nie wykryto szczegĂłĹ‚Ăłw â€” szacunek z metraĹĽu"
             });
         } else {
-            alert("Nie udało się rozpoznać zakresu. Dopisz metraż albo słowa: gniazda, łączniki, malowanie, wykładzina, ścianka.");
+            alert("Nie udaĹ‚o siÄ™ rozpoznaÄ‡ zakresu. Dopisz metraĹĽ albo sĹ‚owa: gniazda, Ĺ‚Ä…czniki, malowanie, wykĹ‚adzina, Ĺ›cianka.");
             return;
         }
     }
@@ -3377,18 +3515,18 @@ function renderujSzybkaWyceneWynik(meta = {}) {
     const brutto = netto + vat;
 
     const metaInfo = [
-        meta.metraz ? `Metraż: ${meta.metraz} m²` : "",
+        meta.metraz ? `MetraĹĽ: ${meta.metraz} mÂ˛` : "",
         meta.gniazda ? `Gniazda: ${meta.gniazda}` : "",
-        meta.laczniki ? `Łączniki: ${meta.laczniki}` : "",
+        meta.laczniki ? `ĹÄ…czniki: ${meta.laczniki}` : "",
         meta.punkty && !meta.gniazda && !meta.laczniki ? `Punkty elektryczne: ${meta.punkty}` : "",
         meta.sanitarne ? `Punkty sanitarne: ${meta.sanitarne}` : "",
         meta.co ? `Punkty C.O.: ${meta.co}` : "",
-        meta.przerobka ? "Tryb: przeróbka" : "",
+        meta.przerobka ? "Tryb: przerĂłbka" : "",
         meta.wymiana ? "Tryb: wymiana" : "",
         meta.pokoje ? `Pokoje: ${meta.pokoje}` : "",
         meta.odZera ? "Zakres: od zera" : "",
         meta.remont ? "Zakres: remont / modernizacja" : ""
-    ].filter(Boolean).join(" • ");
+    ].filter(Boolean).join(" â€˘ ");
 
     box.classList.remove("hidden");
     box.innerHTML = `
@@ -3402,7 +3540,7 @@ function renderujSzybkaWyceneWynik(meta = {}) {
                 <thead>
                     <tr>
                         <th>Pozycja</th>
-                        <th>Ilość</th>
+                        <th>IloĹ›Ä‡</th>
                         <th>Cena</th>
                         <th>Netto</th>
                         <th>Uwagi</th>
@@ -3432,7 +3570,7 @@ function renderujSzybkaWyceneWynik(meta = {}) {
 
 function dodajSzybkaWyceneDoTabeli() {
     if (rolaUsera === "guest") {
-        alert("Gość nie może modyfikować wyceny.");
+        alert("GoĹ›Ä‡ nie moĹĽe modyfikowaÄ‡ wyceny.");
         return;
     }
 
@@ -3469,7 +3607,7 @@ function uruchomSzybkaWyceneGlos() {
     const btn = document.getElementById("btn-szybka-wycena-mow");
 
     if (window.AndroidSpeech && typeof window.AndroidSpeech.startListening === "function") {
-        if (btn) btn.textContent = "🎙 Słucham...";
+        if (btn) btn.textContent = "đźŽ™ SĹ‚ucham...";
         window.AndroidSpeech.startListening();
         return;
     }
@@ -3478,7 +3616,7 @@ function uruchomSzybkaWyceneGlos() {
     const opis = document.getElementById("szybka-wycena-opis");
 
     if (!SpeechRecognition) {
-        alert("Ten telefon albo WebView nie obsługuje rozpoznawania mowy. Wpisz opis ręcznie.");
+        alert("Ten telefon albo WebView nie obsĹ‚uguje rozpoznawania mowy. Wpisz opis rÄ™cznie.");
         return;
     }
 
@@ -3488,7 +3626,7 @@ function uruchomSzybkaWyceneGlos() {
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
 
-        if (btn) btn.textContent = "🎙 Słucham...";
+        if (btn) btn.textContent = "đźŽ™ SĹ‚ucham...";
 
         recognition.onresult = (event) => {
             const tekst = event.results?.[0]?.[0]?.transcript || "";
@@ -3496,18 +3634,18 @@ function uruchomSzybkaWyceneGlos() {
         };
 
         recognition.onerror = () => {
-            if (btn) btn.textContent = "🎙 Dopowiedz";
+            if (btn) btn.textContent = "đźŽ™ Dopowiedz";
         };
 
         recognition.onend = () => {
-            if (btn) btn.textContent = "🎙 Dopowiedz";
+            if (btn) btn.textContent = "đźŽ™ Dopowiedz";
         };
 
         recognition.start();
     } catch (err) {
         console.error(err);
-        if (btn) btn.textContent = "🎙 Dopowiedz";
-        alert("Mikrofon nie uruchomił się. Wpisz opis ręcznie.");
+        if (btn) btn.textContent = "đźŽ™ Dopowiedz";
+        alert("Mikrofon nie uruchomiĹ‚ siÄ™. Wpisz opis rÄ™cznie.");
     }
 }
 
@@ -3527,24 +3665,24 @@ function dopiszTekstDoSzybkiejWyceny(tekst) {
 window.onAndroidSpeechResult = function(tekst) {
     const btn = document.getElementById("btn-szybka-wycena-mow");
     dopiszTekstDoSzybkiejWyceny(tekst);
-    if (btn) btn.textContent = "🎙 Dopowiedz";
+    if (btn) btn.textContent = "đźŽ™ Dopowiedz";
 };
 
 window.onAndroidSpeechError = function(komunikat) {
     const btn = document.getElementById("btn-szybka-wycena-mow");
-    if (btn) btn.textContent = "🎙 Dopowiedz";
-    alert(komunikat || "Nie udało się rozpoznać głosu. Wpisz opis ręcznie.");
+    if (btn) btn.textContent = "đźŽ™ Dopowiedz";
+    alert(komunikat || "Nie udaĹ‚o siÄ™ rozpoznaÄ‡ gĹ‚osu. Wpisz opis rÄ™cznie.");
 };
 
 window.onAndroidSpeechStatus = function(status) {
     const btn = document.getElementById("btn-szybka-wycena-mow");
     if (!btn) return;
-    btn.textContent = status === "Słucham..." ? "🎙 Słucham..." : "🎙 Dopowiedz";
+    btn.textContent = status === "SĹ‚ucham..." ? "đźŽ™ SĹ‚ucham..." : "đźŽ™ Dopowiedz";
 };
 
 function dodajPozycjeRecznieDoWyceny() {
     if (rolaUsera === "guest") {
-        alert("Gość nie może modyfikować wyceny.");
+        alert("GoĹ›Ä‡ nie moĹĽe modyfikowaÄ‡ wyceny.");
         return;
     }
 
@@ -3558,18 +3696,18 @@ function dodajPozycjeRecznieDoWyceny() {
     const vatProcent = Number(document.getElementById("wycena-vat").value);
 
     if (isNaN(ilosc) || ilosc <= 0) {
-        alert("Wpisz poprawną ilość.");
+        alert("Wpisz poprawnÄ… iloĹ›Ä‡.");
         return;
     }
 
     if (!Number.isFinite(cena) || cena < 0) {
-        alert("Cena jednostkowa nie może być pusta ani ujemna.");
+        alert("Cena jednostkowa nie moĹĽe byÄ‡ pusta ani ujemna.");
         return;
     }
 
     const nazwa = u ? u.nazwa : (nazwaInput || "");
     if (!nazwa) {
-        alert("Wybierz usługę z bazy lub wpisz nazwę usługi.");
+        alert("Wybierz usĹ‚ugÄ™ z bazy lub wpisz nazwÄ™ usĹ‚ugi.");
         return;
     }
 
@@ -3605,7 +3743,7 @@ function dodajPozycjeRecznieDoWyceny() {
             vatProcent
         });
 
-        // clear only ilość by default as before
+        // clear only iloĹ›Ä‡ by default as before
         document.getElementById("wycena-ilosc").value = "";
 
         renderujWycene();
@@ -3633,7 +3771,7 @@ function renderujWycene() {
         const vat = netto * (vatProcent / 100);
         const brutto = netto + vat;
         const akcja = rolaUsera !== "guest"
-            ? `<div class="wycena-actions"><button class="btn btn-secondary tiny-btn" onclick="pokazPanelEdycjiPozycji('${p.id}')">Edytuj</button><button class="btn btn-danger tiny-btn" onclick="usunPozycjeWyceny('${p.id}')">Usuń</button></div>`
+            ? `<div class="wycena-actions"><button class="btn btn-secondary tiny-btn" onclick="pokazPanelEdycjiPozycji('${p.id}')">Edytuj</button><button class="btn btn-danger tiny-btn" onclick="usunPozycjeWyceny('${p.id}')">UsuĹ„</button></div>`
             : "";
 
         return `
@@ -3656,7 +3794,7 @@ function renderujWycene() {
 window.zmienCenePozycjiWyceny = function(id, value, silent = false, inputEl = null) {
     const cena = parseKwota(value);
     if (!Number.isFinite(cena) || cena < 0) {
-        if (!silent) alert("Cena jednostkowa nie może być pusta ani ujemna.");
+        if (!silent) alert("Cena jednostkowa nie moĹĽe byÄ‡ pusta ani ujemna.");
         return;
     }
 
@@ -3689,7 +3827,7 @@ window.zmienCenePozycjiWyceny = function(id, value, silent = false, inputEl = nu
 
 function pokazPanelEdycjiPozycji(id) {
     if (rolaUsera === "guest") {
-        alert("Tylko zalogowany użytkownik może edytować pozycje.");
+        alert("Tylko zalogowany uĹĽytkownik moĹĽe edytowaÄ‡ pozycje.");
         return;
     }
 
@@ -3719,17 +3857,17 @@ function zapiszPanelEdycjiPozycji() {
     const uwagi = document.getElementById("edycja-uwagi").value.trim();
 
     if (!nazwa) {
-        alert("Wpisz nazwę usługi.");
+        alert("Wpisz nazwÄ™ usĹ‚ugi.");
         return;
     }
 
     if (isNaN(ilosc) || ilosc <= 0) {
-        alert("Wpisz poprawną ilość.");
+        alert("Wpisz poprawnÄ… iloĹ›Ä‡.");
         return;
     }
 
     if (!Number.isFinite(cena) || cena < 0) {
-        alert("Cena jednostkowa nie może być pusta ani ujemna.");
+        alert("Cena jednostkowa nie moĹĽe byÄ‡ pusta ani ujemna.");
         return;
     }
 
@@ -3779,7 +3917,7 @@ function anulujPanelEdycjiPozycji() {
 
 window.usunPozycjeWyceny = function(id) {
     if (rolaUsera === "guest") {
-        alert("Gość nie może modyfikować wyceny.");
+        alert("GoĹ›Ä‡ nie moĹĽe modyfikowaÄ‡ wyceny.");
         return;
     }
 
@@ -3794,7 +3932,7 @@ window.edytujPozycjeWyceny = function(id) {
 function anulujEdycjePozycji() {
     edytowanaPozycjaId = null;
 
-    // wyczyść pola formularza Dodaj pozycję
+    // wyczyĹ›Ä‡ pola formularza Dodaj pozycjÄ™
     const fields = ["wycena-usluga-search", "wycena-ilosc", "wycena-cena"];
     fields.forEach(id => {
         const el = document.getElementById(id);
@@ -3805,7 +3943,7 @@ function anulujEdycjePozycji() {
     const jednostka = document.getElementById("wycena-jednostka");
     if (jednostka) jednostka.value = "szt.";
 
-    // przywróć tekst przycisku i ukryj Anuluj
+    // przywrĂłÄ‡ tekst przycisku i ukryj Anuluj
     const btn = document.getElementById("btn-dodaj-pozycje-recznie");
     if (btn) btn.textContent = "Dodaj do wyceny";
     const btnAnuluj = document.getElementById("btn-anuluj-edycje-wyceny");
@@ -3818,17 +3956,17 @@ async function zapiszUslugeZWyceny() {
     const cenaNetto = Number(document.getElementById("wycena-nowa-usluga-cena").value);
 
     if (!nazwa) {
-        alert("Wpisz nazwę usługi.");
+        alert("Wpisz nazwÄ™ usĹ‚ugi.");
         return;
     }
 
     if (!jednostka) {
-        alert("Wybierz jednostkę.");
+        alert("Wybierz jednostkÄ™.");
         return;
     }
 
     if (isNaN(cenaNetto) || cenaNetto < 0) {
-        alert("Wpisz poprawną cenę netto (liczba >= 0).");
+        alert("Wpisz poprawnÄ… cenÄ™ netto (liczba >= 0).");
         return;
     }
 
@@ -3849,27 +3987,27 @@ async function zapiszUslugeZWyceny() {
 
         if (!res.ok) {
             const errorText = await res.text();
-            console.error("Błąd zapisu usługi:", errorText);
-            alert("Nie udało się zapisać usługi. Sprawdź bazę usług lub uprawnienia.");
+            console.error("BĹ‚Ä…d zapisu usĹ‚ugi:", errorText);
+            alert("Nie udaĹ‚o siÄ™ zapisaÄ‡ usĹ‚ugi. SprawdĹş bazÄ™ usĹ‚ug lub uprawnienia.");
             return;
         }
 
-        // Odśwież lokalną listę usług
+        // OdĹ›wieĹĽ lokalnÄ… listÄ™ usĹ‚ug
         await pobierzUslugi();
         renderujSelectUslug();
 
-        // Wyczyść formularz
+        // WyczyĹ›Ä‡ formularz
         document.getElementById("wycena-nowa-usluga-nazwa").value = "";
         document.getElementById("wycena-nowa-usluga-jednostka").value = "szt.";
         document.getElementById("wycena-nowa-usluga-cena").value = "";
 
-        // Pokaż komunikat sukcesu
-        alert("Usługa zapisana w cenniku.");
+        // PokaĹĽ komunikat sukcesu
+        alert("UsĹ‚uga zapisana w cenniku.");
 
-        zapiszLog("Wycena", "Dodano usługę do cennika", nazwa);
+        zapiszLog("Wycena", "Dodano usĹ‚ugÄ™ do cennika", nazwa);
     } catch (err) {
-        console.error("Błąd zapisu usługi:", err);
-        alert("Nie udało się zapisać usługi. Sprawdź bazę usług lub uprawnienia.");
+        console.error("BĹ‚Ä…d zapisu usĹ‚ugi:", err);
+        alert("Nie udaĹ‚o siÄ™ zapisaÄ‡ usĹ‚ugi. SprawdĹş bazÄ™ usĹ‚ug lub uprawnienia.");
     }
 }
 
@@ -3897,7 +4035,7 @@ function przeliczWycene() {
     const elBrutto = document.getElementById("suma-brutto");
 
     if (!elNetto || !elVat || !elBrutto) {
-        console.error("Brak wymaganych elementów podsumowania wyceny.");
+        console.error("Brak wymaganych elementĂłw podsumowania wyceny.");
         return {
             netto: sumaNettoPoKorekcie,
             vat: sumaVAT,
@@ -4014,19 +4152,19 @@ function aktualizujTrybEdycjiKosztorysuWidok() {
 
 async function zapiszKosztorys() {
     if (rolaUsera === "guest") {
-        alert("Gość nie może zapisywać kosztorysów.");
+        alert("GoĹ›Ä‡ nie moĹĽe zapisywaÄ‡ kosztorysĂłw.");
         return;
     }
 
     const nazwa = document.getElementById("kosztorys-nazwa").value.trim();
 
     if (!nazwa) {
-        alert("Wpisz nazwę kosztorysu lub dane klienta.");
+        alert("Wpisz nazwÄ™ kosztorysu lub dane klienta.");
         return;
     }
 
     if (!wycenaPozycje.length) {
-        alert("Dodaj przynajmniej jedną pozycję.");
+        alert("Dodaj przynajmniej jednÄ… pozycjÄ™.");
         return;
     }
 
@@ -4080,7 +4218,7 @@ async function zapiszKosztorys() {
 
         if (!res.ok) {
             const errorText = await res.text();
-            console.error("Błąd zapisu kosztorysu Supabase:", {
+            console.error("BĹ‚Ä…d zapisu kosztorysu Supabase:", {
                 status: res.status,
                 statusText: res.statusText,
                 response: errorText,
@@ -4098,8 +4236,8 @@ async function zapiszKosztorys() {
         pokazSekcje("kosztorysy");
         zapiszLog("Kosztorysy", nazwaLogu, nazwa);
     } catch (err) {
-        console.error("Błąd zapisu kosztorysu:", err);
-        alert("Nie udało się zapisać kosztorysu. Szczegóły błędu są w konsoli.");
+        console.error("BĹ‚Ä…d zapisu kosztorysu:", err);
+        alert("Nie udaĹ‚o siÄ™ zapisaÄ‡ kosztorysu. SzczegĂłĹ‚y bĹ‚Ä™du sÄ… w konsoli.");
     }
 }
 
@@ -4129,7 +4267,7 @@ function renderujKosztorysy() {
     if (sort === "brutto-rosnaco") lista.sort((a, b) => Number(a.brutto || 0) - Number(b.brutto || 0));
 
     if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Brak zapisanych kosztorysów.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Brak zapisanych kosztorysĂłw.</td></tr>`;
         return;
     }
 
@@ -4144,7 +4282,7 @@ function renderujKosztorysy() {
             ? `<button class="btn btn-secondary" onclick="wczytajKosztorys('${esc(k.id)}')">Edytuj</button>`
             : "";
         const usun = rolaUsera === "admin"
-            ? `<button class="btn btn-danger" onclick="usunKosztorys('${esc(k.id)}')">Usuń</button>`
+            ? `<button class="btn btn-danger" onclick="usunKosztorys('${esc(k.id)}')">UsuĹ„</button>`
             : "";
 
         // Status display
@@ -4227,8 +4365,8 @@ window.zaakceptujKosztorys = async function(id, extraData = {}) {
         renderujKosztorysy();
         zapiszLog('Kosztorysy', 'Oznaczono jako zaakceptowany', id);
     } catch (err) {
-        console.error('Błąd aktualizacji statusu kosztorysu:', err);
-        alert('Nie udało się zaktualizować statusu kosztorysu.');
+        console.error('BĹ‚Ä…d aktualizacji statusu kosztorysu:', err);
+        alert('Nie udaĹ‚o siÄ™ zaktualizowaÄ‡ statusu kosztorysu.');
     }
 };
 
@@ -4237,7 +4375,7 @@ window.akcjaKosztorysu = async function(id) {
     if (!kosztorys) return;
 
     const wybor = prompt(
-        'Wybierz opcję dla kosztorysu:\n1 - Tylko oznacz jako zaakceptowany\n2 - Utwórz nową inwestycję z kosztorysu\n3 - Połącz z istniejącą inwestycją',
+        'Wybierz opcjÄ™ dla kosztorysu:\n1 - Tylko oznacz jako zaakceptowany\n2 - UtwĂłrz nowÄ… inwestycjÄ™ z kosztorysu\n3 - PoĹ‚Ä…cz z istniejÄ…cÄ… inwestycjÄ…',
         '1'
     );
     if (!wybor) return;
@@ -4257,7 +4395,7 @@ window.akcjaKosztorysu = async function(id) {
         const inwestycja = await utworzNowaInwestycjaZKosztorysu(kosztorys);
         if (inwestycja && inwestycja.id) {
             await zaakceptujKosztorys(id, { investment_id: inwestycja.id });
-            zapiszLog('Kosztorysy', 'Połączono kosztorys z nową inwestycją', id);
+            zapiszLog('Kosztorysy', 'PoĹ‚Ä…czono kosztorys z nowÄ… inwestycjÄ…', id);
         }
         return;
     }
@@ -4307,8 +4445,8 @@ async function utworzNowaInwestycjaZKosztorysu(kosztorys) {
         }
         return data;
     } catch (err) {
-        console.error('Błąd tworzenia inwestycji z kosztorysu:', err);
-        alert('Nie udało się utworzyć inwestycji z kosztorysu.');
+        console.error('BĹ‚Ä…d tworzenia inwestycji z kosztorysu:', err);
+        alert('Nie udaĹ‚o siÄ™ utworzyÄ‡ inwestycji z kosztorysu.');
         return null;
     }
 }
@@ -4317,24 +4455,24 @@ async function polaczZIstniejacaInwestycja(kosztorys) {
     await pobierzInwestycje();
 
     if (!inwestycje.length) {
-        alert('Brak dostępnych inwestycji do połączenia.');
+        alert('Brak dostÄ™pnych inwestycji do poĹ‚Ä…czenia.');
         return;
     }
     // Show a numbered list to the user (number - nazwa - klient). User inputs number (1-based).
     const lines = inwestycje.map((i, idx) => `${idx + 1} - ${i.nazwa || '-'} - ${i.klient || '-'}`);
-    const promptText = `Wybierz numer inwestycji, z którą chcesz połączyć kosztorys:\n${lines.join('\n')}`;
+    const promptText = `Wybierz numer inwestycji, z ktĂłrÄ… chcesz poĹ‚Ä…czyÄ‡ kosztorys:\n${lines.join('\n')}`;
     const wybor = prompt(promptText, '1');
     if (!wybor) return;
 
     const num = Number(wybor.trim());
     if (!Number.isInteger(num) || num < 1 || num > inwestycje.length) {
-        alert('Nieprawidłowy wybór inwestycji.');
+        alert('NieprawidĹ‚owy wybĂłr inwestycji.');
         return;
     }
 
     const chosen = inwestycje[num - 1];
     if (!chosen) {
-        alert('Nieprawidłowy wybór inwestycji.');
+        alert('NieprawidĹ‚owy wybĂłr inwestycji.');
         return;
     }
 
@@ -4343,8 +4481,8 @@ async function polaczZIstniejacaInwestycja(kosztorys) {
     if (!kosztorys.zaakceptowany_at) extra.zaakceptowany_at = formatDateTimeLocal(new Date());
 
     await zaakceptujKosztorys(kosztorys.id, extra);
-    alert('Kosztorys połączony z inwestycją.');
-    zapiszLog('Kosztorysy', 'Połączono kosztorys z istniejącą inwestycją', kosztorys.id);
+    alert('Kosztorys poĹ‚Ä…czony z inwestycjÄ….');
+    zapiszLog('Kosztorysy', 'PoĹ‚Ä…czono kosztorys z istniejÄ…cÄ… inwestycjÄ…', kosztorys.id);
 }
 
 function pobierzOpcjeDrukuKosztorysu() {
@@ -4358,7 +4496,7 @@ function pobierzOpcjeDrukuKosztorysu() {
     };
 
     if (!Object.values(options).some(Boolean)) {
-        alert("Wybierz przynajmniej jedną kolumnę.");
+        alert("Wybierz przynajmniej jednÄ… kolumnÄ™.");
         return null;
     }
 
@@ -4403,7 +4541,7 @@ function pobierzOpcjeDrukuInwestycji() {
     };
 
     if (!Object.values(options).some(Boolean)) {
-        alert("Wybierz przynajmniej jedną pozycję do wydruku.");
+        alert("Wybierz przynajmniej jednÄ… pozycjÄ™ do wydruku.");
         return null;
     }
 
@@ -4433,7 +4571,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
 
     const kwota = value => `${Number(value || 0).toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN`;
     const dataWydruku = new Date().toLocaleString("pl-PL");
-    const termin = dataStart && dataKoniec && dataKoniec !== dataStart ? `${dataStart} – ${dataKoniec}` : (dataStart || "-");
+    const termin = dataStart && dataKoniec && dataKoniec !== dataStart ? `${dataStart} â€“ ${dataKoniec}` : (dataStart || "-");
     const kosztorysyRows = powiazaneKosztorysy.length
         ? powiazaneKosztorysy.map(k => `
             <tr>
@@ -4445,7 +4583,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
                 <td>${esc(statusKosztorysuLabel(k.status))}</td>
             </tr>
         `).join("")
-        : `<tr><td colspan="6">Brak powiązanych kosztorysów.</td></tr>`;
+        : `<tr><td colspan="6">Brak powiÄ…zanych kosztorysĂłw.</td></tr>`;
 
     const pozycjeKosztorysowHtml = szczegolowy
         ? powiazaneKosztorysy.map(k => {
@@ -4471,7 +4609,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
                     <h3>${esc(k.nazwa || "Kosztorys")}</h3>
                     <table>
                         <thead>
-                            <tr><th>Pozycja</th><th>Ilość</th><th>Jm</th><th>Cena netto</th><th>VAT</th><th>Brutto</th></tr>
+                            <tr><th>Pozycja</th><th>IloĹ›Ä‡</th><th>Jm</th><th>Cena netto</th><th>VAT</th><th>Brutto</th></tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
@@ -4494,7 +4632,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
                 </tr>
             `;
         }).join("")
-        : `<tr><td colspan="6">Brak kosztów materiałowych.</td></tr>`;
+        : `<tr><td colspan="6">Brak kosztĂłw materiaĹ‚owych.</td></tr>`;
 
     const zaliczkiRows = zaliczki.length
         ? zaliczki.map(z => `
@@ -4522,8 +4660,8 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
         : `<tr><td colspan="6">Brak prac dodatkowych.</td></tr>`;
 
     const materialyBalanceLabel = rozliczenie.nadwyzkaMaterialowa > 0
-        ? "Zostało z zaliczki na materiały"
-        : "Pozostało za materiały";
+        ? "ZostaĹ‚o z zaliczki na materiaĹ‚y"
+        : "PozostaĹ‚o za materiaĹ‚y";
     const materialyBalanceValue = rozliczenie.nadwyzkaMaterialowa > 0
         ? rozliczenie.nadwyzkaMaterialowa
         : rozliczenie.pozostaloMaterialy;
@@ -4547,49 +4685,49 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
                     <tr><td>Netto</td><td class="num">${kwota(rozliczenie.robociznaNetto)}</td></tr>
                     <tr><td>VAT</td><td class="num">${kwota(rozliczenie.robociznaVat)}</td></tr>
                     <tr><td>Brutto</td><td class="num">${kwota(rozliczenie.robociznaBrutto)}</td></tr>
-                    <tr><td>Zaliczki na robociznę</td><td class="num">${kwota(rozliczenie.zaliczkiRobocizna)}</td></tr>
-                    <tr class="total"><td>Pozostało za robociznę</td><td class="num">${kwota(rozliczenie.pozostaloRobocizna)}</td></tr>
+                    <tr><td>Zaliczki na robociznÄ™</td><td class="num">${kwota(rozliczenie.zaliczkiRobocizna)}</td></tr>
+                    <tr class="total"><td>PozostaĹ‚o za robociznÄ™</td><td class="num">${kwota(rozliczenie.pozostaloRobocizna)}</td></tr>
                 </tbody>
             </table>
         </section>
         <section class="print-section avoid-break">
-            <h2>Rozliczenie materiałów</h2>
+            <h2>Rozliczenie materiaĹ‚Ăłw</h2>
             <table class="summary-table">
                 <tbody>
                     <tr><td>Netto</td><td class="num">${kwota(rozliczenie.materialyNetto)}</td></tr>
                     <tr><td>VAT</td><td class="num">${kwota(rozliczenie.materialyVat)}</td></tr>
                     <tr><td>Brutto</td><td class="num">${kwota(rozliczenie.materialyBrutto)}</td></tr>
-                    <tr><td>Zaliczki na materiały</td><td class="num">${kwota(rozliczenie.zaliczkiMaterialy)}</td></tr>
+                    <tr><td>Zaliczki na materiaĹ‚y</td><td class="num">${kwota(rozliczenie.zaliczkiMaterialy)}</td></tr>
                     <tr class="total"><td>${materialyBalanceLabel}</td><td class="num">${kwota(materialyBalanceValue)}</td></tr>
                 </tbody>
             </table>
         </section>
         ${praceSummaryHtml}
         <section class="print-section avoid-break final-summary">
-            <h2>Podsumowanie końcowe</h2>
+            <h2>Podsumowanie koĹ„cowe</h2>
             <table class="summary-table">
                 <tbody>
                     <tr><td>Razem netto</td><td class="num">${kwota(rozliczenie.razemNetto)}</td></tr>
                     <tr><td>VAT razem</td><td class="num">${kwota(rozliczenie.vatRazem)}</td></tr>
                     <tr><td>Razem brutto</td><td class="num">${kwota(rozliczenie.razemBrutto)}</td></tr>
                     <tr><td>Zaliczki razem</td><td class="num">${kwota(rozliczenie.zaliczkiRazem)}</td></tr>
-                    <tr><td>Robocizna do zapłaty</td><td class="num">${kwota(rozliczenie.pozostaloRobocizna)}</td></tr>
-                    <tr><td>Zostało z zaliczki na materiały</td><td class="num">-${kwota(rozliczenie.nadwyzkaMaterialowa)}</td></tr>
-                    <tr class="total"><td>Pozostało do zapłaty</td><td class="num">${kwota(rozliczenie.pozostaloDoZaplaty)}</td></tr>
+                    <tr><td>Robocizna do zapĹ‚aty</td><td class="num">${kwota(rozliczenie.pozostaloRobocizna)}</td></tr>
+                    <tr><td>ZostaĹ‚o z zaliczki na materiaĹ‚y</td><td class="num">-${kwota(rozliczenie.nadwyzkaMaterialowa)}</td></tr>
+                    <tr class="total"><td>PozostaĹ‚o do zapĹ‚aty</td><td class="num">${kwota(rozliczenie.pozostaloDoZaplaty)}</td></tr>
                 </tbody>
             </table>
-            ${rozliczenie.nadwyzkaMaterialowa > 0 ? `<p class="print-note">Nadwyżka z zaliczki materiałowej pomniejsza końcową kwotę do zapłaty.</p>` : ""}
+            ${rozliczenie.nadwyzkaMaterialowa > 0 ? `<p class="print-note">NadwyĹĽka z zaliczki materiaĹ‚owej pomniejsza koĹ„cowÄ… kwotÄ™ do zapĹ‚aty.</p>` : ""}
         </section>
     `;
 
     const szczegolyHtml = szczegolowy ? `
         <section class="print-section">
-            <h2>Pozycje kosztorysów</h2>
-            ${pozycjeKosztorysowHtml || "<p>Brak powiązanych kosztorysów.</p>"}
+            <h2>Pozycje kosztorysĂłw</h2>
+            ${pozycjeKosztorysowHtml || "<p>Brak powiÄ…zanych kosztorysĂłw.</p>"}
         </section>
 
         <section class="print-section avoid-break">
-            <h2>Koszty materiałowe</h2>
+            <h2>Koszty materiaĹ‚owe</h2>
             <table>
                 <thead><tr><th>Data</th><th>Netto</th><th>VAT</th><th>Brutto</th><th>Kategoria</th><th>Opis</th></tr></thead>
                 <tbody>${kosztyRows}</tbody>
@@ -4599,7 +4737,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
         <section class="print-section avoid-break">
             <h2>Zaliczki</h2>
             <table>
-                <thead><tr><th>Data</th><th>Kwota</th><th>Płatność</th><th>Przeznaczenie</th><th>Opis</th></tr></thead>
+                <thead><tr><th>Data</th><th>Kwota</th><th>PĹ‚atnoĹ›Ä‡</th><th>Przeznaczenie</th><th>Opis</th></tr></thead>
                 <tbody>${zaliczkiRows}</tbody>
             </table>
         </section>
@@ -4618,7 +4756,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
         <html>
         <head>
             <meta charset="UTF-8">
-            <title>EL-Net — Rozliczenie inwestycji</title>
+            <title>EL-Net â€” Rozliczenie inwestycji</title>
             <style>
                 @page { size: A4 portrait; margin: 12mm; @bottom-right { content: "Strona " counter(page); } }
                 * { box-sizing: border-box; }
@@ -4652,7 +4790,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
                 <div class="brand">EL-Net</div>
                 <div class="doc-title">Rozliczenie inwestycji</div>
                 <div class="print-meta">
-                    <div>${szczegolowy ? "Wydruk szczegółowy" : "Wydruk bez szczegółów"}</div>
+                    <div>${szczegolowy ? "Wydruk szczegĂłĹ‚owy" : "Wydruk bez szczegĂłĹ‚Ăłw"}</div>
                     <div>Data: ${esc(dataWydruku)}</div>
                 </div>
             </header>
@@ -4670,7 +4808,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
             </section>
 
             <section class="print-section avoid-break">
-                <h2>Powiązane kosztorysy</h2>
+                <h2>PowiÄ…zane kosztorysy</h2>
                 <table>
                     <thead><tr><th>Nazwa</th><th>Data</th><th>Netto</th><th>VAT</th><th>Brutto</th><th>Status</th></tr></thead>
                     <tbody>${kosztorysyRows}</tbody>
@@ -4680,7 +4818,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
             ${rozliczeniePrintHtml}
 
             ${szczegolyHtml}
-            <div class="footer-note">EL-Net — data wydruku: ${esc(dataWydruku)}</div>
+            <div class="footer-note">EL-Net â€” data wydruku: ${esc(dataWydruku)}</div>
         </body>
         </html>
     `;
@@ -4692,7 +4830,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
 
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
-        alert("Nie udało się otworzyć okna drukowania.");
+        alert("Nie udaĹ‚o siÄ™ otworzyÄ‡ okna drukowania.");
         return;
     }
 
@@ -4700,7 +4838,7 @@ function drukujRozliczenieInwestycji({ tryb = "skrocony" } = {}) {
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
-    zapiszLog("Inwestycje", szczegolowy ? "Druk rozliczenia szczegółowego" : "Druk rozliczenia bez szczegółów", inwestycja.nazwa);
+    zapiszLog("Inwestycje", szczegolowy ? "Druk rozliczenia szczegĂłĹ‚owego" : "Druk rozliczenia bez szczegĂłĹ‚Ăłw", inwestycja.nazwa);
 }
 
 function drukujInwestycjeDoOkna(options) {
@@ -4736,7 +4874,7 @@ function drukujInwestycjeDoOkna(options) {
     let kosztorysHtml = "";
     if (options.kosztorys) {
         if (!kosztorys) {
-            kosztorysHtml = `<p>Brak powiązanego kosztorysu robocizny.</p>`;
+            kosztorysHtml = `<p>Brak powiÄ…zanego kosztorysu robocizny.</p>`;
         } else {
             kosztorysHtml = `
                 <table>
@@ -4773,7 +4911,7 @@ function drukujInwestycjeDoOkna(options) {
 
             praceHtml = `
                 <table>
-                    <thead><tr><th>Nazwa</th><th>Ilość</th><th>Cena netto</th><th>VAT</th><th>Netto</th><th>Brutto</th><th>Opis</th></tr></thead>
+                    <thead><tr><th>Nazwa</th><th>IloĹ›Ä‡</th><th>Cena netto</th><th>VAT</th><th>Netto</th><th>Brutto</th><th>Opis</th></tr></thead>
                     <tbody>${rows}</tbody>
                 </table>
             `;
@@ -4792,13 +4930,13 @@ function drukujInwestycjeDoOkna(options) {
                     <td>${esc(z.opis || "")}</td>
                 </tr>
             `).join("");
-            zaliczkiHtml = `<table><thead><tr><th>Data</th><th>Kwota</th><th>Płatność</th><th>Opis</th></tr></thead><tbody>${rows}</tbody></table>`;
+            zaliczkiHtml = `<table><thead><tr><th>Data</th><th>Kwota</th><th>PĹ‚atnoĹ›Ä‡</th><th>Opis</th></tr></thead><tbody>${rows}</tbody></table>`;
         }
     }
 
     let kosztyHtml = "";
     if (options.koszty) {
-        if (!koszty.length) kosztyHtml = `<p>Brak kosztów.</p>`;
+        if (!koszty.length) kosztyHtml = `<p>Brak kosztĂłw.</p>`;
         else {
             const rows = koszty.map(k => `
                 <tr>
@@ -4818,11 +4956,11 @@ function drukujInwestycjeDoOkna(options) {
             <table class="summary">
                 <tr><td>Robocizna (kosztorys) brutto</td><td style="text-align:right">${Number(kosztorys?.brutto || 0).toFixed(2)} PLN</td></tr>
                 <tr><td>Prace dodatkowe brutto</td><td style="text-align:right">${sumaPraceBrutto.toFixed(2)} PLN</td></tr>
-                <tr><td>Koszty materiałowe</td><td style="text-align:right">${sumaKosztow.toFixed(2)} PLN</td></tr>
+                <tr><td>Koszty materiaĹ‚owe</td><td style="text-align:right">${sumaKosztow.toFixed(2)} PLN</td></tr>
                 <tr><td><strong>Razem do rozliczenia</strong></td><td style="text-align:right"><strong>${razemDoRozliczenia.toFixed(2)} PLN</strong></td></tr>
                 <tr><td>Zaliczki</td><td style="text-align:right">${sumaZaliczek.toFixed(2)} PLN</td></tr>
-                <tr><td><strong>Pozostało do zapłaty</strong></td><td style="text-align:right"><strong>${pozostaloDoZaplaty.toFixed(2)} PLN</strong></td></tr>
-                <tr><td>Bilans gotówki (zaliczki - koszty materiałowe)</td><td style="text-align:right">${bilansGotowki.toFixed(2)} PLN</td></tr>
+                <tr><td><strong>PozostaĹ‚o do zapĹ‚aty</strong></td><td style="text-align:right"><strong>${pozostaloDoZaplaty.toFixed(2)} PLN</strong></td></tr>
+                <tr><td>Bilans gotĂłwki (zaliczki - koszty materiaĹ‚owe)</td><td style="text-align:right">${bilansGotowki.toFixed(2)} PLN</td></tr>
             </table>
         `;
     }
@@ -4871,7 +5009,7 @@ function drukujInwestycjeDoOkna(options) {
             </style>
         </head>
         <body>
-            <h1>EL-Net — Rozliczenie inwestycji</h1>
+            <h1>EL-Net â€” Rozliczenie inwestycji</h1>
             ${options.dane ? `
             <div class="section">
                 <h2>Inwestycja</h2>
@@ -4885,8 +5023,8 @@ function drukujInwestycjeDoOkna(options) {
             ${options.kosztorys ? `<div class="section"><h2>Kosztorys robocizny</h2>${kosztorysHtml}</div>` : ''}
             ${options.prace ? `<div class="section"><h2>Prace dodatkowe</h2>${praceHtml}</div>` : ''}
             ${options.zaliczki ? `<div class="section"><h2>Zaliczki</h2>${zaliczkiHtml}</div>` : ''}
-            ${options.koszty ? `<div class="section"><h2>Koszty materiałowe</h2>${kosztyHtml}</div>` : ''}
-            ${options.podsumowanie ? `<div class="section"><h2>Podsumowanie końcowe</h2>${podsumowanieHtml}</div>` : ''}
+            ${options.koszty ? `<div class="section"><h2>Koszty materiaĹ‚owe</h2>${kosztyHtml}</div>` : ''}
+            ${options.podsumowanie ? `<div class="section"><h2>Podsumowanie koĹ„cowe</h2>${podsumowanieHtml}</div>` : ''}
             ${uwagiHtml}
         </body>
         </html>
@@ -4894,7 +5032,7 @@ function drukujInwestycjeDoOkna(options) {
 
     if (window.AndroidPrint && window.AndroidPrint.printHtml) { window.AndroidPrint.printHtml(html); return; }
     const printWindow = window.open("", "_blank");
-    if (!printWindow) { alert("Nie udało się otworzyć okna drukowania."); return; }
+    if (!printWindow) { alert("Nie udaĹ‚o siÄ™ otworzyÄ‡ okna drukowania."); return; }
     printWindow.document.write(html);
     printWindow.document.close();
     printWindow.focus();
@@ -4916,7 +5054,7 @@ function drukujKosztorysDoOkna(id, options) {
         try {
             pozycje = JSON.parse(pozycje);
         } catch (err) {
-            console.error("Błąd parsowania pozycji kosztorysu:", err);
+            console.error("BĹ‚Ä…d parsowania pozycji kosztorysu:", err);
             return;
         }
     }
@@ -4929,9 +5067,9 @@ function drukujKosztorysDoOkna(id, options) {
     const columns = [
         { key: "nazwa", label: "Nazwa", visible: true },
         { key: "jednostka", label: "Jednostka", visible: options.jednostka },
-        { key: "ilosc", label: "Ilość", visible: options.ilosc },
+        { key: "ilosc", label: "IloĹ›Ä‡", visible: options.ilosc },
         { key: "cenaNetto", label: "Cena netto", visible: options.cenaNetto },
-        { key: "wartoscNetto", label: "Wartość netto", visible: options.wartoscNetto },
+        { key: "wartoscNetto", label: "WartoĹ›Ä‡ netto", visible: options.wartoscNetto },
         { key: "vat", label: "VAT", visible: options.vat },
         { key: "brutto", label: "Brutto", visible: options.brutto }
     ];
@@ -5094,13 +5232,13 @@ window.drukujInwestycje = function() {
                     <td>${esc(k.opis || "")}</td>
                 </tr>
             `).join("")
-        : `<tr><td colspan="4">Brak kosztów</td></tr>`;
+        : `<tr><td colspan="4">Brak kosztĂłw</td></tr>`;
 
     const html = `
         <html>
         <head>
             <meta charset="UTF-8">
-            <title>EL-Net — Rozliczenie inwestycji</title>
+            <title>EL-Net â€” Rozliczenie inwestycji</title>
             <style>
                 body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
                 h1, h2 { margin: 0 0 12px; }
@@ -5114,7 +5252,7 @@ window.drukujInwestycje = function() {
             </style>
         </head>
         <body>
-            <h1>EL-Net — Rozliczenie inwestycji</h1>
+            <h1>EL-Net â€” Rozliczenie inwestycji</h1>
             <div class="section">
                 <h2>Inwestycja</h2>
                 <p><strong>Nazwa:</strong> ${esc(inwestycja.nazwa || "-")}</p>
@@ -5127,8 +5265,8 @@ window.drukujInwestycje = function() {
             <div class="section">
                 <h2>Podsumowanie</h2>
                 <p class="summary-box"><strong>Suma zaliczek:</strong> ${sumaZaliczek.toFixed(2)} PLN</p>
-                <p class="summary-box"><strong>Suma kosztów:</strong> ${sumaKosztow.toFixed(2)} PLN</p>
-                <p class="summary-box"><strong>Różnica:</strong> ${roznica.toFixed(2)} PLN</p>
+                <p class="summary-box"><strong>Suma kosztĂłw:</strong> ${sumaKosztow.toFixed(2)} PLN</p>
+                <p class="summary-box"><strong>RĂłĹĽnica:</strong> ${roznica.toFixed(2)} PLN</p>
             </div>
 
             <div class="section">
@@ -5138,7 +5276,7 @@ window.drukujInwestycje = function() {
                         <tr>
                             <th>Data</th>
                             <th>Kwota</th>
-                            <th>Sposób płatności</th>
+                            <th>SposĂłb pĹ‚atnoĹ›ci</th>
                             <th>Opis</th>
                         </tr>
                     </thead>
@@ -5171,7 +5309,7 @@ window.drukujInwestycje = function() {
     if (window.AndroidPrint && window.AndroidPrint.printHtml) { window.AndroidPrint.printHtml(html); return; }
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
-        alert("Nie udało się otworzyć okna drukowania.");
+        alert("Nie udaĹ‚o siÄ™ otworzyÄ‡ okna drukowania.");
         return;
     }
 
@@ -5184,7 +5322,7 @@ window.drukujInwestycje = function() {
 
 window.wczytajKosztorys = function(id) {
     if (rolaUsera === "guest") {
-        alert("Gość nie może edytować kosztorysów.");
+        alert("GoĹ›Ä‡ nie moĹĽe edytowaÄ‡ kosztorysĂłw.");
         return;
     }
 
@@ -5211,11 +5349,11 @@ window.wczytajKosztorys = function(id) {
 
 window.usunKosztorys = async function(id) {
     if (rolaUsera !== "admin") {
-        alert("Tylko administrator może usuwać kosztorysy.");
+        alert("Tylko administrator moĹĽe usuwaÄ‡ kosztorysy.");
         return;
     }
 
-    if (!confirm("Usunąć kosztorys?")) return;
+    if (!confirm("UsunÄ…Ä‡ kosztorys?")) return;
 
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/kosztorysy?id=eq.${id}`, {
@@ -5228,10 +5366,10 @@ window.usunKosztorys = async function(id) {
         await pobierzKosztorysy();
         renderujKosztorysy();
         renderujPulpit();
-        zapiszLog("Kosztorysy", "Usunięto kosztorys", id);
+        zapiszLog("Kosztorysy", "UsuniÄ™to kosztorys", id);
     } catch (err) {
         console.error(err);
-        alert("Nie udało się usunąć kosztorysu.");
+        alert("Nie udaĹ‚o siÄ™ usunÄ…Ä‡ kosztorysu.");
     }
 };
 
@@ -5304,11 +5442,11 @@ function renderujInwestycje() {
         const roznica = zaliczki - koszty;
         const linkedEventId = pobierzPowiazanyTerminId(i);
         const calendarButton = linkedEventId
-            ? `<button class="btn btn-secondary small-btn" onclick="pokazInwestycjeWTerminarzu('${esc(i.id)}')">Pokaż w Terminarzu</button>`
+            ? `<button class="btn btn-secondary small-btn" onclick="pokazInwestycjeWTerminarzu('${esc(i.id)}')">PokaĹĽ w Terminarzu</button>`
             : `<button class="btn btn-secondary small-btn" onclick="dodajInwestycjeDoTerminarza('${esc(i.id)}')">Dodaj do Terminarza</button>`;
 
         const akcje = rolaUsera === "admin"
-            ? `<button class="btn btn-secondary small-btn" onclick="edytujInwestycje('${esc(i.id)}')">Edytuj</button><button class="btn btn-danger small-btn" onclick="usunInwestycje('${esc(i.id)}')">Usuń</button>`
+            ? `<button class="btn btn-secondary small-btn" onclick="edytujInwestycje('${esc(i.id)}')">Edytuj</button><button class="btn btn-danger small-btn" onclick="usunInwestycje('${esc(i.id)}')">UsuĹ„</button>`
             : "";
 
         return `
@@ -5318,7 +5456,7 @@ function renderujInwestycje() {
                 <td class="nowrap-cell">${zaliczki.toFixed(2)} PLN</td>
                 <td class="nowrap-cell">${koszty.toFixed(2)} PLN</td>
                 <td class="nowrap-cell"><strong>${roznica.toFixed(2)} PLN</strong></td>
-                <td><div class="table-actions investycje-actions"><button class="btn btn-secondary small-btn" onclick="otworzInwestycje('${esc(i.id)}')">Otwórz</button>${calendarButton}${akcje}</div></td>
+                <td><div class="table-actions investycje-actions"><button class="btn btn-secondary small-btn" onclick="otworzInwestycje('${esc(i.id)}')">OtwĂłrz</button>${calendarButton}${akcje}</div></td>
             </tr>
         `;
     }).join("");
@@ -5339,12 +5477,12 @@ function pobierzPolaFormularzaInwestycji() {
     const status = document.getElementById("inwestycja-status")?.value || "aktywna";
 
     if (!nazwa) {
-        alert("Wpisz nazwę inwestycji.");
+        alert("Wpisz nazwÄ™ inwestycji.");
         return null;
     }
 
     if (dataStart && dataKoniec && parseDateLocal(dataKoniec) < parseDateLocal(dataStart)) {
-        alert("Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.");
+        alert("Data zakoĹ„czenia nie moĹĽe byÄ‡ wczeĹ›niejsza niĹĽ data rozpoczÄ™cia.");
         return null;
     }
 
@@ -5378,22 +5516,22 @@ function walidujPozycjeKosztorysu() {
         const input = Array.from(document.querySelectorAll(".wycena-price-input[data-position-id]"))
             .find(el => String(el.dataset.positionId) === String(p.id));
         if (input && !String(input.value || "").trim()) {
-            alert(`Cena jednostkowa w pozycji ${index + 1} nie może być pusta ani ujemna.`);
+            alert(`Cena jednostkowa w pozycji ${index + 1} nie moĹĽe byÄ‡ pusta ani ujemna.`);
             return null;
         }
         if (input) {
             const inputCena = parseKwota(input.value);
             if (!Number.isFinite(inputCena) || inputCena < 0) {
-                alert(`Cena jednostkowa w pozycji ${index + 1} nie może być pusta ani ujemna.`);
+                alert(`Cena jednostkowa w pozycji ${index + 1} nie moĹĽe byÄ‡ pusta ani ujemna.`);
                 return null;
             }
         }
         if (!Number.isFinite(p.ilosc) || p.ilosc <= 0) {
-            alert(`Ilość w pozycji ${index + 1} musi być większa od zera.`);
+            alert(`IloĹ›Ä‡ w pozycji ${index + 1} musi byÄ‡ wiÄ™ksza od zera.`);
             return null;
         }
         if (!Number.isFinite(p.cenaNetto) || p.cenaNetto < 0) {
-            alert(`Cena jednostkowa w pozycji ${index + 1} nie może być pusta ani ujemna.`);
+            alert(`Cena jednostkowa w pozycji ${index + 1} nie moĹĽe byÄ‡ pusta ani ujemna.`);
             return null;
         }
     }
@@ -5404,9 +5542,9 @@ function ustawTrybFormularzaInwestycji({ editing = false, source = "inwestycje" 
     const title = document.getElementById("inwestycja-form-title");
     const btnDodaj = document.getElementById("btn-dodaj-inwestycje");
     const btnAnuluj = document.getElementById("btn-anuluj-inwestycje");
-    if (title) title.textContent = editing ? "Edytuj inwestycję" : "Nowa inwestycja";
+    if (title) title.textContent = editing ? "Edytuj inwestycjÄ™" : "Nowa inwestycja";
     if (btnDodaj) {
-        btnDodaj.textContent = editing ? "Zapisz zmiany" : "Zapisz inwestycję";
+        btnDodaj.textContent = editing ? "Zapisz zmiany" : "Zapisz inwestycjÄ™";
         btnDodaj.disabled = false;
         btnDodaj.dataset.source = source;
     }
@@ -5457,23 +5595,39 @@ function otworzFormularzInwestycji({ id = null, source = "inwestycje" } = {}) {
 
 async function dodajInwestycje() {
     if (rolaUsera === "guest") {
-        alert("Gość nie może dodawać inwestycji.");
+        alert("GoĹ›Ä‡ nie moĹĽe dodawaÄ‡ inwestycji.");
         return;
     }
 
     const payload = pobierzPolaFormularzaInwestycji();
     if (!payload) return;
 
+    const editingId = edytowanaInwestycjaId;
+    const poprzedniaInwestycja = editingId
+        ? inwestycje.find(i => String(i.id) === String(editingId)) || null
+        : null;
+    let zakonczenieInwestycji = null;
+    const ponowneOtwarcieInwestycji = editingId
+        && czyStatusInwestycjiZakonczony(poprzedniaInwestycja?.status)
+        && !czyStatusInwestycjiZakonczony(payload.status);
+    if (editingId && czyStatusInwestycjiZakonczony(payload.status) && !czyStatusInwestycjiZakonczony(poprzedniaInwestycja?.status)) {
+        const linkedEventId = poprzedniaInwestycja ? pobierzPowiazanyTerminId(poprzedniaInwestycja) : null;
+        const linkedTermin = linkedEventId ? terminarz.find(t => String(t.id) === String(linkedEventId)) || null : null;
+        const completedAt = await pokazModalZakonczeniaInwestycji(poprzedniaInwestycja, linkedTermin);
+        if (!completedAt) return;
+        payload.completed_at = completedAt;
+        zakonczenieInwestycji = { completedAt, linkedEventId, inwestycja: poprzedniaInwestycja };
+    }
+
     const btnDodaj = document.getElementById("btn-dodaj-inwestycje");
-    const originalText = btnDodaj?.textContent || "Zapisz inwestycję";
+    const originalText = btnDodaj?.textContent || "Zapisz inwestycjÄ™";
     if (btnDodaj?.disabled) return;
     if (btnDodaj) {
         btnDodaj.disabled = true;
         btnDodaj.textContent = "Zapisywanie...";
     }
 
-    const editingId = edytowanaInwestycjaId;
-    const akcjaInwestycji = editingId ? "Edytowano inwestycję" : "Dodano inwestycję";
+    const akcjaInwestycji = editingId ? "Edytowano inwestycjÄ™" : "Dodano inwestycjÄ™";
 
     try {
         let res;
@@ -5494,7 +5648,7 @@ async function dodajInwestycje() {
 
         if (!res.ok) {
             const errorText = await res.text();
-            console.error("Błąd zapisu inwestycji Supabase:", {
+            console.error("BĹ‚Ä…d zapisu inwestycji Supabase:", {
                 status: res.status,
                 statusText: res.statusText,
                 response: errorText,
@@ -5511,24 +5665,38 @@ async function dodajInwestycje() {
         const inwestycjaPoZapisie = inwestycje.find(i => String(i.id) === String(zapisanaInwestycjaId));
 
         let keepInvestmentFormOpen = false;
+        let syncFailed = false;
         try {
             if (!editingId && inwestycjaPoZapisie?.data_start) {
                 await zsynchronizujInwestycjeZTerminarzem(inwestycjaPoZapisie, { force: true });
                 await pobierzInwestycje();
                 await pobierzTerminarz();
+            } else if (zakonczenieInwestycji && inwestycjaPoZapisie) {
+                await zsynchronizujZakonczenieInwestycjiZTerminarzem(inwestycjaPoZapisie, zakonczenieInwestycji.completedAt);
+                await pobierzTerminarz();
             } else if (editingId && inwestycjaPoZapisie && pobierzPowiazanyTerminId(inwestycjaPoZapisie)) {
                 await zsynchronizujInwestycjeZTerminarzem(inwestycjaPoZapisie, { force: true });
                 await pobierzTerminarz();
+                if (ponowneOtwarcieInwestycji) {
+                    await zapiszLog("Inwestycje", "Ponownie otwarto inwestycję", inwestycjaPoZapisie.nazwa || inwestycjaPoZapisie.id, {
+                        previous_completed_at: rzeczywistaDataZakonczenia(poprzedniaInwestycja),
+                        calendar_event_id: pobierzPowiazanyTerminId(inwestycjaPoZapisie),
+                        user_id: zalogowanyUser?.id || null,
+                        email: zalogowanyUser?.email || ""
+                    });
+                }
             }
         } catch (syncErr) {
-            console.error("Błąd synchronizacji inwestycji z Terminarzem:", syncErr);
+            syncFailed = true;
+            console.error("BĹ‚Ä…d synchronizacji inwestycji z Terminarzem:", syncErr);
             if (!editingId) {
                 edytowanaInwestycjaId = zapisanaInwestycjaId;
                 ustawTrybFormularzaInwestycji({ editing: true, source: btnDodaj?.dataset.source || "inwestycje" });
                 keepInvestmentFormOpen = true;
-                alert("Inwestycja została utworzona, ale nie udało się dodać jej do Terminarza.");
+                alert("Inwestycja zostaĹ‚a utworzona, ale nie udaĹ‚o siÄ™ dodaÄ‡ jej do Terminarza.");
             } else {
-                alert("Inwestycja została zapisana, ale nie udało się zaktualizować wpisu w Terminarzu.");
+                keepInvestmentFormOpen = true;
+                alert("Inwestycja została zapisana, ale nie udało się zaktualizować powiązanego wpisu w Terminarzu. Szczegóły są w konsoli.");
             }
             await pobierzTerminarz();
         }
@@ -5543,17 +5711,19 @@ async function dodajInwestycje() {
         renderujTerminarz();
         renderujKalendarzTerminarza();
         renderujPulpit();
-        zapiszLog("Inwestycje", akcjaInwestycji, payload.nazwa);
+        if (!syncFailed) {
+            zapiszLog("Inwestycje", akcjaInwestycji, payload.nazwa);
+        }
     } catch (err) {
         console.error(err);
-        alert("Nie udało się zapisać inwestycji. Sprawdź tabelę inwestycje i RLS.");
+        alert("Nie udaĹ‚o siÄ™ zapisaÄ‡ inwestycji. SprawdĹş tabelÄ™ inwestycje i RLS.");
     } finally {
         if (btnDodaj) {
             btnDodaj.disabled = false;
             if (edytowanaInwestycjaId) {
                 btnDodaj.textContent = "Zapisz zmiany";
             } else {
-                btnDodaj.textContent = originalText === "Zapisywanie..." ? "Zapisz inwestycję" : originalText;
+                btnDodaj.textContent = originalText === "Zapisywanie..." ? "Zapisz inwestycjÄ™" : originalText;
             }
         }
     }
@@ -5574,7 +5744,7 @@ window.otworzInwestycje = function(id) {
 
 window.edytujInwestycje = function(id) {
     if (rolaUsera !== "admin") {
-        alert("Tylko administrator może edytować inwestycje.");
+        alert("Tylko administrator moĹĽe edytowaÄ‡ inwestycje.");
         return;
     }
     otworzFormularzInwestycji({ id, source: "inwestycje" });
@@ -5617,12 +5787,12 @@ function wybierzOpcjeUsuwaniaInwestycji(choice) {
     if (!choice) {
         confirmBtn.classList.remove("btn-danger");
         confirmBtn.classList.add("btn-main");
-        confirmBtn.textContent = "Potwierdź";
+        confirmBtn.textContent = "PotwierdĹş";
         return;
     }
     confirmBtn.classList.toggle("btn-danger", choice === "delete-event");
     confirmBtn.classList.toggle("btn-main", choice !== "delete-event");
-    confirmBtn.textContent = choice === "delete-event" ? "Usuń oba wpisy" : "Usuń i odłącz";
+    confirmBtn.textContent = choice === "delete-event" ? "UsuĹ„ oba wpisy" : "UsuĹ„ i odĹ‚Ä…cz";
 }
 
 function zamknijModalUsuwaniaInwestycji(result) {
@@ -5636,7 +5806,7 @@ function zamknijModalUsuwaniaInwestycji(result) {
         confirmBtn.disabled = true;
         confirmBtn.classList.remove("btn-danger");
         confirmBtn.classList.add("btn-main");
-        confirmBtn.textContent = "Potwierdź";
+        confirmBtn.textContent = "PotwierdĹş";
     }
 
     if (usunInwestycjeModalResolve) {
@@ -5662,15 +5832,76 @@ function pokazModalUsuwaniaInwestycji() {
     });
 }
 
+function ustawStanModalaZakonczeniaInwestycji(isSaving) {
+    const modal = document.getElementById("zakoncz-inwestycje-modal");
+    if (!modal) return;
+    modal.querySelectorAll("button, input").forEach(el => {
+        el.disabled = isSaving;
+    });
+}
+
+function zamknijModalZakonczeniaInwestycji(result) {
+    const modal = document.getElementById("zakoncz-inwestycje-modal");
+    if (modal) modal.classList.add("hidden");
+    ustawStanModalaZakonczeniaInwestycji(false);
+    if (zakonczInwestycjeModalResolve) {
+        const resolve = zakonczInwestycjeModalResolve;
+        zakonczInwestycjeModalResolve = null;
+        resolve(result);
+    }
+}
+
+function potwierdzModalZakonczeniaInwestycji() {
+    const input = document.getElementById("zakoncz-inwestycje-completed-at");
+    const completedAt = input?.value || "";
+    if (!completedAt) {
+        alert("Wybierz rzeczywistÄ… datÄ™ zakoĹ„czenia.");
+        return;
+    }
+    ustawStanModalaZakonczeniaInwestycji(true);
+    zamknijModalZakonczeniaInwestycji(completedAt);
+}
+
+function pokazModalZakonczeniaInwestycji(inwestycja, termin) {
+    const modal = document.getElementById("zakoncz-inwestycje-modal");
+    if (!modal) return Promise.resolve(formatDateLocal(new Date()));
+
+    const { dataStart, dataKoniec } = pobierzDatyInwestycji(inwestycja);
+    const today = formatDateLocal(new Date());
+    const input = document.getElementById("zakoncz-inwestycje-completed-at");
+    if (input) input.value = rzeczywistaDataZakonczenia(inwestycja) || today;
+
+    const info = document.getElementById("zakoncz-inwestycje-info");
+    if (info) {
+        const linkedText = termin
+            ? `Terminarz zostanie zaktualizowany: ${esc(termin.id)}`
+            : "Brak powiÄ…zania z Terminarzem. Nowy wpis nie zostanie utworzony automatycznie.";
+        info.innerHTML = `
+            <p><strong>Termin planowany:</strong> ${esc(dataStart || "-")}â€“${esc(dataKoniec || dataStart || "-")}</p>
+            <p><strong>Rzeczywiste zakoĹ„czenie:</strong> ${esc(input?.value || today)}</p>
+            <p>${linkedText}</p>
+        `;
+        input?.addEventListener("input", () => {
+            const dateLine = info.querySelector("p:nth-child(2)");
+            if (dateLine) dateLine.innerHTML = `<strong>Rzeczywiste zakoĹ„czenie:</strong> ${esc(input.value || "-")}`;
+        }, { once: true });
+    }
+
+    modal.classList.remove("hidden");
+    return new Promise(resolve => {
+        zakonczInwestycjeModalResolve = resolve;
+    });
+}
+
 window.usunInwestycje = async function(id) {
     if (rolaUsera !== "admin") {
-        alert("Tylko administrator może usuwać inwestycje.");
+        alert("Tylko administrator moĹĽe usuwaÄ‡ inwestycje.");
         return;
     }
 
     const inwestycja = inwestycje.find(i => String(i.id) === String(id));
     if (!inwestycja) {
-        alert("Nie znaleziono inwestycji do usunięcia.");
+        alert("Nie znaleziono inwestycji do usuniÄ™cia.");
         return;
     }
 
@@ -5681,7 +5912,7 @@ window.usunInwestycje = async function(id) {
     if (linkedEventId) {
         linkedAction = await pokazModalUsuwaniaInwestycji();
         if (!linkedAction) return;
-    } else if (!confirm("Usunąć inwestycję razem z jej zaliczkami i kosztami?")) {
+    } else if (!confirm("UsunÄ…Ä‡ inwestycjÄ™ razem z jej zaliczkami i kosztami?")) {
         return;
     }
 
@@ -5714,14 +5945,14 @@ window.usunInwestycje = async function(id) {
         renderujTerminarz();
         renderujKalendarzTerminarza();
         renderujPulpit();
-        zapiszLog("Inwestycje", "Usunięto inwestycję", id);
+        zapiszLog("Inwestycje", "UsuniÄ™to inwestycjÄ™", id);
 
         if (String(aktywnaInwestycjaId) === String(id)) {
             zamknijPanelInwestycji();
         }
     } catch (err) {
-        console.error("Błąd usuwania inwestycji:", err);
-        alert("Nie udało się usunąć inwestycji.");
+        console.error("BĹ‚Ä…d usuwania inwestycji:", err);
+        alert("Nie udaĹ‚o siÄ™ usunÄ…Ä‡ inwestycji.");
     }
 }
 
@@ -5731,7 +5962,7 @@ function renderujPanelInwestycji() {
 
     const title = document.getElementById("wybrana-inwestycja-title");
     if (title) {
-        title.textContent = `${inwestycja.nazwa} — ${inwestycja.klient || "bez klienta"}`;
+        title.textContent = `${inwestycja.nazwa} â€” ${inwestycja.klient || "bez klienta"}`;
     }
 
     const meta = document.getElementById("wybrana-inwestycja-meta");
@@ -5739,7 +5970,7 @@ function renderujPanelInwestycji() {
         const { dataStart, dataKoniec } = pobierzDatyInwestycji(inwestycja);
         meta.innerHTML = `
             <p><strong>Telefon:</strong> ${esc(inwestycja.telefon || "-")}</p>
-            <p><strong>Termin:</strong> ${esc(dataStart || "-")}${dataKoniec ? ` – ${esc(dataKoniec)}` : ""}</p>
+            <p><strong>Termin:</strong> ${esc(dataStart || "-")}${dataKoniec ? ` â€“ ${esc(dataKoniec)}` : ""}</p>
             <p><strong>Opis:</strong> ${esc(inwestycja.opis || "-")}</p>
         `;
     }
@@ -5771,7 +6002,7 @@ function renderujPraceDodatkoweInwestycji() {
 
     tbody.innerHTML = related.map(p => {
         const akcja = rolaUsera === "admin"
-            ? `<button class="btn btn-danger small-btn" onclick="usunPraceDodatkowa('${esc(p.id)}')">Usuń</button>`
+            ? `<button class="btn btn-danger small-btn" onclick="usunPraceDodatkowa('${esc(p.id)}')">UsuĹ„</button>`
             : "";
 
         return `
@@ -5797,7 +6028,7 @@ function renderujPowiazaneKosztorysyInwestycji() {
     const actionsHtml = `
         <div class="investment-estimates-actions">
             <button class="btn btn-main small-btn" onclick="utworzKosztorysDlaInwestycji('${esc(aktywnaInwestycjaId)}')">Nowy kosztorys</button>
-            <button class="btn btn-secondary small-btn" onclick="polaczIstniejacyKosztorysZInwestycja('${esc(aktywnaInwestycjaId)}')">Połącz istniejący</button>
+            <button class="btn btn-secondary small-btn" onclick="polaczIstniejacyKosztorysZInwestycja('${esc(aktywnaInwestycjaId)}')">PoĹ‚Ä…cz istniejÄ…cy</button>
         </div>
     `;
 
@@ -5807,20 +6038,20 @@ function renderujPowiazaneKosztorysyInwestycji() {
                 <h2>Kosztorysy</h2>
                 ${actionsHtml}
             </div>
-            <p class="investment-estimate-empty">Brak powiązanych kosztorysów dla tej inwestycji.</p>
+            <p class="investment-estimate-empty">Brak powiÄ…zanych kosztorysĂłw dla tej inwestycji.</p>
         `;
         return;
     }
 
     const itemsHtml = related.map(k => {
         const statusLabel = statusKosztorysuBadge(k.status);
-        const openButton = `<button class="btn btn-secondary small-btn" onclick="otworzKosztorysNaLiscie('${esc(k.id)}')">Otwórz</button>`;
+        const openButton = `<button class="btn btn-secondary small-btn" onclick="otworzKosztorysNaLiscie('${esc(k.id)}')">OtwĂłrz</button>`;
         const editButton = rolaUsera !== "guest"
             ? `<button class="btn btn-secondary small-btn" onclick="wczytajKosztorys('${esc(k.id)}')">Edytuj</button>`
             : "";
         const printButton = `<button class="btn btn-secondary small-btn" onclick="drukujKosztorys('${esc(k.id)}')">Drukuj</button>`;
         const detachButton = rolaUsera !== "guest"
-            ? `<button class="btn btn-danger small-btn" onclick="odlaczKosztorysOdInwestycji('${esc(k.id)}')">Odłącz</button>`
+            ? `<button class="btn btn-danger small-btn" onclick="odlaczKosztorysOdInwestycji('${esc(k.id)}')">OdĹ‚Ä…cz</button>`
             : "";
 
         return `
@@ -5850,7 +6081,7 @@ function renderujPowiazaneKosztorysyInwestycji() {
 
 window.utworzKosztorysDlaInwestycji = function(inwestycjaId = aktywnaInwestycjaId) {
     if (rolaUsera === "guest") {
-        alert("Gość nie może tworzyć kosztorysów.");
+        alert("GoĹ›Ä‡ nie moĹĽe tworzyÄ‡ kosztorysĂłw.");
         return;
     }
 
@@ -5874,7 +6105,7 @@ window.utworzKosztorysDlaInwestycji = function(inwestycjaId = aktywnaInwestycjaI
 
 window.polaczIstniejacyKosztorysZInwestycja = async function(inwestycjaId = aktywnaInwestycjaId) {
     if (rolaUsera === "guest") {
-        alert("Gość nie może łączyć kosztorysów z inwestycją.");
+        alert("GoĹ›Ä‡ nie moĹĽe Ĺ‚Ä…czyÄ‡ kosztorysĂłw z inwestycjÄ….");
         return;
     }
 
@@ -5886,7 +6117,7 @@ window.polaczIstniejacyKosztorysZInwestycja = async function(inwestycjaId = akty
 
     const lista = (kosztorysy || []).filter(k => !kosztorysPasujeDoInwestycji(k, inwestycjaId));
     if (!lista.length) {
-        alert("Brak kosztorysów do połączenia.");
+        alert("Brak kosztorysĂłw do poĹ‚Ä…czenia.");
         return;
     }
 
@@ -5895,46 +6126,46 @@ window.polaczIstniejacyKosztorysZInwestycja = async function(inwestycjaId = akty
         const suffix = linked ? ` (obecnie: ${linked.nazwa || "inna inwestycja"})` : "";
         return `${idx + 1} - ${k.nazwa || "Kosztorys"} - ${k.data || "-"}${suffix}`;
     });
-    const wybor = prompt(`Wybierz numer kosztorysu do połączenia z inwestycją:\n${lines.join("\n")}`, "1");
+    const wybor = prompt(`Wybierz numer kosztorysu do poĹ‚Ä…czenia z inwestycjÄ…:\n${lines.join("\n")}`, "1");
     if (!wybor) return;
 
     const num = Number(wybor.trim());
     if (!Number.isInteger(num) || num < 1 || num > lista.length) {
-        alert("Nieprawidłowy wybór kosztorysu.");
+        alert("NieprawidĹ‚owy wybĂłr kosztorysu.");
         return;
     }
 
     const kosztorys = lista[num - 1];
     const currentInvestment = znajdzInwestycjeKosztorysu(kosztorys);
-    if (currentInvestment && !confirm(`Ten kosztorys jest już połączony z inwestycją "${currentInvestment.nazwa || "-"}". Zmienić powiązanie?`)) {
+    if (currentInvestment && !confirm(`Ten kosztorys jest juĹĽ poĹ‚Ä…czony z inwestycjÄ… "${currentInvestment.nazwa || "-"}". ZmieniÄ‡ powiÄ…zanie?`)) {
         return;
     }
 
     try {
         await zapiszPowiazanieKosztorysuZInwestycja(kosztorys.id, inwestycjaId);
-        alert("Kosztorys połączony z inwestycją.");
-        zapiszLog("Kosztorysy", "Połączono kosztorys z inwestycją", kosztorys.id);
+        alert("Kosztorys poĹ‚Ä…czony z inwestycjÄ….");
+        zapiszLog("Kosztorysy", "PoĹ‚Ä…czono kosztorys z inwestycjÄ…", kosztorys.id);
     } catch (err) {
-        console.error("Błąd połączenia kosztorysu z inwestycją:", err);
-        alert("Nie udało się połączyć kosztorysu z inwestycją. Szczegóły są w konsoli.");
+        console.error("BĹ‚Ä…d poĹ‚Ä…czenia kosztorysu z inwestycjÄ…:", err);
+        alert("Nie udaĹ‚o siÄ™ poĹ‚Ä…czyÄ‡ kosztorysu z inwestycjÄ…. SzczegĂłĹ‚y sÄ… w konsoli.");
     }
 };
 
 window.odlaczKosztorysOdInwestycji = async function(kosztorysId) {
     if (rolaUsera === "guest") {
-        alert("Gość nie może odłączać kosztorysów.");
+        alert("GoĹ›Ä‡ nie moĹĽe odĹ‚Ä…czaÄ‡ kosztorysĂłw.");
         return;
     }
 
-    if (!confirm("Odłączyć kosztorys od inwestycji?")) return;
+    if (!confirm("OdĹ‚Ä…czyÄ‡ kosztorys od inwestycji?")) return;
 
     try {
         await zapiszPowiazanieKosztorysuZInwestycja(kosztorysId, null);
-        alert("Kosztorys odłączony od inwestycji.");
-        zapiszLog("Kosztorysy", "Odłączono kosztorys od inwestycji", kosztorysId);
+        alert("Kosztorys odĹ‚Ä…czony od inwestycji.");
+        zapiszLog("Kosztorysy", "OdĹ‚Ä…czono kosztorys od inwestycji", kosztorysId);
     } catch (err) {
-        console.error("Błąd odłączenia kosztorysu od inwestycji:", err);
-        alert("Nie udało się odłączyć kosztorysu. Szczegóły są w konsoli.");
+        console.error("BĹ‚Ä…d odĹ‚Ä…czenia kosztorysu od inwestycji:", err);
+        alert("Nie udaĹ‚o siÄ™ odĹ‚Ä…czyÄ‡ kosztorysu. SzczegĂłĹ‚y sÄ… w konsoli.");
     }
 };
 
@@ -5973,9 +6204,9 @@ function anulujEdycjeZaliczki() {
     const title = document.getElementById("zaliczka-form-title");
     const btn = document.getElementById("btn-dodaj-zaliczke");
     const cancel = document.getElementById("btn-anuluj-zaliczke");
-    if (title) title.textContent = "Dodaj zaliczkę";
+    if (title) title.textContent = "Dodaj zaliczkÄ™";
     if (btn) {
-        btn.textContent = "Dodaj zaliczkę";
+        btn.textContent = "Dodaj zaliczkÄ™";
         btn.disabled = false;
     }
     if (cancel) cancel.classList.add("hidden");
@@ -6032,13 +6263,13 @@ window.edytujZaliczke = function(id) {
     const title = document.getElementById("zaliczka-form-title");
     const btn = document.getElementById("btn-dodaj-zaliczke");
     const cancel = document.getElementById("btn-anuluj-zaliczke");
-    if (title) title.textContent = "Edytuj zaliczkę";
+    if (title) title.textContent = "Edytuj zaliczkÄ™";
     if (btn) btn.textContent = "Zapisz zmiany";
     if (cancel) cancel.classList.remove("hidden");
     document.getElementById("zaliczka-data").value = zaliczka.data || "";
     document.getElementById("zaliczka-kwota").value = Number(zaliczka.kwota || 0);
     document.getElementById("zaliczka-purpose").value = pobierzPrzeznaczenieZaliczki(zaliczka) || "";
-    document.getElementById("zaliczka-platnosc").value = zaliczka.sposob_platnosci || "gotówka";
+    document.getElementById("zaliczka-platnosc").value = zaliczka.sposob_platnosci || "gotĂłwka";
     document.getElementById("zaliczka-opis").value = zaliczka.opis || "";
     document.getElementById("card-zaliczka-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
 };
@@ -6065,7 +6296,7 @@ window.edytujKoszt = function(id) {
     document.getElementById("koszt-netto").value = kwoty.netto === null ? "" : Number(kwoty.netto || 0).toFixed(2);
     document.getElementById("koszt-vat-rate").value = kwoty.vatRate === null ? "zw" : String(kwoty.vatRate);
     document.getElementById("koszt-brutto").value = Number(kwoty.brutto || 0).toFixed(2);
-    document.getElementById("koszt-kategoria").value = koszt.kategoria || "materiały";
+    document.getElementById("koszt-kategoria").value = koszt.kategoria || "materiaĹ‚y";
     document.getElementById("koszt-opis").value = koszt.opis || "";
     document.getElementById("card-koszt-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
 };
@@ -6081,7 +6312,7 @@ function renderujTabeleZaliczek(lista) {
 
     tbody.innerHTML = lista.map(z => {
         const akcja = rolaUsera === "admin"
-            ? `<div class="table-actions"><button class="btn btn-secondary small-btn" onclick="edytujZaliczke('${esc(z.id)}')">Edytuj</button><button class="btn btn-danger small-btn" onclick="usunZaliczke('${esc(z.id)}')">Usuń</button></div>`
+            ? `<div class="table-actions"><button class="btn btn-secondary small-btn" onclick="edytujZaliczke('${esc(z.id)}')">Edytuj</button><button class="btn btn-danger small-btn" onclick="usunZaliczke('${esc(z.id)}')">UsuĹ„</button></div>`
             : "";
 
         return `
@@ -6102,13 +6333,13 @@ function renderujTabeleKosztow(lista) {
     if (!tbody) return;
 
     if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Brak kosztów.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Brak kosztĂłw.</td></tr>`;
         return;
     }
 
     tbody.innerHTML = lista.map(k => {
         const akcja = rolaUsera === "admin"
-            ? `<div class="table-actions"><button class="btn btn-secondary small-btn" onclick="edytujKoszt('${esc(k.id)}')">Edytuj</button><button class="btn btn-danger small-btn" onclick="usunKoszt('${esc(k.id)}')">Usuń</button></div>`
+            ? `<div class="table-actions"><button class="btn btn-secondary small-btn" onclick="edytujKoszt('${esc(k.id)}')">Edytuj</button><button class="btn btn-danger small-btn" onclick="usunKoszt('${esc(k.id)}')">UsuĹ„</button></div>`
             : "";
 
         const kwoty = k._kwoty || wyliczKosztMaterialowy(k);
@@ -6158,23 +6389,23 @@ function przeliczFormularzKosztu(source = "netto") {
 
 async function dodajZaliczke() {
     if (rolaUsera === "guest") {
-        alert("Gość nie może dodawać zaliczek.");
+        alert("GoĹ›Ä‡ nie moĹĽe dodawaÄ‡ zaliczek.");
         return;
     }
 
     if (!aktywnaInwestycjaId) {
-        alert("Najpierw otwórz inwestycję.");
+        alert("Najpierw otwĂłrz inwestycjÄ™.");
         return;
     }
 
     const data = document.getElementById("zaliczka-data").value;
-    const kwota = pobierzKwoteFormularza("zaliczka-kwota", "Wpisz poprawną kwotę zaliczki.");
+    const kwota = pobierzKwoteFormularza("zaliczka-kwota", "Wpisz poprawnÄ… kwotÄ™ zaliczki.");
     const purpose = document.getElementById("zaliczka-purpose")?.value || "";
     const sposob_platnosci = document.getElementById("zaliczka-platnosc").value;
     const opis = document.getElementById("zaliczka-opis").value.trim();
 
     if (!data) {
-        alert("Wybierz datę zaliczki.");
+        alert("Wybierz datÄ™ zaliczki.");
         return;
     }
 
@@ -6224,22 +6455,22 @@ async function dodajZaliczke() {
         await pobierzInwestycjeZaliczki();
         renderujInwestycje();
         renderujPanelInwestycji();
-        zapiszLog("Inwestycje", editingId ? "Zmieniono zaliczkę" : "Dodano zaliczkę", opis);
+        zapiszLog("Inwestycje", editingId ? "Zmieniono zaliczkÄ™" : "Dodano zaliczkÄ™", opis);
     } catch (err) {
-        console.error("Błąd zapisu zaliczki:", err);
-        alert(edytowanaZaliczkaId ? "Nie udało się zapisać zmian." : "Nie udało się zapisać zaliczki.");
+        console.error("BĹ‚Ä…d zapisu zaliczki:", err);
+        alert(edytowanaZaliczkaId ? "Nie udaĹ‚o siÄ™ zapisaÄ‡ zmian." : "Nie udaĹ‚o siÄ™ zapisaÄ‡ zaliczki.");
         ustawPrzyciskZapisu(btn, false);
     }
 }
 
 async function dodajKoszt() {
     if (rolaUsera === "guest") {
-        alert("Gość nie może dodawać kosztów.");
+        alert("GoĹ›Ä‡ nie moĹĽe dodawaÄ‡ kosztĂłw.");
         return;
     }
 
     if (!aktywnaInwestycjaId) {
-        alert("Najpierw otwórz inwestycję.");
+        alert("Najpierw otwĂłrz inwestycjÄ™.");
         return;
     }
 
@@ -6253,12 +6484,12 @@ async function dodajKoszt() {
     const opis = document.getElementById("koszt-opis").value.trim();
 
     if (!data) {
-        alert("Wybierz datę kosztu.");
+        alert("Wybierz datÄ™ kosztu.");
         return;
     }
 
     if (!Number.isFinite(netto) || netto < 0 || !Number.isFinite(brutto) || brutto < 0) {
-        alert("Wpisz poprawną kwotę netto albo brutto kosztu.");
+        alert("Wpisz poprawnÄ… kwotÄ™ netto albo brutto kosztu.");
         return;
     }
 
@@ -6310,15 +6541,15 @@ async function dodajKoszt() {
         renderujPanelInwestycji();
         zapiszLog("Inwestycje", editingId ? "Zmieniono koszt" : "Dodano koszt", opis);
     } catch (err) {
-        console.error("Błąd zapisu kosztu:", err);
-        alert(edytowanyKosztId ? "Nie udało się zapisać zmian." : "Nie udało się zapisać kosztu.");
+        console.error("BĹ‚Ä…d zapisu kosztu:", err);
+        alert(edytowanyKosztId ? "Nie udaĹ‚o siÄ™ zapisaÄ‡ zmian." : "Nie udaĹ‚o siÄ™ zapisaÄ‡ kosztu.");
         ustawPrzyciskZapisu(btn, false);
     }
 }
 
 window.usunZaliczke = async function(id) {
     if (rolaUsera !== "admin") {
-        alert("Tylko administrator może usuwać zaliczki.");
+        alert("Tylko administrator moĹĽe usuwaÄ‡ zaliczki.");
         return;
     }
 
@@ -6334,16 +6565,16 @@ window.usunZaliczke = async function(id) {
         await pobierzInwestycje();
         renderujInwestycje();
         renderujPanelInwestycji();
-        zapiszLog("Inwestycje", "Usunięto zaliczkę", id);
+        zapiszLog("Inwestycje", "UsuniÄ™to zaliczkÄ™", id);
     } catch (err) {
         console.error(err);
-        alert("Nie udało się usunąć zaliczki.");
+        alert("Nie udaĹ‚o siÄ™ usunÄ…Ä‡ zaliczki.");
     }
 };
 
 window.usunKoszt = async function(id) {
     if (rolaUsera !== "admin") {
-        alert("Tylko administrator może usuwać koszty.");
+        alert("Tylko administrator moĹĽe usuwaÄ‡ koszty.");
         return;
     }
 
@@ -6359,21 +6590,21 @@ window.usunKoszt = async function(id) {
         await pobierzInwestycje();
         renderujInwestycje();
         renderujPanelInwestycji();
-        zapiszLog("Inwestycje", "Usunięto koszt", id);
+        zapiszLog("Inwestycje", "UsuniÄ™to koszt", id);
     } catch (err) {
         console.error(err);
-        alert("Nie udało się usunąć koszt.");
+        alert("Nie udaĹ‚o siÄ™ usunÄ…Ä‡ koszt.");
     }
 };
 
 async function dodajPraceDodatkowa() {
     if (rolaUsera === "guest") {
-        alert("Gość nie może dodawać prac dodatkowych.");
+        alert("GoĹ›Ä‡ nie moĹĽe dodawaÄ‡ prac dodatkowych.");
         return;
     }
 
     if (!aktywnaInwestycjaId) {
-        alert("Najpierw otwórz inwestycję.");
+        alert("Najpierw otwĂłrz inwestycjÄ™.");
         return;
     }
 
@@ -6384,15 +6615,15 @@ async function dodajPraceDodatkowa() {
     const vat = Number(document.getElementById("praca-vat").value);
 
     if (!nazwa) {
-        alert("Podaj nazwę pracy.");
+        alert("Podaj nazwÄ™ pracy.");
         return;
     }
     if (isNaN(ilosc) || ilosc <= 0) {
-        alert("Podaj poprawną ilość.");
+        alert("Podaj poprawnÄ… iloĹ›Ä‡.");
         return;
     }
     if (isNaN(cena_netto) || cena_netto < 0) {
-        alert("Podaj poprawną cenę netto.");
+        alert("Podaj poprawnÄ… cenÄ™ netto.");
         return;
     }
 
@@ -6431,16 +6662,16 @@ async function dodajPraceDodatkowa() {
         await pobierzInwestycjePraceDodatkowe();
         renderujInwestycje();
         renderujPanelInwestycji();
-        zapiszLog("Inwestycje", "Dodano pracę dodatkową", nazwa);
+        zapiszLog("Inwestycje", "Dodano pracÄ™ dodatkowÄ…", nazwa);
     } catch (err) {
         console.error(err);
-        alert("Nie udało się zapisać pracy dodatkowej.");
+        alert("Nie udaĹ‚o siÄ™ zapisaÄ‡ pracy dodatkowej.");
     }
 }
 
 window.usunPraceDodatkowa = async function(id) {
     if (rolaUsera !== "admin") {
-        alert("Tylko administrator może usuwać prace dodatkowe.");
+        alert("Tylko administrator moĹĽe usuwaÄ‡ prace dodatkowe.");
         return;
     }
 
@@ -6456,10 +6687,10 @@ window.usunPraceDodatkowa = async function(id) {
         await pobierzInwestycje();
         renderujInwestycje();
         renderujPanelInwestycji();
-        zapiszLog("Inwestycje", "Usunięto pracę dodatkową", id);
+        zapiszLog("Inwestycje", "UsuniÄ™to pracÄ™ dodatkowÄ…", id);
     } catch (err) {
         console.error(err);
-        alert("Nie udało się usunąć pracy dodatkowej.");
+        alert("Nie udaĹ‚o siÄ™ usunÄ…Ä‡ pracy dodatkowej.");
     }
 };
 
@@ -6468,11 +6699,11 @@ function renderujSelectPracDodatkowych() {
     if (!select) return;
 
     if (!uslugi.length) {
-        select.innerHTML = `<option value="">— Brak usług w bazie —</option>`;
+        select.innerHTML = `<option value="">â€” Brak usĹ‚ug w bazie â€”</option>`;
         return;
     }
 
-    select.innerHTML = `<option value="">— Brak wyboru (wpisz ręcznie) —</option>
+    select.innerHTML = `<option value="">â€” Brak wyboru (wpisz rÄ™cznie) â€”</option>
 ${uslugi.map(u => `<option value="${esc(u.id)}">\r${esc(u.nazwa)} (${cenaUslugi(u).toFixed(2)} PLN)</option>`).join("\n")}`;
 }
 
@@ -6493,11 +6724,11 @@ function ustawPraceDodatkoweZUslugi() {
 
     document.getElementById("praca-nazwa").value = usluga.nazwa || "";
     document.getElementById("praca-cena-netto").value = cenaUslugi(usluga).toFixed(2);
-    // Keep ILość at 1 (default), opis empty unless user fills, VAT at 23%
+    // Keep ILoĹ›Ä‡ at 1 (default), opis empty unless user fills, VAT at 23%
 }
 
 // ==========================================
-// SZYBKA WYCENA V8 — REGUŁY REMONTOWE
+// SZYBKA WYCENA V8 â€” REGUĹY REMONTOWE
 // ==========================================
 
 function dodajRemontowaPropozycje(lista, config) {
@@ -6506,7 +6737,7 @@ function dodajRemontowaPropozycje(lista, config) {
 
 function generujSzybkaWycene() {
     if (rolaUsera === "guest") {
-        alert("Gość nie może generować wyceny.");
+        alert("GoĹ›Ä‡ nie moĹĽe generowaÄ‡ wyceny.");
         return;
     }
 
@@ -6515,27 +6746,27 @@ function generujSzybkaWycene() {
     const opis = normalizeText(opisOryginalny);
 
     if (!opis) {
-        alert("Opisz zlecenie, np. mieszkanie 30 m², malowanie, gładź, 10 punktów elektrycznych.");
+        alert("Opisz zlecenie, np. mieszkanie 30 mÂ˛, malowanie, gĹ‚adĹş, 10 punktĂłw elektrycznych.");
         return;
     }
 
     const metraz = pobierzLiczbeZOpisu(opis, [
-        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów|metry|metra|m powierzchni)\b/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛|metrow|metrĂłw|metry|metra|m powierzchni)\b/,
         /mieszkanie\s*(\d+(?:[.,]\d+)?)/,
         /lokal\s*(\d+(?:[.,]\d+)?)/,
         /dom\s*(\d+(?:[.,]\d+)?)/
     ]);
 
     const pokoje = pobierzLiczbeZOpisu(opis, [
-        /(\d+)\s*(?:pokoi|pokoje|pokojach|pokój|pokoj|pomieszczenia|pomieszczeń)\b/
+        /(\d+)\s*(?:pokoi|pokoje|pokojach|pokĂłj|pokoj|pomieszczenia|pomieszczeĹ„)\b/
     ]);
 
     const okna = pobierzLiczbeZOpisu(opis, [/(\d+)\s*(?:okien|okna|okno)\b/]) || pokoje || 1;
-    const drzwi = pobierzLiczbeZOpisu(opis, [/(\d+)\s*(?:drzwi|oscieznic|ościeżnic)\b/]) || pokoje || 1;
+    const drzwi = pobierzLiczbeZOpisu(opis, [/(\d+)\s*(?:drzwi|oscieznic|oĹ›cieĹĽnic)\b/]) || pokoje || 1;
 
     const punktyElektryczne = pobierzLiczbeZOpisu(opis, [
-        /(\d+)\s*(?:punktow|punktów|punkty|pkt|punkt)\s*(?:elektrycznych|elektryczne|elektryki|instalacji elektrycznej)?\b/,
-        /(?:instalacj[ai] elektryczn[aej]?|elektryka)[^\d]{0,35}(\d+)\s*(?:szt|punkt|punktow|punktów|pkt)?/
+        /(\d+)\s*(?:punktow|punktĂłw|punkty|pkt|punkt)\s*(?:elektrycznych|elektryczne|elektryki|instalacji elektrycznej)?\b/,
+        /(?:instalacj[ai] elektryczn[aej]?|elektryka)[^\d]{0,35}(\d+)\s*(?:szt|punkt|punktow|punktĂłw|pkt)?/
     ]);
 
     const gniazda = pobierzLiczbeZOpisu(opis, [
@@ -6544,42 +6775,42 @@ function generujSzybkaWycene() {
     ]);
 
     const laczniki = pobierzLiczbeZOpisu(opis, [
-        /(\d+)\s*(?:lacznikow|łączników|wlacznikow|włączników|laczniki|łączniki|wlaczniki|włączniki)\b/,
-        /(\d+)\s*(?:rocznikow|roczników|roczniki)\b/
+        /(\d+)\s*(?:lacznikow|Ĺ‚Ä…cznikĂłw|wlacznikow|wĹ‚Ä…cznikĂłw|laczniki|Ĺ‚Ä…czniki|wlaczniki|wĹ‚Ä…czniki)\b/,
+        /(\d+)\s*(?:rocznikow|rocznikĂłw|roczniki)\b/
     ]);
 
     const punktySanitarne = pobierzLiczbeZOpisu(opis, [
-        /(\d+)\s*(?:punktow|punktów|punkty|pkt|punkt)\s*(?:sanitarnych|sanitarne|wod-kan|wodkan|wodno|wody|kanalizacji|hydraulicznych)\b/,
-        /(?:instalacj[ai] sanitarn[aej]?|wod-kan|wodkan|kanalizacj[ai]|hydraulik[ai]|wodno kanalizacyjn[aej]?)[^\d]{0,45}(\d+)\s*(?:szt|punkt|punktow|punktów|pkt)?/
+        /(\d+)\s*(?:punktow|punktĂłw|punkty|pkt|punkt)\s*(?:sanitarnych|sanitarne|wod-kan|wodkan|wodno|wody|kanalizacji|hydraulicznych)\b/,
+        /(?:instalacj[ai] sanitarn[aej]?|wod-kan|wodkan|kanalizacj[ai]|hydraulik[ai]|wodno kanalizacyjn[aej]?)[^\d]{0,45}(\d+)\s*(?:szt|punkt|punktow|punktĂłw|pkt)?/
     ]);
 
     const punktyCO = pobierzLiczbeZOpisu(opis, [
-        /(\d+)\s*(?:punktow|punktów|punkty|pkt|punkt)\s*(?:co|c\.o\.|grzejnikowych|grzejnikowe|centralnego ogrzewania)\b/,
-        /(?:instalacj[ai] co|instalacj[ai] c\.o\.|centralne ogrzewanie|grzejnik|grzejnika|grzejniki)[^\d]{0,45}(\d+)\s*(?:szt|punkt|punktow|punktów|pkt)?/
+        /(\d+)\s*(?:punktow|punktĂłw|punkty|pkt|punkt)\s*(?:co|c\.o\.|grzejnikowych|grzejnikowe|centralnego ogrzewania)\b/,
+        /(?:instalacj[ai] co|instalacj[ai] c\.o\.|centralne ogrzewanie|grzejnik|grzejnika|grzejniki)[^\d]{0,45}(\d+)\s*(?:szt|punkt|punktow|punktĂłw|pkt)?/
     ]);
 
-    const grzejniki = pobierzLiczbeZOpisu(opis, [/(\d+)\s*(?:grzejnikow|grzejników|grzejniki|grzejnik)\b/]);
+    const grzejniki = pobierzLiczbeZOpisu(opis, [/(\d+)\s*(?:grzejnikow|grzejnikĂłw|grzejniki|grzejnik)\b/]);
 
     const sciankaM2 = pobierzLiczbeZOpisu(opis, [
-        /(?:scianka|ścianka|gk|karton gips|karton-gips|regips)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów)?/,
-        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²)\s*(?:scianka|ścianka|gk|karton gips|karton-gips|regips)/
+        /(?:scianka|Ĺ›cianka|gk|karton gips|karton-gips|regips)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛|metrow|metrĂłw)?/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛)\s*(?:scianka|Ĺ›cianka|gk|karton gips|karton-gips|regips)/
     ]);
 
     const podlogaM2 = pobierzLiczbeZOpisu(opis, [
-        /(?:wykladzina|wykładzina|podloge|podłoge|podłogę|podloga|podłoga|panele)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów)?/,
-        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²)\s*(?:wykladzina|wykładzina|podloga|podłoga|panele)/
+        /(?:wykladzina|wykĹ‚adzina|podloge|podĹ‚oge|podĹ‚ogÄ™|podloga|podĹ‚oga|panele)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛|metrow|metrĂłw)?/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛)\s*(?:wykladzina|wykĹ‚adzina|podloga|podĹ‚oga|panele)/
     ]);
 
-    const odZera = /od zera|nowa instalacja|nowe punkty|wykonanie|wykonac|wykonać|kompletna instalacja|stan deweloperski|deweloperski|generalny/.test(opis);
-    const remont = /remont|stare|stary|modernizacja|przerobka|przeróbka|przerobienie|przerobić|przerobic/.test(opis);
-    const wymiana = /wymiana|wymienic|wymienić|do wymiany/.test(opis);
-    const przerobka = /przerobka|przeróbka|przerobienie|przerobić|przerobic|przeniesienie|przeniesc|przenieść/.test(opis);
+    const odZera = /od zera|nowa instalacja|nowe punkty|wykonanie|wykonac|wykonaÄ‡|kompletna instalacja|stan deweloperski|deweloperski|generalny/.test(opis);
+    const remont = /remont|stare|stary|modernizacja|przerobka|przerĂłbka|przerobienie|przerobiÄ‡|przerobic/.test(opis);
+    const wymiana = /wymiana|wymienic|wymieniÄ‡|do wymiany/.test(opis);
+    const przerobka = /przerobka|przerĂłbka|przerobienie|przerobiÄ‡|przerobic|przeniesienie|przeniesc|przenieĹ›Ä‡/.test(opis);
 
-    const zakresMalowanie = /malowania|malowanie|pomalowac|pomalować|farba|bialy|biały|kolor|sciany|ściany|sufit/.test(opis);
-    const zakresGladz = /gladz|gładź|gladzie|gładzie|szpachlowanie|szlifowanie/.test(opis);
-    const zakresZabezpieczen = /zabezpiec|folia|folie|taśmy|tasmy|oklejanie|okleic|okleić|parapet|detal|meble/.test(opis);
-    const zakresSanitarny = /sanitarn|wod-kan|wodkan|wodno|kanalizac|hydraul|woda|odpływ|odplyw|podejscie|podejście|umywalk|zlew|wc|toalet|prysznic|wanna/.test(opis);
-    const zakresCO = /c\.o\.|co |centralne ogrzewanie|grzejnik|grzejniki|podlogowka|podłogówka|ogrzewanie/.test(opis);
+    const zakresMalowanie = /malowania|malowanie|pomalowac|pomalowaÄ‡|farba|bialy|biaĹ‚y|kolor|sciany|Ĺ›ciany|sufit/.test(opis);
+    const zakresGladz = /gladz|gĹ‚adĹş|gladzie|gĹ‚adzie|szpachlowanie|szlifowanie/.test(opis);
+    const zakresZabezpieczen = /zabezpiec|folia|folie|taĹ›my|tasmy|oklejanie|okleic|okleiÄ‡|parapet|detal|meble/.test(opis);
+    const zakresSanitarny = /sanitarn|wod-kan|wodkan|wodno|kanalizac|hydraul|woda|odpĹ‚yw|odplyw|podejscie|podejĹ›cie|umywalk|zlew|wc|toalet|prysznic|wanna/.test(opis);
+    const zakresCO = /c\.o\.|co |centralne ogrzewanie|grzejnik|grzejniki|podlogowka|podĹ‚ogĂłwka|ogrzewanie/.test(opis);
 
     const propozycje = [];
     const dodaj = (config) => dodajRemontowaPropozycje(propozycje, config);
@@ -6591,89 +6822,89 @@ function generujSzybkaWycene() {
         const sufit = Math.round(metraz);
         const sciany = Math.round(metraz * 3);
         powierzchniaMalowania = sufit + sciany;
-        uwagaMalowania = `Szacunek: sufit ${sufit} m² + ściany ok. ${sciany} m²`;
+        uwagaMalowania = `Szacunek: sufit ${sufit} mÂ˛ + Ĺ›ciany ok. ${sciany} mÂ˛`;
     }
 
     const powierzchniaRobocza = powierzchniaMalowania || (metraz ? Math.round(metraz * 4) : 120);
 
     if (zakresZabezpieczen || zakresMalowanie || zakresGladz) {
         if (metraz) {
-            dodaj({ nazwa: "Zabezpieczenie podłóg folią", szukaj: ["zabezpieczenie podłóg", "folia", "zabezpieczenie"], jednostka: "m²", ilosc: metraz, cena: 6, uwaga: "Doliczono automatycznie: prace wykończeniowe wymagają zabezpieczenia podłóg" });
+            dodaj({ nazwa: "Zabezpieczenie podĹ‚Ăłg foliÄ…", szukaj: ["zabezpieczenie podĹ‚Ăłg", "folia", "zabezpieczenie"], jednostka: "mÂ˛", ilosc: metraz, cena: 6, uwaga: "Doliczono automatycznie: prace wykoĹ„czeniowe wymagajÄ… zabezpieczenia podĹ‚Ăłg" });
         }
-        dodaj({ nazwa: "Oklejanie taśmą malarską detali", szukaj: ["taśma", "tasma", "oklejanie", "zabezpieczenie"], jednostka: "kpl.", ilosc: Math.max(1, pokoje || 1), cena: 80, uwaga: "Doliczono automatycznie: zabezpieczenie detali, narożników, ościeżnic i krawędzi" });
-        dodaj({ nazwa: "Zabezpieczenie okien i parapetów", szukaj: ["zabezpieczenie okien", "parapet", "okno"], jednostka: "kpl.", ilosc: okna, cena: 45, uwaga: "Szacunek: przyjęto orientacyjnie 1 okno/parapet na pomieszczenie" });
+        dodaj({ nazwa: "Oklejanie taĹ›mÄ… malarskÄ… detali", szukaj: ["taĹ›ma", "tasma", "oklejanie", "zabezpieczenie"], jednostka: "kpl.", ilosc: Math.max(1, pokoje || 1), cena: 80, uwaga: "Doliczono automatycznie: zabezpieczenie detali, naroĹĽnikĂłw, oĹ›cieĹĽnic i krawÄ™dzi" });
+        dodaj({ nazwa: "Zabezpieczenie okien i parapetĂłw", szukaj: ["zabezpieczenie okien", "parapet", "okno"], jednostka: "kpl.", ilosc: okna, cena: 45, uwaga: "Szacunek: przyjÄ™to orientacyjnie 1 okno/parapet na pomieszczenie" });
     }
 
     if (zakresGladz) {
-        dodaj({ nazwa: "Przygotowanie powierzchni pod gładź", szukaj: ["przygotowanie powierzchni", "przygotowanie pod gładź", "gladz"], jednostka: "m²", ilosc: powierzchniaRobocza, cena: 8, uwaga: "Doliczono automatycznie: gładź wymaga przygotowania podłoża" });
-        dodaj({ nazwa: "Gruntowanie pod gładź", szukaj: ["gruntowanie", "grunt"], jednostka: "m²", ilosc: powierzchniaRobocza, cena: 7, uwaga: "Doliczono automatycznie: gładź wymaga gruntowania" });
-        dodaj({ nazwa: "Montaż narożników aluminiowych", szukaj: ["narożnik", "naroznik", "aluminiowy"], jednostka: "mb", ilosc: Math.max(4, Math.round(okna * 4 + drzwi * 2)), cena: 18, uwaga: "Szacunek: narożniki przy oknach/drzwiach i detalach" });
-        dodaj({ nazwa: "Wykonanie gładzi", szukaj: ["gładź", "gladz", "gladzie", "gładzie"], jednostka: "m²", ilosc: powierzchniaRobocza, cena: 32, uwaga: "Zakres z opisu: gładź" });
-        dodaj({ nazwa: "Szlifowanie gładzi", szukaj: ["szlifowanie", "gladz", "gładź"], jednostka: "m²", ilosc: powierzchniaRobocza, cena: 10, uwaga: "Doliczono automatycznie: po gładzi potrzebne jest szlifowanie" });
-        dodaj({ nazwa: "Gruntowanie po gładzi pod malowanie", szukaj: ["gruntowanie", "grunt"], jednostka: "m²", ilosc: powierzchniaRobocza, cena: 7, uwaga: "Doliczono automatycznie: przygotowanie pod malowanie" });
+        dodaj({ nazwa: "Przygotowanie powierzchni pod gĹ‚adĹş", szukaj: ["przygotowanie powierzchni", "przygotowanie pod gĹ‚adĹş", "gladz"], jednostka: "mÂ˛", ilosc: powierzchniaRobocza, cena: 8, uwaga: "Doliczono automatycznie: gĹ‚adĹş wymaga przygotowania podĹ‚oĹĽa" });
+        dodaj({ nazwa: "Gruntowanie pod gĹ‚adĹş", szukaj: ["gruntowanie", "grunt"], jednostka: "mÂ˛", ilosc: powierzchniaRobocza, cena: 7, uwaga: "Doliczono automatycznie: gĹ‚adĹş wymaga gruntowania" });
+        dodaj({ nazwa: "MontaĹĽ naroĹĽnikĂłw aluminiowych", szukaj: ["naroĹĽnik", "naroznik", "aluminiowy"], jednostka: "mb", ilosc: Math.max(4, Math.round(okna * 4 + drzwi * 2)), cena: 18, uwaga: "Szacunek: naroĹĽniki przy oknach/drzwiach i detalach" });
+        dodaj({ nazwa: "Wykonanie gĹ‚adzi", szukaj: ["gĹ‚adĹş", "gladz", "gladzie", "gĹ‚adzie"], jednostka: "mÂ˛", ilosc: powierzchniaRobocza, cena: 32, uwaga: "Zakres z opisu: gĹ‚adĹş" });
+        dodaj({ nazwa: "Szlifowanie gĹ‚adzi", szukaj: ["szlifowanie", "gladz", "gĹ‚adĹş"], jednostka: "mÂ˛", ilosc: powierzchniaRobocza, cena: 10, uwaga: "Doliczono automatycznie: po gĹ‚adzi potrzebne jest szlifowanie" });
+        dodaj({ nazwa: "Gruntowanie po gĹ‚adzi pod malowanie", szukaj: ["gruntowanie", "grunt"], jednostka: "mÂ˛", ilosc: powierzchniaRobocza, cena: 7, uwaga: "Doliczono automatycznie: przygotowanie pod malowanie" });
     }
 
     if (zakresMalowanie) {
-        dodaj({ nazwa: "Malowanie ścian i sufitu", szukaj: ["malowanie", "malowania", "farba"], jednostka: "m²", ilosc: powierzchniaMalowania || 100, cena: 28, uwaga: uwagaMalowania || "Szacunek powierzchni malowania" });
+        dodaj({ nazwa: "Malowanie Ĺ›cian i sufitu", szukaj: ["malowanie", "malowania", "farba"], jednostka: "mÂ˛", ilosc: powierzchniaMalowania || 100, cena: 28, uwaga: uwagaMalowania || "Szacunek powierzchni malowania" });
     }
 
     if (punktyElektryczne) {
-        dodaj({ nazwa: "Wykonanie punktu elektrycznego", szukaj: ["punkt elektryczny", "montaż punktu", "montaz punktu", "punkt"], unikaj: ["przemysł", "przemyslow", "siłowe", "silowe"], jednostka: "pkt", ilosc: punktyElektryczne, cena: 120, uwaga: "Ilość punktów z opisu" });
+        dodaj({ nazwa: "Wykonanie punktu elektrycznego", szukaj: ["punkt elektryczny", "montaĹĽ punktu", "montaz punktu", "punkt"], unikaj: ["przemysĹ‚", "przemyslow", "siĹ‚owe", "silowe"], jednostka: "pkt", ilosc: punktyElektryczne, cena: 120, uwaga: "IloĹ›Ä‡ punktĂłw z opisu" });
         if (odZera || przerobka) {
             dodaj({ nazwa: "Kucie / bruzdowanie pod punkt elektryczny", szukaj: ["bruzdowanie", "kucie", "bruzda"], jednostka: "szt.", ilosc: punktyElektryczne, cena: 45, uwaga: "Doliczono automatycznie: nowy/przerabiany punkt wymaga przygotowania trasy" });
-            dodaj({ nazwa: "Naprawa bruzd po elektryce", szukaj: ["naprawa bruzd", "bruzdy", "zaprawienie"], jednostka: "szt.", ilosc: punktyElektryczne, cena: 35, uwaga: "Doliczono automatycznie: po wykonaniu punktu trzeba naprawić bruzdę" });
+            dodaj({ nazwa: "Naprawa bruzd po elektryce", szukaj: ["naprawa bruzd", "bruzdy", "zaprawienie"], jednostka: "szt.", ilosc: punktyElektryczne, cena: 35, uwaga: "Doliczono automatycznie: po wykonaniu punktu trzeba naprawiÄ‡ bruzdÄ™" });
         }
-        dodaj({ nazwa: "Montaż osprzętu elektrycznego", szukaj: ["osprzęt", "osprzet", "gniazdo", "łącznik", "wlacznik"], unikaj: ["przemysł", "przemyslow", "siłowe", "silowe"], jednostka: "szt.", ilosc: punktyElektryczne, cena: 35, uwaga: "Doliczono automatycznie: punkt wymaga montażu/podłączenia osprzętu" });
+        dodaj({ nazwa: "MontaĹĽ osprzÄ™tu elektrycznego", szukaj: ["osprzÄ™t", "osprzet", "gniazdo", "Ĺ‚Ä…cznik", "wlacznik"], unikaj: ["przemysĹ‚", "przemyslow", "siĹ‚owe", "silowe"], jednostka: "szt.", ilosc: punktyElektryczne, cena: 35, uwaga: "Doliczono automatycznie: punkt wymaga montaĹĽu/podĹ‚Ä…czenia osprzÄ™tu" });
     }
 
     if (gniazda) {
-        if (wymiana) dodaj({ nazwa: "Demontaż starego gniazda", szukaj: ["demontaż", "demontaz", "gniazdo"], jednostka: "szt.", ilosc: gniazda, cena: 20, uwaga: "Doliczono automatycznie: wymiana = demontaż starego osprzętu" });
-        dodaj({ nazwa: "Wymiana / montaż gniazda elektrycznego", szukaj: ["wymiana gniazda", "gniazdo elektryczne", "montaż gniazda", "montaz gniazda", "gniazdo"], unikaj: ["przemysł", "przemyslow", "siłowe", "silowe", "230v przemyslowe", "400v"], jednostka: "szt.", ilosc: gniazda, cena: 90, uwaga: "Ilość gniazd z opisu" });
+        if (wymiana) dodaj({ nazwa: "DemontaĹĽ starego gniazda", szukaj: ["demontaĹĽ", "demontaz", "gniazdo"], jednostka: "szt.", ilosc: gniazda, cena: 20, uwaga: "Doliczono automatycznie: wymiana = demontaĹĽ starego osprzÄ™tu" });
+        dodaj({ nazwa: "Wymiana / montaĹĽ gniazda elektrycznego", szukaj: ["wymiana gniazda", "gniazdo elektryczne", "montaĹĽ gniazda", "montaz gniazda", "gniazdo"], unikaj: ["przemysĹ‚", "przemyslow", "siĹ‚owe", "silowe", "230v przemyslowe", "400v"], jednostka: "szt.", ilosc: gniazda, cena: 90, uwaga: "IloĹ›Ä‡ gniazd z opisu" });
     }
 
     if (laczniki) {
-        if (wymiana) dodaj({ nazwa: "Demontaż starego łącznika / włącznika", szukaj: ["demontaż", "demontaz", "łącznik", "wlacznik"], jednostka: "szt.", ilosc: laczniki, cena: 20, uwaga: "Doliczono automatycznie: wymiana = demontaż starego osprzętu" });
-        dodaj({ nazwa: "Wymiana / montaż łącznika światła", szukaj: ["łącznik", "lacznik", "włącznik", "wlacznik", "osprzęt", "osprzet"], unikaj: ["przemysł", "przemyslow", "siłowe", "silowe"], jednostka: "szt.", ilosc: laczniki, cena: 80, uwaga: opis.includes("rocznik") ? "Rozpoznano z dyktowania jako „roczniki” — potraktowano jako łączniki" : "Ilość łączników z opisu" });
+        if (wymiana) dodaj({ nazwa: "DemontaĹĽ starego Ĺ‚Ä…cznika / wĹ‚Ä…cznika", szukaj: ["demontaĹĽ", "demontaz", "Ĺ‚Ä…cznik", "wlacznik"], jednostka: "szt.", ilosc: laczniki, cena: 20, uwaga: "Doliczono automatycznie: wymiana = demontaĹĽ starego osprzÄ™tu" });
+        dodaj({ nazwa: "Wymiana / montaĹĽ Ĺ‚Ä…cznika Ĺ›wiatĹ‚a", szukaj: ["Ĺ‚Ä…cznik", "lacznik", "wĹ‚Ä…cznik", "wlacznik", "osprzÄ™t", "osprzet"], unikaj: ["przemysĹ‚", "przemyslow", "siĹ‚owe", "silowe"], jednostka: "szt.", ilosc: laczniki, cena: 80, uwaga: opis.includes("rocznik") ? "Rozpoznano z dyktowania jako â€žrocznikiâ€ť â€” potraktowano jako Ĺ‚Ä…czniki" : "IloĹ›Ä‡ Ĺ‚Ä…cznikĂłw z opisu" });
     }
 
     if (zakresSanitarny || punktySanitarne) {
         const ilosc = punktySanitarne || 1;
-        if (przerobka || wymiana || remont) dodaj({ nazwa: "Demontaż / odkrycie starego punktu wod-kan", szukaj: ["demontaż", "demontaz", "wod-kan", "hydraulika"], jednostka: "szt.", ilosc, cena: 90, uwaga: "Doliczono automatycznie: przeróbka/wymiana punktu sanitarnego wymaga demontażu lub odkrycia starego układu" });
-        if (odZera || przerobka || /wykonanie|wykonac|wykonać|nowy/.test(opis)) dodaj({ nazwa: "Kucie / przygotowanie trasy pod wod-kan", szukaj: ["kucie", "bruzdowanie", "wod-kan", "hydraulika"], jednostka: "szt.", ilosc, cena: 120, uwaga: "Doliczono automatycznie: nowy punkt sanitarny wymaga przygotowania trasy" });
-        dodaj({ nazwa: przerobka ? "Przeróbka punktu wod-kan" : "Wykonanie punktu wod-kan", szukaj: ["wod-kan", "hydraulika", "punkt sanitarny", "kanalizacja", "woda"], jednostka: "szt.", ilosc, cena: przerobka ? 420 : 360, uwaga: przerobka ? "Zakres z opisu: przeróbka punktu sanitarnego" : "Zakres z opisu: wykonanie punktu sanitarnego" });
-        dodaj({ nazwa: "Naprawa bruzd po instalacji wod-kan", szukaj: ["naprawa bruzd", "zaprawienie", "bruzdy"], jednostka: "szt.", ilosc, cena: 45, uwaga: "Doliczono automatycznie: po instalacji sanitarnej trzeba naprawić bruzdy" });
-        dodaj({ nazwa: "Próba szczelności instalacji wod-kan", szukaj: ["próba szczelności", "proba szczelnosci", "szczelność", "szczelnosc"], jednostka: "usługa", ilosc: 1, cena: 180, uwaga: "Doliczono automatycznie: instalacja wod-kan wymaga sprawdzenia szczelności" });
+        if (przerobka || wymiana || remont) dodaj({ nazwa: "DemontaĹĽ / odkrycie starego punktu wod-kan", szukaj: ["demontaĹĽ", "demontaz", "wod-kan", "hydraulika"], jednostka: "szt.", ilosc, cena: 90, uwaga: "Doliczono automatycznie: przerĂłbka/wymiana punktu sanitarnego wymaga demontaĹĽu lub odkrycia starego ukĹ‚adu" });
+        if (odZera || przerobka || /wykonanie|wykonac|wykonaÄ‡|nowy/.test(opis)) dodaj({ nazwa: "Kucie / przygotowanie trasy pod wod-kan", szukaj: ["kucie", "bruzdowanie", "wod-kan", "hydraulika"], jednostka: "szt.", ilosc, cena: 120, uwaga: "Doliczono automatycznie: nowy punkt sanitarny wymaga przygotowania trasy" });
+        dodaj({ nazwa: przerobka ? "PrzerĂłbka punktu wod-kan" : "Wykonanie punktu wod-kan", szukaj: ["wod-kan", "hydraulika", "punkt sanitarny", "kanalizacja", "woda"], jednostka: "szt.", ilosc, cena: przerobka ? 420 : 360, uwaga: przerobka ? "Zakres z opisu: przerĂłbka punktu sanitarnego" : "Zakres z opisu: wykonanie punktu sanitarnego" });
+        dodaj({ nazwa: "Naprawa bruzd po instalacji wod-kan", szukaj: ["naprawa bruzd", "zaprawienie", "bruzdy"], jednostka: "szt.", ilosc, cena: 45, uwaga: "Doliczono automatycznie: po instalacji sanitarnej trzeba naprawiÄ‡ bruzdy" });
+        dodaj({ nazwa: "PrĂłba szczelnoĹ›ci instalacji wod-kan", szukaj: ["prĂłba szczelnoĹ›ci", "proba szczelnosci", "szczelnoĹ›Ä‡", "szczelnosc"], jednostka: "usĹ‚uga", ilosc: 1, cena: 180, uwaga: "Doliczono automatycznie: instalacja wod-kan wymaga sprawdzenia szczelnoĹ›ci" });
     }
 
     if (zakresCO || punktyCO || grzejniki) {
         const ilosc = punktyCO || grzejniki || 1;
-        if (przerobka || wymiana || remont) dodaj({ nazwa: "Demontaż grzejnika / starego podejścia C.O.", szukaj: ["demontaż", "demontaz", "grzejnik", "co"], jednostka: "szt.", ilosc, cena: 120, uwaga: "Doliczono automatycznie: przeróbka/wymiana C.O. wymaga demontażu starego elementu" });
-        if (odZera || przerobka || /wykonanie|wykonac|wykonać|nowy/.test(opis)) dodaj({ nazwa: "Kucie / przygotowanie trasy pod C.O.", szukaj: ["kucie", "bruzdowanie", "co", "centralne ogrzewanie"], jednostka: "szt.", ilosc, cena: 120, uwaga: "Doliczono automatycznie: nowy/przerabiany punkt C.O. wymaga przygotowania trasy" });
-        dodaj({ nazwa: przerobka ? "Przeróbka punktu C.O." : "Wykonanie punktu C.O.", szukaj: ["co", "centralne ogrzewanie", "grzejnik", "podejście"], jednostka: "szt.", ilosc, cena: przerobka ? 450 : 380, uwaga: przerobka ? "Zakres z opisu: przeróbka punktu C.O." : "Zakres z opisu: wykonanie punktu C.O." });
-        if (grzejniki || /grzejnik/.test(opis)) dodaj({ nazwa: "Montaż grzejnika", szukaj: ["montaż grzejnika", "montaz grzejnika", "grzejnik"], jednostka: "szt.", ilosc, cena: 180, uwaga: "Doliczono automatycznie: punkt C.O. zwykle kończy się montażem grzejnika" });
-        dodaj({ nazwa: "Próba szczelności instalacji C.O.", szukaj: ["próba szczelności", "proba szczelnosci", "szczelność", "szczelnosc", "co"], jednostka: "usługa", ilosc: 1, cena: 200, uwaga: "Doliczono automatycznie: instalacja C.O. wymaga próby szczelności" });
+        if (przerobka || wymiana || remont) dodaj({ nazwa: "DemontaĹĽ grzejnika / starego podejĹ›cia C.O.", szukaj: ["demontaĹĽ", "demontaz", "grzejnik", "co"], jednostka: "szt.", ilosc, cena: 120, uwaga: "Doliczono automatycznie: przerĂłbka/wymiana C.O. wymaga demontaĹĽu starego elementu" });
+        if (odZera || przerobka || /wykonanie|wykonac|wykonaÄ‡|nowy/.test(opis)) dodaj({ nazwa: "Kucie / przygotowanie trasy pod C.O.", szukaj: ["kucie", "bruzdowanie", "co", "centralne ogrzewanie"], jednostka: "szt.", ilosc, cena: 120, uwaga: "Doliczono automatycznie: nowy/przerabiany punkt C.O. wymaga przygotowania trasy" });
+        dodaj({ nazwa: przerobka ? "PrzerĂłbka punktu C.O." : "Wykonanie punktu C.O.", szukaj: ["co", "centralne ogrzewanie", "grzejnik", "podejĹ›cie"], jednostka: "szt.", ilosc, cena: przerobka ? 450 : 380, uwaga: przerobka ? "Zakres z opisu: przerĂłbka punktu C.O." : "Zakres z opisu: wykonanie punktu C.O." });
+        if (grzejniki || /grzejnik/.test(opis)) dodaj({ nazwa: "MontaĹĽ grzejnika", szukaj: ["montaĹĽ grzejnika", "montaz grzejnika", "grzejnik"], jednostka: "szt.", ilosc, cena: 180, uwaga: "Doliczono automatycznie: punkt C.O. zwykle koĹ„czy siÄ™ montaĹĽem grzejnika" });
+        dodaj({ nazwa: "PrĂłba szczelnoĹ›ci instalacji C.O.", szukaj: ["prĂłba szczelnoĹ›ci", "proba szczelnosci", "szczelnoĹ›Ä‡", "szczelnosc", "co"], jednostka: "usĹ‚uga", ilosc: 1, cena: 200, uwaga: "Doliczono automatycznie: instalacja C.O. wymaga prĂłby szczelnoĹ›ci" });
     }
 
-    if (/scianka|ścianka|gk|karton gips|karton-gips|regips|dzialowa|działowa/.test(opis)) {
+    if (/scianka|Ĺ›cianka|gk|karton gips|karton-gips|regips|dzialowa|dziaĹ‚owa/.test(opis)) {
         const m2 = sciankaM2 || 10;
-        dodaj({ nazwa: "Konstrukcja ścianki GK", szukaj: ["ścianka", "scianka", "gk", "karton gips", "profil"], jednostka: "m²", ilosc: m2, cena: 85, uwaga: "Doliczono automatycznie: ścianka GK wymaga konstrukcji" });
-        dodaj({ nazwa: "Płytowanie ścianki GK", szukaj: ["płyta gk", "plyta gk", "karton gips", "regips"], jednostka: "m²", ilosc: m2, cena: 95, uwaga: "Zakres z opisu: ścianka GK" });
-        dodaj({ nazwa: "Taśmowanie i spoinowanie GK", szukaj: ["taśmowanie", "tasmowanie", "spoinowanie", "gk"], jednostka: "m²", ilosc: m2, cena: 35, uwaga: "Doliczono automatycznie: GK wymaga spoinowania" });
-        dodaj({ nazwa: "Szlifowanie i gruntowanie GK", szukaj: ["szlifowanie", "gruntowanie", "gk"], jednostka: "m²", ilosc: m2, cena: 18, uwaga: "Doliczono automatycznie: przygotowanie GK pod malowanie" });
+        dodaj({ nazwa: "Konstrukcja Ĺ›cianki GK", szukaj: ["Ĺ›cianka", "scianka", "gk", "karton gips", "profil"], jednostka: "mÂ˛", ilosc: m2, cena: 85, uwaga: "Doliczono automatycznie: Ĺ›cianka GK wymaga konstrukcji" });
+        dodaj({ nazwa: "PĹ‚ytowanie Ĺ›cianki GK", szukaj: ["pĹ‚yta gk", "plyta gk", "karton gips", "regips"], jednostka: "mÂ˛", ilosc: m2, cena: 95, uwaga: "Zakres z opisu: Ĺ›cianka GK" });
+        dodaj({ nazwa: "TaĹ›mowanie i spoinowanie GK", szukaj: ["taĹ›mowanie", "tasmowanie", "spoinowanie", "gk"], jednostka: "mÂ˛", ilosc: m2, cena: 35, uwaga: "Doliczono automatycznie: GK wymaga spoinowania" });
+        dodaj({ nazwa: "Szlifowanie i gruntowanie GK", szukaj: ["szlifowanie", "gruntowanie", "gk"], jednostka: "mÂ˛", ilosc: m2, cena: 18, uwaga: "Doliczono automatycznie: przygotowanie GK pod malowanie" });
     }
 
-    if (/wykladzina|wykładzina|podloge|podłoge|podłogę|podloga|podłoga|panele|paneli/.test(opis)) {
+    if (/wykladzina|wykĹ‚adzina|podloge|podĹ‚oge|podĹ‚ogÄ™|podloga|podĹ‚oga|panele|paneli/.test(opis)) {
         const m2 = podlogaM2 || metraz || 50;
-        dodaj({ nazwa: "Przygotowanie podłoża pod podłogę", szukaj: ["przygotowanie podłoża", "podłoże", "podloze", "podłoga"], jednostka: "m²", ilosc: m2, cena: 12, uwaga: "Doliczono automatycznie: przed ułożeniem podłogi trzeba przygotować podłoże" });
-        dodaj({ nazwa: /panele|paneli/.test(opis) ? "Ułożenie paneli" : "Ułożenie wykładziny", szukaj: /panele|paneli/.test(opis) ? ["panele", "podłoga"] : ["wykładzina", "wykladzina", "podłoga", "podloga"], jednostka: "m²", ilosc: m2, cena: /panele|paneli/.test(opis) ? 55 : 45, uwaga: podlogaM2 ? "Metraż podłogi z opisu" : "Przyjęto metraż mieszkania jako powierzchnię podłogi" });
-        dodaj({ nazwa: "Docinki / progi / wykończenie podłogi", szukaj: ["docinki", "progi", "listwy", "podłoga"], jednostka: "kpl.", ilosc: Math.max(1, pokoje || 1), cena: 120, uwaga: "Doliczono automatycznie: podłoga wymaga docinek i wykończeń" });
+        dodaj({ nazwa: "Przygotowanie podĹ‚oĹĽa pod podĹ‚ogÄ™", szukaj: ["przygotowanie podĹ‚oĹĽa", "podĹ‚oĹĽe", "podloze", "podĹ‚oga"], jednostka: "mÂ˛", ilosc: m2, cena: 12, uwaga: "Doliczono automatycznie: przed uĹ‚oĹĽeniem podĹ‚ogi trzeba przygotowaÄ‡ podĹ‚oĹĽe" });
+        dodaj({ nazwa: /panele|paneli/.test(opis) ? "UĹ‚oĹĽenie paneli" : "UĹ‚oĹĽenie wykĹ‚adziny", szukaj: /panele|paneli/.test(opis) ? ["panele", "podĹ‚oga"] : ["wykĹ‚adzina", "wykladzina", "podĹ‚oga", "podloga"], jednostka: "mÂ˛", ilosc: m2, cena: /panele|paneli/.test(opis) ? 55 : 45, uwaga: podlogaM2 ? "MetraĹĽ podĹ‚ogi z opisu" : "PrzyjÄ™to metraĹĽ mieszkania jako powierzchniÄ™ podĹ‚ogi" });
+        dodaj({ nazwa: "Docinki / progi / wykoĹ„czenie podĹ‚ogi", szukaj: ["docinki", "progi", "listwy", "podĹ‚oga"], jednostka: "kpl.", ilosc: Math.max(1, pokoje || 1), cena: 120, uwaga: "Doliczono automatycznie: podĹ‚oga wymaga docinek i wykoĹ„czeĹ„" });
     }
 
     if (!propozycje.length) {
         if (metraz) {
-            dodaj({ nazwa: "Robocizna remontowa — wycena szacunkowa", szukaj: ["robocizna", "remont", "prace"], jednostka: "m²", ilosc: metraz, cena: 110, uwaga: "Nie wykryto szczegółów — szacunek z metrażu" });
+            dodaj({ nazwa: "Robocizna remontowa â€” wycena szacunkowa", szukaj: ["robocizna", "remont", "prace"], jednostka: "mÂ˛", ilosc: metraz, cena: 110, uwaga: "Nie wykryto szczegĂłĹ‚Ăłw â€” szacunek z metraĹĽu" });
         } else {
-            alert("Nie udało się rozpoznać zakresu. Dopisz metraż albo słowa: malowanie, gładź, gniazda, punkty, wod-kan, C.O., wykładzina.");
+            alert("Nie udaĹ‚o siÄ™ rozpoznaÄ‡ zakresu. Dopisz metraĹĽ albo sĹ‚owa: malowanie, gĹ‚adĹş, gniazda, punkty, wod-kan, C.O., wykĹ‚adzina.");
             return;
         }
     }
@@ -6697,7 +6928,7 @@ function generujSzybkaWycene() {
 
 
 // ==========================================
-// SZYBKA WYCENA V10 — ZESTAWY ROBÓT BEZ POWIELANIA
+// SZYBKA WYCENA V10 â€” ZESTAWY ROBĂ“T BEZ POWIELANIA
 // ==========================================
 
 function dodajPozycjeRegulyBezPowielania(lista, config) {
@@ -6707,7 +6938,7 @@ function dodajPozycjeRegulyBezPowielania(lista, config) {
         .replace(/\s+/g, " ")
         .replace(/wykonanie /g, "")
         .replace(/montaz /g, "")
-        .replace(/montaż /g, "")
+        .replace(/montaĹĽ /g, "")
         .trim();
 
     const istnieje = lista.some(p => {
@@ -6715,7 +6946,7 @@ function dodajPozycjeRegulyBezPowielania(lista, config) {
             .replace(/\s+/g, " ")
             .replace(/wykonanie /g, "")
             .replace(/montaz /g, "")
-            .replace(/montaż /g, "")
+            .replace(/montaĹĽ /g, "")
             .trim();
         return nazwa === key;
     });
@@ -6749,7 +6980,7 @@ function dodajPozycjeRegulyBezPowielania(lista, config) {
 
 function generujSzybkaWycene() {
     if (rolaUsera === "guest") {
-        alert("Gość nie może generować wyceny.");
+        alert("GoĹ›Ä‡ nie moĹĽe generowaÄ‡ wyceny.");
         return;
     }
 
@@ -6758,27 +6989,27 @@ function generujSzybkaWycene() {
     const opis = normalizeText(opisOryginalny);
 
     if (!opis) {
-        alert("Opisz zlecenie, np. mieszkanie 30 m², malowanie, gładź, 10 punktów elektrycznych.");
+        alert("Opisz zlecenie, np. mieszkanie 30 mÂ˛, malowanie, gĹ‚adĹş, 10 punktĂłw elektrycznych.");
         return;
     }
 
     const metraz = pobierzLiczbeZOpisu(opis, [
-        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów|metry|metra|m powierzchni)\b/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛|metrow|metrĂłw|metry|metra|m powierzchni)\b/,
         /mieszkanie\s*(\d+(?:[.,]\d+)?)/,
         /lokal\s*(\d+(?:[.,]\d+)?)/,
         /dom\s*(\d+(?:[.,]\d+)?)/
     ]);
 
     const pokoje = pobierzLiczbeZOpisu(opis, [
-        /(\d+)\s*(?:pokoi|pokoje|pokojach|pokój|pokoj|pomieszczenia|pomieszczeń)\b/
+        /(\d+)\s*(?:pokoi|pokoje|pokojach|pokĂłj|pokoj|pomieszczenia|pomieszczeĹ„)\b/
     ]);
 
     const okna = pobierzLiczbeZOpisu(opis, [/(\d+)\s*(?:okien|okna|okno)\b/]) || pokoje || 1;
-    const drzwi = pobierzLiczbeZOpisu(opis, [/(\d+)\s*(?:drzwi|oscieznic|ościeżnic)\b/]) || pokoje || 1;
+    const drzwi = pobierzLiczbeZOpisu(opis, [/(\d+)\s*(?:drzwi|oscieznic|oĹ›cieĹĽnic)\b/]) || pokoje || 1;
 
     const punktyElektryczne = pobierzLiczbeZOpisu(opis, [
-        /(\d+)\s*(?:punktow|punktów|punkty|pkt|punkt)\s*(?:elektrycznych|elektryczne|elektryki|instalacji elektrycznej)?\b/,
-        /(?:instalacj[ai] elektryczn[aej]?|elektryka)[^\d]{0,35}(\d+)\s*(?:szt|punkt|punktow|punktów|pkt)?/
+        /(\d+)\s*(?:punktow|punktĂłw|punkty|pkt|punkt)\s*(?:elektrycznych|elektryczne|elektryki|instalacji elektrycznej)?\b/,
+        /(?:instalacj[ai] elektryczn[aej]?|elektryka)[^\d]{0,35}(\d+)\s*(?:szt|punkt|punktow|punktĂłw|pkt)?/
     ]);
 
     const gniazda = pobierzLiczbeZOpisu(opis, [
@@ -6787,42 +7018,42 @@ function generujSzybkaWycene() {
     ]);
 
     const laczniki = pobierzLiczbeZOpisu(opis, [
-        /(\d+)\s*(?:lacznikow|łączników|wlacznikow|włączników|laczniki|łączniki|wlaczniki|włączniki)\b/,
-        /(\d+)\s*(?:rocznikow|roczników|roczniki)\b/
+        /(\d+)\s*(?:lacznikow|Ĺ‚Ä…cznikĂłw|wlacznikow|wĹ‚Ä…cznikĂłw|laczniki|Ĺ‚Ä…czniki|wlaczniki|wĹ‚Ä…czniki)\b/,
+        /(\d+)\s*(?:rocznikow|rocznikĂłw|roczniki)\b/
     ]);
 
     const punktySanitarne = pobierzLiczbeZOpisu(opis, [
-        /(\d+)\s*(?:punktow|punktów|punkty|pkt|punkt)\s*(?:sanitarnych|sanitarne|wod-kan|wodkan|wodno|wody|kanalizacji|hydraulicznych)\b/,
-        /(?:instalacj[ai] sanitarn[aej]?|wod-kan|wodkan|kanalizacj[ai]|hydraulik[ai]|wodno kanalizacyjn[aej]?)[^\d]{0,45}(\d+)\s*(?:szt|punkt|punktow|punktów|pkt)?/
+        /(\d+)\s*(?:punktow|punktĂłw|punkty|pkt|punkt)\s*(?:sanitarnych|sanitarne|wod-kan|wodkan|wodno|wody|kanalizacji|hydraulicznych)\b/,
+        /(?:instalacj[ai] sanitarn[aej]?|wod-kan|wodkan|kanalizacj[ai]|hydraulik[ai]|wodno kanalizacyjn[aej]?)[^\d]{0,45}(\d+)\s*(?:szt|punkt|punktow|punktĂłw|pkt)?/
     ]);
 
     const punktyCO = pobierzLiczbeZOpisu(opis, [
-        /(\d+)\s*(?:punktow|punktów|punkty|pkt|punkt)\s*(?:co|c\.o\.|grzejnikowych|grzejnikowe|centralnego ogrzewania)\b/,
-        /(?:instalacj[ai] co|instalacj[ai] c\.o\.|centralne ogrzewanie|grzejnik|grzejnika|grzejniki)[^\d]{0,45}(\d+)\s*(?:szt|punkt|punktow|punktów|pkt)?/
+        /(\d+)\s*(?:punktow|punktĂłw|punkty|pkt|punkt)\s*(?:co|c\.o\.|grzejnikowych|grzejnikowe|centralnego ogrzewania)\b/,
+        /(?:instalacj[ai] co|instalacj[ai] c\.o\.|centralne ogrzewanie|grzejnik|grzejnika|grzejniki)[^\d]{0,45}(\d+)\s*(?:szt|punkt|punktow|punktĂłw|pkt)?/
     ]);
 
-    const grzejniki = pobierzLiczbeZOpisu(opis, [/(\d+)\s*(?:grzejnikow|grzejników|grzejniki|grzejnik)\b/]);
+    const grzejniki = pobierzLiczbeZOpisu(opis, [/(\d+)\s*(?:grzejnikow|grzejnikĂłw|grzejniki|grzejnik)\b/]);
 
     const sciankaM2 = pobierzLiczbeZOpisu(opis, [
-        /(?:scianka|ścianka|gk|karton gips|karton-gips|regips)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów)?/,
-        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²)\s*(?:scianka|ścianka|gk|karton gips|karton-gips|regips)/
+        /(?:scianka|Ĺ›cianka|gk|karton gips|karton-gips|regips)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛|metrow|metrĂłw)?/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛)\s*(?:scianka|Ĺ›cianka|gk|karton gips|karton-gips|regips)/
     ]);
 
     const podlogaM2 = pobierzLiczbeZOpisu(opis, [
-        /(?:wykladzina|wykładzina|podloge|podłoge|podłogę|podloga|podłoga|panele)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|m²|metrow|metrów)?/,
-        /(\d+(?:[.,]\d+)?)\s*(?:m2|m²)\s*(?:wykladzina|wykładzina|podloga|podłoga|panele)/
+        /(?:wykladzina|wykĹ‚adzina|podloge|podĹ‚oge|podĹ‚ogÄ™|podloga|podĹ‚oga|panele)[^\d]{0,50}(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛|metrow|metrĂłw)?/,
+        /(\d+(?:[.,]\d+)?)\s*(?:m2|mÂ˛)\s*(?:wykladzina|wykĹ‚adzina|podloga|podĹ‚oga|panele)/
     ]);
 
-    const odZera = /od zera|nowa instalacja|nowe punkty|wykonanie|wykonac|wykonać|kompletna instalacja|stan deweloperski|deweloperski|generalny/.test(opis);
-    const remont = /remont|stare|stary|modernizacja|przerobka|przeróbka|przerobienie|przerobić|przerobic/.test(opis);
-    const wymiana = /wymiana|wymienic|wymienić|do wymiany/.test(opis);
-    const przerobka = /przerobka|przeróbka|przerobienie|przerobić|przerobic|przeniesienie|przeniesc|przenieść/.test(opis);
+    const odZera = /od zera|nowa instalacja|nowe punkty|wykonanie|wykonac|wykonaÄ‡|kompletna instalacja|stan deweloperski|deweloperski|generalny/.test(opis);
+    const remont = /remont|stare|stary|modernizacja|przerobka|przerĂłbka|przerobienie|przerobiÄ‡|przerobic/.test(opis);
+    const wymiana = /wymiana|wymienic|wymieniÄ‡|do wymiany/.test(opis);
+    const przerobka = /przerobka|przerĂłbka|przerobienie|przerobiÄ‡|przerobic|przeniesienie|przeniesc|przenieĹ›Ä‡/.test(opis);
 
-    const zakresMalowanie = /malowania|malowanie|pomalowac|pomalować|farba|bialy|biały|kolor|sciany|ściany|sufit/.test(opis);
-    const zakresGladz = /gladz|gładź|gladzie|gładzie|szpachlowanie|szlifowanie/.test(opis);
-    const zakresZabezpieczen = /zabezpiec|folia|folie|taśmy|tasmy|oklejanie|okleic|okleić|parapet|detal|meble/.test(opis);
-    const zakresSanitarny = /sanitarn|wod-kan|wodkan|wodno|kanalizac|hydraul|woda|odpływ|odplyw|podejscie|podejście|umywalk|zlew|wc|toalet|prysznic|wanna/.test(opis);
-    const zakresCO = /c\.o\.|co |centralne ogrzewanie|grzejnik|grzejniki|podlogowka|podłogówka|ogrzewanie/.test(opis);
+    const zakresMalowanie = /malowania|malowanie|pomalowac|pomalowaÄ‡|farba|bialy|biaĹ‚y|kolor|sciany|Ĺ›ciany|sufit/.test(opis);
+    const zakresGladz = /gladz|gĹ‚adĹş|gladzie|gĹ‚adzie|szpachlowanie|szlifowanie/.test(opis);
+    const zakresZabezpieczen = /zabezpiec|folia|folie|taĹ›my|tasmy|oklejanie|okleic|okleiÄ‡|parapet|detal|meble/.test(opis);
+    const zakresSanitarny = /sanitarn|wod-kan|wodkan|wodno|kanalizac|hydraul|woda|odpĹ‚yw|odplyw|podejscie|podejĹ›cie|umywalk|zlew|wc|toalet|prysznic|wanna/.test(opis);
+    const zakresCO = /c\.o\.|co |centralne ogrzewanie|grzejnik|grzejniki|podlogowka|podĹ‚ogĂłwka|ogrzewanie/.test(opis);
 
     const propozycje = [];
     const dodaj = (config) => dodajPozycjeRegulyBezPowielania(propozycje, config);
@@ -6834,107 +7065,107 @@ function generujSzybkaWycene() {
         const sufit = Math.round(metraz);
         const sciany = Math.round(metraz * 3);
         powierzchniaMalowania = sufit + sciany;
-        uwagaMalowania = `Szacunek: sufit ${sufit} m² + ściany ok. ${sciany} m²`;
+        uwagaMalowania = `Szacunek: sufit ${sufit} mÂ˛ + Ĺ›ciany ok. ${sciany} mÂ˛`;
     }
 
     const powierzchniaRobocza = powierzchniaMalowania || (metraz ? Math.round(metraz * 4) : 120);
 
-    // 1. ZABEZPIECZENIE — jeden kontrolowany zestaw, bez łapania każdego słowa osobno.
+    // 1. ZABEZPIECZENIE â€” jeden kontrolowany zestaw, bez Ĺ‚apania kaĹĽdego sĹ‚owa osobno.
     if (zakresZabezpieczen || zakresMalowanie || zakresGladz) {
         if (metraz) {
-            dodaj({ nazwa: "Zabezpieczenie podłóg folią", jednostka: "m²", ilosc: metraz, cena: 6, uwaga: "Doliczono automatycznie: prace wykończeniowe wymagają zabezpieczenia podłóg" });
+            dodaj({ nazwa: "Zabezpieczenie podĹ‚Ăłg foliÄ…", jednostka: "mÂ˛", ilosc: metraz, cena: 6, uwaga: "Doliczono automatycznie: prace wykoĹ„czeniowe wymagajÄ… zabezpieczenia podĹ‚Ăłg" });
         }
-        dodaj({ nazwa: "Oklejanie taśmą malarską detali", jednostka: "kpl.", ilosc: Math.max(1, pokoje || 1), cena: 80, uwaga: "Doliczono automatycznie: zabezpieczenie detali, narożników, ościeżnic i krawędzi" });
-        if (okna) dodaj({ nazwa: "Zabezpieczenie okien i parapetów", jednostka: "kpl.", ilosc: okna, cena: 45, uwaga: "Szacunek: przyjęto orientacyjnie 1 okno/parapet na pomieszczenie" });
+        dodaj({ nazwa: "Oklejanie taĹ›mÄ… malarskÄ… detali", jednostka: "kpl.", ilosc: Math.max(1, pokoje || 1), cena: 80, uwaga: "Doliczono automatycznie: zabezpieczenie detali, naroĹĽnikĂłw, oĹ›cieĹĽnic i krawÄ™dzi" });
+        if (okna) dodaj({ nazwa: "Zabezpieczenie okien i parapetĂłw", jednostka: "kpl.", ilosc: okna, cena: 45, uwaga: "Szacunek: przyjÄ™to orientacyjnie 1 okno/parapet na pomieszczenie" });
     }
 
-    // 2. GŁADŹ — bez podwójnej gładzi i bez podwójnego gruntowania.
+    // 2. GĹADĹą â€” bez podwĂłjnej gĹ‚adzi i bez podwĂłjnego gruntowania.
     if (zakresGladz) {
-        dodaj({ nazwa: "Przygotowanie powierzchni pod gładź", jednostka: "m²", ilosc: powierzchniaRobocza, cena: 8, uwaga: "Doliczono automatycznie: gładź wymaga przygotowania podłoża" });
-        dodaj({ nazwa: "Gruntowanie pod gładź", jednostka: "m²", ilosc: powierzchniaRobocza, cena: 7, uwaga: "Doliczono automatycznie: gładź wymaga gruntowania" });
-        dodaj({ nazwa: "Montaż narożników aluminiowych", jednostka: "mb", ilosc: Math.max(4, Math.round(okna * 4 + drzwi * 2)), cena: 18, uwaga: "Szacunek: narożniki przy oknach/drzwiach i detalach" });
-        dodaj({ nazwa: "Wykonanie gładzi", jednostka: "m²", ilosc: powierzchniaRobocza, cena: 32, uwaga: "Zakres z opisu: gładź" });
-        dodaj({ nazwa: "Szlifowanie gładzi", jednostka: "m²", ilosc: powierzchniaRobocza, cena: 10, uwaga: "Doliczono automatycznie: po gładzi potrzebne jest szlifowanie" });
-        dodaj({ nazwa: "Gruntowanie pod malowanie", jednostka: "m²", ilosc: powierzchniaRobocza, cena: 7, uwaga: "Doliczono automatycznie: przygotowanie powierzchni po gładzi pod malowanie" });
+        dodaj({ nazwa: "Przygotowanie powierzchni pod gĹ‚adĹş", jednostka: "mÂ˛", ilosc: powierzchniaRobocza, cena: 8, uwaga: "Doliczono automatycznie: gĹ‚adĹş wymaga przygotowania podĹ‚oĹĽa" });
+        dodaj({ nazwa: "Gruntowanie pod gĹ‚adĹş", jednostka: "mÂ˛", ilosc: powierzchniaRobocza, cena: 7, uwaga: "Doliczono automatycznie: gĹ‚adĹş wymaga gruntowania" });
+        dodaj({ nazwa: "MontaĹĽ naroĹĽnikĂłw aluminiowych", jednostka: "mb", ilosc: Math.max(4, Math.round(okna * 4 + drzwi * 2)), cena: 18, uwaga: "Szacunek: naroĹĽniki przy oknach/drzwiach i detalach" });
+        dodaj({ nazwa: "Wykonanie gĹ‚adzi", jednostka: "mÂ˛", ilosc: powierzchniaRobocza, cena: 32, uwaga: "Zakres z opisu: gĹ‚adĹş" });
+        dodaj({ nazwa: "Szlifowanie gĹ‚adzi", jednostka: "mÂ˛", ilosc: powierzchniaRobocza, cena: 10, uwaga: "Doliczono automatycznie: po gĹ‚adzi potrzebne jest szlifowanie" });
+        dodaj({ nazwa: "Gruntowanie pod malowanie", jednostka: "mÂ˛", ilosc: powierzchniaRobocza, cena: 7, uwaga: "Doliczono automatycznie: przygotowanie powierzchni po gĹ‚adzi pod malowanie" });
     }
 
     // 3. MALOWANIE.
     if (zakresMalowanie) {
-        dodaj({ nazwa: "Malowanie ścian i sufitu", jednostka: "m²", ilosc: powierzchniaMalowania || 100, cena: 28, uwaga: uwagaMalowania || "Szacunek powierzchni malowania" });
+        dodaj({ nazwa: "Malowanie Ĺ›cian i sufitu", jednostka: "mÂ˛", ilosc: powierzchniaMalowania || 100, cena: 28, uwaga: uwagaMalowania || "Szacunek powierzchni malowania" });
     }
 
     // 4. ELEKTRYKA.
     if (punktyElektryczne) {
-        dodaj({ nazwa: "Wykonanie punktu elektrycznego", jednostka: "szt.", ilosc: punktyElektryczne, cena: 120, uwaga: "Ilość punktów z opisu" });
+        dodaj({ nazwa: "Wykonanie punktu elektrycznego", jednostka: "szt.", ilosc: punktyElektryczne, cena: 120, uwaga: "IloĹ›Ä‡ punktĂłw z opisu" });
         if (odZera || przerobka) {
             dodaj({ nazwa: "Kucie / bruzdowanie pod punkt elektryczny", jednostka: "szt.", ilosc: punktyElektryczne, cena: 45, uwaga: "Doliczono automatycznie: nowy/przerabiany punkt wymaga przygotowania trasy" });
-            dodaj({ nazwa: "Naprawa bruzd po elektryce", jednostka: "szt.", ilosc: punktyElektryczne, cena: 35, uwaga: "Doliczono automatycznie: po wykonaniu punktu trzeba naprawić bruzdę" });
+            dodaj({ nazwa: "Naprawa bruzd po elektryce", jednostka: "szt.", ilosc: punktyElektryczne, cena: 35, uwaga: "Doliczono automatycznie: po wykonaniu punktu trzeba naprawiÄ‡ bruzdÄ™" });
         }
-        dodaj({ nazwa: "Montaż osprzętu elektrycznego", jednostka: "szt.", ilosc: punktyElektryczne, cena: 35, uwaga: "Doliczono automatycznie: punkt wymaga montażu/podłączenia osprzętu" });
+        dodaj({ nazwa: "MontaĹĽ osprzÄ™tu elektrycznego", jednostka: "szt.", ilosc: punktyElektryczne, cena: 35, uwaga: "Doliczono automatycznie: punkt wymaga montaĹĽu/podĹ‚Ä…czenia osprzÄ™tu" });
     }
 
     if (gniazda) {
-        if (wymiana) dodaj({ nazwa: "Demontaż starego gniazda", jednostka: "szt.", ilosc: gniazda, cena: 20, uwaga: "Doliczono automatycznie: wymiana = demontaż starego osprzętu" });
-        dodaj({ nazwa: "Montaż gniazda elektrycznego", jednostka: "szt.", ilosc: gniazda, cena: 90, uwaga: "Ilość gniazd z opisu" });
+        if (wymiana) dodaj({ nazwa: "DemontaĹĽ starego gniazda", jednostka: "szt.", ilosc: gniazda, cena: 20, uwaga: "Doliczono automatycznie: wymiana = demontaĹĽ starego osprzÄ™tu" });
+        dodaj({ nazwa: "MontaĹĽ gniazda elektrycznego", jednostka: "szt.", ilosc: gniazda, cena: 90, uwaga: "IloĹ›Ä‡ gniazd z opisu" });
     }
 
     if (laczniki) {
-        if (wymiana) dodaj({ nazwa: "Demontaż starego łącznika / włącznika", jednostka: "szt.", ilosc: laczniki, cena: 20, uwaga: "Doliczono automatycznie: wymiana = demontaż starego osprzętu" });
-        dodaj({ nazwa: "Montaż łącznika światła", jednostka: "szt.", ilosc: laczniki, cena: 80, uwaga: opis.includes("rocznik") ? "Rozpoznano z dyktowania jako „roczniki” — potraktowano jako łączniki" : "Ilość łączników z opisu" });
+        if (wymiana) dodaj({ nazwa: "DemontaĹĽ starego Ĺ‚Ä…cznika / wĹ‚Ä…cznika", jednostka: "szt.", ilosc: laczniki, cena: 20, uwaga: "Doliczono automatycznie: wymiana = demontaĹĽ starego osprzÄ™tu" });
+        dodaj({ nazwa: "MontaĹĽ Ĺ‚Ä…cznika Ĺ›wiatĹ‚a", jednostka: "szt.", ilosc: laczniki, cena: 80, uwaga: opis.includes("rocznik") ? "Rozpoznano z dyktowania jako â€žrocznikiâ€ť â€” potraktowano jako Ĺ‚Ä…czniki" : "IloĹ›Ä‡ Ĺ‚Ä…cznikĂłw z opisu" });
     }
 
     // 5. WOD-KAN.
     if (zakresSanitarny || punktySanitarne) {
         const ilosc = punktySanitarne || 1;
         if (przerobka || wymiana || remont) {
-            dodaj({ nazwa: "Demontaż / odkrycie starego punktu wod-kan", jednostka: "szt.", ilosc, cena: 90, uwaga: "Doliczono automatycznie: przeróbka/wymiana punktu sanitarnego wymaga demontażu lub odkrycia starego układu" });
+            dodaj({ nazwa: "DemontaĹĽ / odkrycie starego punktu wod-kan", jednostka: "szt.", ilosc, cena: 90, uwaga: "Doliczono automatycznie: przerĂłbka/wymiana punktu sanitarnego wymaga demontaĹĽu lub odkrycia starego ukĹ‚adu" });
         }
-        if (odZera || przerobka || /wykonanie|wykonac|wykonać|nowy/.test(opis)) {
+        if (odZera || przerobka || /wykonanie|wykonac|wykonaÄ‡|nowy/.test(opis)) {
             dodaj({ nazwa: "Kucie / przygotowanie trasy pod wod-kan", jednostka: "szt.", ilosc, cena: 120, uwaga: "Doliczono automatycznie: nowy punkt sanitarny wymaga przygotowania trasy" });
         }
-        dodaj({ nazwa: przerobka ? "Przeróbka punktu wod-kan" : "Wykonanie punktu wod-kan", jednostka: "szt.", ilosc, cena: przerobka ? 420 : 360, uwaga: przerobka ? "Zakres z opisu: przeróbka punktu sanitarnego" : "Zakres z opisu: wykonanie punktu sanitarnego" });
-        dodaj({ nazwa: "Naprawa bruzd po instalacji wod-kan", jednostka: "szt.", ilosc, cena: 45, uwaga: "Doliczono automatycznie: po instalacji sanitarnej trzeba naprawić bruzdy" });
-        dodaj({ nazwa: "Próba szczelności instalacji wod-kan", jednostka: "usługa", ilosc: 1, cena: 180, uwaga: "Doliczono automatycznie: instalacja wod-kan wymaga sprawdzenia szczelności" });
+        dodaj({ nazwa: przerobka ? "PrzerĂłbka punktu wod-kan" : "Wykonanie punktu wod-kan", jednostka: "szt.", ilosc, cena: przerobka ? 420 : 360, uwaga: przerobka ? "Zakres z opisu: przerĂłbka punktu sanitarnego" : "Zakres z opisu: wykonanie punktu sanitarnego" });
+        dodaj({ nazwa: "Naprawa bruzd po instalacji wod-kan", jednostka: "szt.", ilosc, cena: 45, uwaga: "Doliczono automatycznie: po instalacji sanitarnej trzeba naprawiÄ‡ bruzdy" });
+        dodaj({ nazwa: "PrĂłba szczelnoĹ›ci instalacji wod-kan", jednostka: "usĹ‚uga", ilosc: 1, cena: 180, uwaga: "Doliczono automatycznie: instalacja wod-kan wymaga sprawdzenia szczelnoĹ›ci" });
     }
 
     // 6. C.O.
     if (zakresCO || punktyCO || grzejniki) {
         const ilosc = punktyCO || grzejniki || 1;
         if (przerobka || wymiana || remont) {
-            dodaj({ nazwa: "Demontaż grzejnika / starego podejścia C.O.", jednostka: "szt.", ilosc, cena: 120, uwaga: "Doliczono automatycznie: przeróbka/wymiana C.O. wymaga demontażu starego elementu" });
+            dodaj({ nazwa: "DemontaĹĽ grzejnika / starego podejĹ›cia C.O.", jednostka: "szt.", ilosc, cena: 120, uwaga: "Doliczono automatycznie: przerĂłbka/wymiana C.O. wymaga demontaĹĽu starego elementu" });
         }
-        if (odZera || przerobka || /wykonanie|wykonac|wykonać|nowy/.test(opis)) {
+        if (odZera || przerobka || /wykonanie|wykonac|wykonaÄ‡|nowy/.test(opis)) {
             dodaj({ nazwa: "Kucie / przygotowanie trasy pod C.O.", jednostka: "szt.", ilosc, cena: 120, uwaga: "Doliczono automatycznie: nowy/przerabiany punkt C.O. wymaga przygotowania trasy" });
         }
-        dodaj({ nazwa: przerobka ? "Przeróbka punktu C.O." : "Wykonanie punktu C.O.", jednostka: "szt.", ilosc, cena: przerobka ? 450 : 380, uwaga: przerobka ? "Zakres z opisu: przeróbka punktu C.O." : "Zakres z opisu: wykonanie punktu C.O." });
+        dodaj({ nazwa: przerobka ? "PrzerĂłbka punktu C.O." : "Wykonanie punktu C.O.", jednostka: "szt.", ilosc, cena: przerobka ? 450 : 380, uwaga: przerobka ? "Zakres z opisu: przerĂłbka punktu C.O." : "Zakres z opisu: wykonanie punktu C.O." });
         if (grzejniki || /grzejnik/.test(opis)) {
-            dodaj({ nazwa: "Montaż grzejnika", jednostka: "szt.", ilosc, cena: 180, uwaga: "Doliczono automatycznie: punkt C.O. zwykle kończy się montażem grzejnika" });
+            dodaj({ nazwa: "MontaĹĽ grzejnika", jednostka: "szt.", ilosc, cena: 180, uwaga: "Doliczono automatycznie: punkt C.O. zwykle koĹ„czy siÄ™ montaĹĽem grzejnika" });
         }
-        dodaj({ nazwa: "Próba szczelności instalacji C.O.", jednostka: "usługa", ilosc: 1, cena: 200, uwaga: "Doliczono automatycznie: instalacja C.O. wymaga próby szczelności" });
+        dodaj({ nazwa: "PrĂłba szczelnoĹ›ci instalacji C.O.", jednostka: "usĹ‚uga", ilosc: 1, cena: 200, uwaga: "Doliczono automatycznie: instalacja C.O. wymaga prĂłby szczelnoĹ›ci" });
     }
 
     // 7. GK.
-    if (/scianka|ścianka|gk|karton gips|karton-gips|regips|dzialowa|działowa/.test(opis)) {
+    if (/scianka|Ĺ›cianka|gk|karton gips|karton-gips|regips|dzialowa|dziaĹ‚owa/.test(opis)) {
         const m2 = sciankaM2 || 10;
-        dodaj({ nazwa: "Konstrukcja ścianki GK", jednostka: "m²", ilosc: m2, cena: 85, uwaga: "Doliczono automatycznie: ścianka GK wymaga konstrukcji" });
-        dodaj({ nazwa: "Płytowanie ścianki GK", jednostka: "m²", ilosc: m2, cena: 95, uwaga: "Zakres z opisu: ścianka GK" });
-        dodaj({ nazwa: "Taśmowanie i spoinowanie GK", jednostka: "m²", ilosc: m2, cena: 35, uwaga: "Doliczono automatycznie: GK wymaga spoinowania" });
-        dodaj({ nazwa: "Szlifowanie i gruntowanie GK", jednostka: "m²", ilosc: m2, cena: 18, uwaga: "Doliczono automatycznie: przygotowanie GK pod malowanie" });
+        dodaj({ nazwa: "Konstrukcja Ĺ›cianki GK", jednostka: "mÂ˛", ilosc: m2, cena: 85, uwaga: "Doliczono automatycznie: Ĺ›cianka GK wymaga konstrukcji" });
+        dodaj({ nazwa: "PĹ‚ytowanie Ĺ›cianki GK", jednostka: "mÂ˛", ilosc: m2, cena: 95, uwaga: "Zakres z opisu: Ĺ›cianka GK" });
+        dodaj({ nazwa: "TaĹ›mowanie i spoinowanie GK", jednostka: "mÂ˛", ilosc: m2, cena: 35, uwaga: "Doliczono automatycznie: GK wymaga spoinowania" });
+        dodaj({ nazwa: "Szlifowanie i gruntowanie GK", jednostka: "mÂ˛", ilosc: m2, cena: 18, uwaga: "Doliczono automatycznie: przygotowanie GK pod malowanie" });
     }
 
-    // 8. PODŁOGI.
-    if (/wykladzina|wykładzina|podloge|podłoge|podłogę|podloga|podłoga|panele|paneli/.test(opis)) {
+    // 8. PODĹOGI.
+    if (/wykladzina|wykĹ‚adzina|podloge|podĹ‚oge|podĹ‚ogÄ™|podloga|podĹ‚oga|panele|paneli/.test(opis)) {
         const m2 = podlogaM2 || metraz || 50;
-        dodaj({ nazwa: "Przygotowanie podłoża pod podłogę", jednostka: "m²", ilosc: m2, cena: 12, uwaga: "Doliczono automatycznie: przed ułożeniem podłogi trzeba przygotować podłoże" });
-        dodaj({ nazwa: /panele|paneli/.test(opis) ? "Ułożenie paneli" : "Ułożenie wykładziny", jednostka: "m²", ilosc: m2, cena: /panele|paneli/.test(opis) ? 55 : 45, uwaga: podlogaM2 ? "Metraż podłogi z opisu" : "Przyjęto metraż mieszkania jako powierzchnię podłogi" });
-        dodaj({ nazwa: "Docinki / progi / wykończenie podłogi", jednostka: "kpl.", ilosc: Math.max(1, pokoje || 1), cena: 120, uwaga: "Doliczono automatycznie: podłoga wymaga docinek i wykończeń" });
+        dodaj({ nazwa: "Przygotowanie podĹ‚oĹĽa pod podĹ‚ogÄ™", jednostka: "mÂ˛", ilosc: m2, cena: 12, uwaga: "Doliczono automatycznie: przed uĹ‚oĹĽeniem podĹ‚ogi trzeba przygotowaÄ‡ podĹ‚oĹĽe" });
+        dodaj({ nazwa: /panele|paneli/.test(opis) ? "UĹ‚oĹĽenie paneli" : "UĹ‚oĹĽenie wykĹ‚adziny", jednostka: "mÂ˛", ilosc: m2, cena: /panele|paneli/.test(opis) ? 55 : 45, uwaga: podlogaM2 ? "MetraĹĽ podĹ‚ogi z opisu" : "PrzyjÄ™to metraĹĽ mieszkania jako powierzchniÄ™ podĹ‚ogi" });
+        dodaj({ nazwa: "Docinki / progi / wykoĹ„czenie podĹ‚ogi", jednostka: "kpl.", ilosc: Math.max(1, pokoje || 1), cena: 120, uwaga: "Doliczono automatycznie: podĹ‚oga wymaga docinek i wykoĹ„czeĹ„" });
     }
 
     if (!propozycje.length) {
         if (metraz) {
-            dodaj({ nazwa: "Robocizna remontowa — wycena szacunkowa", jednostka: "m²", ilosc: metraz, cena: 110, uwaga: "Nie wykryto szczegółów — szacunek z metrażu" });
+            dodaj({ nazwa: "Robocizna remontowa â€” wycena szacunkowa", jednostka: "mÂ˛", ilosc: metraz, cena: 110, uwaga: "Nie wykryto szczegĂłĹ‚Ăłw â€” szacunek z metraĹĽu" });
         } else {
-            alert("Nie udało się rozpoznać zakresu. Dopisz metraż albo słowa: malowanie, gładź, gniazda, punkty, wod-kan, C.O., wykładzina.");
+            alert("Nie udaĹ‚o siÄ™ rozpoznaÄ‡ zakresu. Dopisz metraĹĽ albo sĹ‚owa: malowanie, gĹ‚adĹş, gniazda, punkty, wod-kan, C.O., wykĹ‚adzina.");
             return;
         }
     }
@@ -6958,7 +7189,7 @@ function generujSzybkaWycene() {
 
 
 // ==========================================
-// SZYBKA WYCENA V12 — POPRAWKA DODAWANIA DO ZESTAWIENIA
+// SZYBKA WYCENA V12 â€” POPRAWKA DODAWANIA DO ZESTAWIENIA
 // ==========================================
 
 function pobierzLiczbeBezpiecznieV12(value, fallback = 0) {
@@ -7006,7 +7237,7 @@ function przygotujPozycjeDoGlownejWycenyV12(p) {
 
 function dodajPozycjeZSzybkiejWyceny() {
     if (!Array.isArray(szybkaWycenaPropozycje) || !szybkaWycenaPropozycje.length) {
-        alert("Najpierw wygeneruj propozycję wyceny.");
+        alert("Najpierw wygeneruj propozycjÄ™ wyceny.");
         return;
     }
 
@@ -7019,23 +7250,23 @@ function dodajPozycjeZSzybkiejWyceny() {
         return;
     }
 
-    // Najczęstsza nazwa tablicy w EL-Net.
+    // NajczÄ™stsza nazwa tablicy w EL-Net.
     if (!Array.isArray(window.wycenaPozycje)) {
         window.wycenaPozycje = [];
     }
 
     pozycje.forEach(p => window.wycenaPozycje.push(p));
 
-    // Dla starszych fragmentów kodu, które mogą używać zmiennej globalnej bez window.
+    // Dla starszych fragmentĂłw kodu, ktĂłre mogÄ… uĹĽywaÄ‡ zmiennej globalnej bez window.
     try {
         if (typeof wycenaPozycje !== "undefined" && Array.isArray(wycenaPozycje) && wycenaPozycje !== window.wycenaPozycje) {
             pozycje.forEach(p => wycenaPozycje.push(p));
         }
     } catch (err) {
-        // ignorujemy — window.wycenaPozycje jest główne
+        // ignorujemy â€” window.wycenaPozycje jest gĹ‚Ăłwne
     }
 
-    // Odśwież tabelę i sumy — obsługa różnych nazw funkcji z wcześniejszych wersji.
+    // OdĹ›wieĹĽ tabelÄ™ i sumy â€” obsĹ‚uga rĂłĹĽnych nazw funkcji z wczeĹ›niejszych wersji.
     const renderFns = [
         "renderujWycene",
         "renderujPozycjeWyceny",
@@ -7051,13 +7282,13 @@ function dodajPozycjeZSzybkiejWyceny() {
         try {
             if (typeof window[fn] === "function") window[fn]();
         } catch (err) {
-            console.warn("Nie udało się wykonać", fn, err);
+            console.warn("Nie udaĹ‚o siÄ™ wykonaÄ‡", fn, err);
         }
     });
 
     try { przeliczWyceneAwaryjnieV12(); } catch (err) { console.warn(err); }
 
-    // Jeżeli istnieje ręczny formularz dodawania, nie czyścimy go. Czyścimy tylko propozycję.
+    // JeĹĽeli istnieje rÄ™czny formularz dodawania, nie czyĹ›cimy go. CzyĹ›cimy tylko propozycjÄ™.
     szybkaWycenaPropozycje = [];
     const wynik = document.getElementById("szybka-wycena-wynik");
     if (wynik) {
@@ -7068,14 +7299,14 @@ function dodajPozycjeZSzybkiejWyceny() {
         `;
     }
 
-    // Przewiń do głównego zestawienia.
+    // PrzewiĹ„ do gĹ‚Ăłwnego zestawienia.
     const zestawienie = document.querySelector("#wycena-pozycje, #lista-pozycji-wyceny, #wycena-table, .wycena-table, .estimate-table, .table-scroll");
     if (zestawienie && typeof zestawienie.scrollIntoView === "function") {
         zestawienie.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 }
 
-// Awaryjne przeliczenie tabeli, gdy starsza funkcja renderująca nie zna nowych pól.
+// Awaryjne przeliczenie tabeli, gdy starsza funkcja renderujÄ…ca nie zna nowych pĂłl.
 function przeliczWyceneAwaryjnieV12() {
     const lista = Array.isArray(window.wycenaPozycje) ? window.wycenaPozycje : [];
     const netto = lista.reduce((sum, p) => {
@@ -7103,4 +7334,4 @@ function przeliczWyceneAwaryjnieV12() {
 
 
 
-// RESTORE V19 — Wycena przywrócona do stabilnej wersji v12. Bez panelu Edycja.
+// RESTORE V19 â€” Wycena przywrĂłcona do stabilnej wersji v12. Bez panelu Edycja.
