@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-26-ELNET";
+const APP_VERSION = "2026.06.13-27-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -46,6 +46,7 @@ let edytowanyKosztId = null;
 let usunInwestycjeModalResolve = null;
 let usunInwestycjeModalWybor = null;
 let zakonczInwestycjeModalResolve = null;
+let aktywnaZakladkaInwestycji = "active";
 let trybEdycjiKosztorysu = false;
 let edytowanyKosztorysId = null;
 let aktualnyDrukowanyKosztorysId = null;
@@ -366,6 +367,22 @@ function podepnijZdarzenia() {
 
     const inwestycjeSort = document.getElementById("inwestycje-sort");
     if (inwestycjeSort) inwestycjeSort.addEventListener("change", renderujInwestycje);
+
+    document.querySelectorAll("[data-investment-tab]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            aktywnaZakladkaInwestycji = btn.dataset.investmentTab || "active";
+            renderujInwestycje();
+        });
+    });
+
+    const inwestycjeDateFrom = document.getElementById("inwestycje-date-from");
+    if (inwestycjeDateFrom) inwestycjeDateFrom.addEventListener("change", renderujInwestycje);
+
+    const inwestycjeDateTo = document.getElementById("inwestycje-date-to");
+    if (inwestycjeDateTo) inwestycjeDateTo.addEventListener("change", renderujInwestycje);
+
+    const btnWyczyscFiltryInwestycji = document.getElementById("btn-wyczysc-filtry-inwestycji");
+    if (btnWyczyscFiltryInwestycji) btnWyczyscFiltryInwestycji.addEventListener("click", wyczyscFiltryInwestycji);
 
     const btnDodajInwestycje = document.getElementById("btn-dodaj-inwestycje");
     if (btnDodajInwestycje) btnDodajInwestycje.addEventListener("click", dodajInwestycje);
@@ -1412,6 +1429,28 @@ function czyStatusTerminuZakonczony(status) {
 
 function rzeczywistaDataZakonczenia(inwestycja) {
     return inwestycja?.completed_at || inwestycja?.completedAt || "";
+}
+
+function czyInwestycjaZakonczona(inwestycja) {
+    return Boolean(czyStatusInwestycjiZakonczony(inwestycja?.status) || rzeczywistaDataZakonczenia(inwestycja));
+}
+
+function czyInwestycjaBiezaca(inwestycja) {
+    const status = normalizujStatusTekst(inwestycja?.status);
+    return !czyInwestycjaZakonczona(inwestycja) && status !== "anulowana";
+}
+
+function dataReferencyjnaInwestycji(inwestycja, mode = "current") {
+    if (mode === "completed") {
+        return rzeczywistaDataZakonczenia(inwestycja) || inwestycja?.data_koniec || inwestycja?.data_zakonczenia || inwestycja?.end_date || inwestycja?.created_at || "";
+    }
+    const { dataStart, dataKoniec } = pobierzDatyInwestycji(inwestycja);
+    return dataStart || dataKoniec || inwestycja?.created_at || "";
+}
+
+function formatujDateInwestycji(value) {
+    const parsed = value ? parseDateLocal(String(value).slice(0, 10)) : null;
+    return parsed ? parsed.toLocaleDateString("pl-PL") : "";
 }
 
 function rzeczywistaDataZakonczeniaTerminu(termin) {
@@ -2666,9 +2705,15 @@ async function zapiszPowiazanieKosztorysuZInwestycja(kosztorysId, investmentId) 
 // ==========================================
 
 function renderujPulpit() {
-    const aktywne = inwestycje.filter(i => i.status === "aktywna").length;
-    const sumaZaliczek = inwestycjeZaliczki.reduce((s, z) => s + Number(z.kwota || 0), 0);
-    const sumaKosztow = inwestycjeKoszty.reduce((s, k) => s + Number(k.kwota || 0), 0);
+    const biezaceInwestycje = (inwestycje || []).filter(czyInwestycjaBiezaca);
+    const biezaceInwestycjeIds = new Set(biezaceInwestycje.map(i => String(i.id)));
+    const aktywne = biezaceInwestycje.length;
+    const sumaZaliczek = inwestycjeZaliczki
+        .filter(z => biezaceInwestycjeIds.has(String(z.inwestycja_id)))
+        .reduce((s, z) => s + Number(z.kwota || 0), 0);
+    const sumaKosztow = inwestycjeKoszty
+        .filter(k => biezaceInwestycjeIds.has(String(k.inwestycja_id)))
+        .reduce((s, k) => s + Number(k.kwota || 0), 0);
 
     // Zaplanowane terminy - liczenie przyszłych terminów
     const dzisiaj = new Date();
@@ -2682,7 +2727,7 @@ function renderujPulpit() {
         .sort((a, b) => new Date(b.data) - new Date(a.data))
         .slice(0, 5);
 
-    const ostatnieInwestycje = [...inwestycje]
+    const ostatnieInwestycje = [...biezaceInwestycje]
         .slice(-5)
         .reverse();
 
@@ -5396,57 +5441,118 @@ function sumaKosztowDlaInwestycji(inwestycjaId) {
         .reduce((s, k) => s + Number(k.kwota || 0), 0);
 }
 
+function aktualizujZakladkiInwestycji() {
+    const all = inwestycje || [];
+    const activeCount = all.filter(czyInwestycjaBiezaca).length;
+    const completedCount = all.filter(czyInwestycjaZakonczona).length;
+    const allCount = all.length;
+
+    const counters = {
+        active: document.getElementById("count-invest-active"),
+        completed: document.getElementById("count-invest-completed"),
+        all: document.getElementById("count-invest-all")
+    };
+    if (counters.active) counters.active.textContent = activeCount;
+    if (counters.completed) counters.completed.textContent = completedCount;
+    if (counters.all) counters.all.textContent = allCount;
+
+    document.querySelectorAll("[data-investment-tab]").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.investmentTab === aktywnaZakladkaInwestycji);
+    });
+}
+
+function czyFiltryInwestycjiAktywne() {
+    return Boolean(
+        document.getElementById("inwestycje-search")?.value.trim()
+        || document.getElementById("inwestycje-date-from")?.value
+        || document.getElementById("inwestycje-date-to")?.value
+    );
+}
+
+function wyczyscFiltryInwestycji() {
+    const search = document.getElementById("inwestycje-search");
+    const dateFrom = document.getElementById("inwestycje-date-from");
+    const dateTo = document.getElementById("inwestycje-date-to");
+    const sort = document.getElementById("inwestycje-sort");
+    if (search) search.value = "";
+    if (dateFrom) dateFrom.value = "";
+    if (dateTo) dateTo.value = "";
+    if (sort) sort.value = "newest";
+    renderujInwestycje();
+}
+
 function renderujInwestycje() {
     const tbody = document.getElementById("tabela-inwestycji");
     if (!tbody) return;
 
+    aktualizujZakladkiInwestycji();
+
     let lista = [...(inwestycje || [])];
     const searchValue = document.getElementById("inwestycje-search")?.value.toLowerCase().trim() || "";
     const sortValue = document.getElementById("inwestycje-sort")?.value || "newest";
+    const dateFromValue = document.getElementById("inwestycje-date-from")?.value || "";
+    const dateToValue = document.getElementById("inwestycje-date-to")?.value || "";
+
+    if (aktywnaZakladkaInwestycji === "active") {
+        lista = lista.filter(czyInwestycjaBiezaca);
+    } else if (aktywnaZakladkaInwestycji === "completed") {
+        lista = lista.filter(czyInwestycjaZakonczona);
+    }
 
     if (searchValue) {
         lista = lista.filter(i => {
-            const combined = [i.nazwa, i.klient, i.adres, i.status]
+            const combined = [i.nazwa, i.klient, i.adres, i.telefon]
                 .map(v => String(v || "").toLowerCase())
                 .join(" ");
             return combined.includes(searchValue);
         });
     }
 
+    if (dateFromValue || dateToValue) {
+        const dateFrom = dateFromValue ? parseDateLocal(dateFromValue) : null;
+        const dateTo = dateToValue ? parseDateLocal(dateToValue) : null;
+        lista = lista.filter(i => {
+            const mode = czyInwestycjaZakonczona(i) ? "completed" : "current";
+            const value = dataReferencyjnaInwestycji(i, mode);
+            const parsed = value ? parseDateLocal(String(value).slice(0, 10)) : null;
+            if (!parsed) return false;
+            if (dateFrom && parsed < dateFrom) return false;
+            if (dateTo && parsed > dateTo) return false;
+            return true;
+        });
+    }
+
     if (sortValue === "newest") {
-        lista.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        lista.sort((a, b) => new Date(dataReferencyjnaInwestycji(b, czyInwestycjaZakonczona(b) ? "completed" : "current") || 0) - new Date(dataReferencyjnaInwestycji(a, czyInwestycjaZakonczona(a) ? "completed" : "current") || 0));
     } else if (sortValue === "oldest") {
-        lista.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+        lista.sort((a, b) => new Date(dataReferencyjnaInwestycji(a, czyInwestycjaZakonczona(a) ? "completed" : "current") || 0) - new Date(dataReferencyjnaInwestycji(b, czyInwestycjaZakonczona(b) ? "completed" : "current") || 0));
     } else if (sortValue === "name-az") {
         lista.sort((a, b) => String(a.nazwa || "").localeCompare(String(b.nazwa || ""), 'pl'));
     } else if (sortValue === "name-za") {
         lista.sort((a, b) => String(b.nazwa || "").localeCompare(String(a.nazwa || ""), 'pl'));
-    } else if (sortValue === "client-az") {
-        lista.sort((a, b) => String(a.klient || "").localeCompare(String(b.klient || ""), 'pl'));
-    } else if (sortValue === "balance-desc") {
-        lista.sort((a, b) => {
-            const aBalance = sumaZaliczekDlaInwestycji(a.id) - sumaKosztowDlaInwestycji(a.id);
-            const bBalance = sumaZaliczekDlaInwestycji(b.id) - sumaKosztowDlaInwestycji(b.id);
-            return bBalance - aBalance;
-        });
-    } else if (sortValue === "balance-asc") {
-        lista.sort((a, b) => {
-            const aBalance = sumaZaliczekDlaInwestycji(a.id) - sumaKosztowDlaInwestycji(a.id);
-            const bBalance = sumaZaliczekDlaInwestycji(b.id) - sumaKosztowDlaInwestycji(b.id);
-            return aBalance - bBalance;
-        });
     }
 
     if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Brak inwestycji w bazie.</td></tr>`;
+        const emptyText = czyFiltryInwestycjiAktywne()
+            ? "Brak inwestycji spełniających wybrane kryteria."
+            : aktywnaZakladkaInwestycji === "completed"
+                ? "Brak zakończonych inwestycji."
+                : aktywnaZakladkaInwestycji === "active"
+                    ? "Brak aktywnych inwestycji."
+                    : "Brak inwestycji w bazie.";
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-row">${emptyText}</td></tr>`;
         return;
     }
 
     tbody.innerHTML = lista.map(i => {
-        const statusClass = `status-${String(i.status || "aktywna").toLowerCase()}`;
         const zaliczki = sumaZaliczekDlaInwestycji(i.id);
         const koszty = sumaKosztowDlaInwestycji(i.id);
         const roznica = zaliczki - koszty;
+        const isCompleted = czyInwestycjaZakonczona(i);
+        const completedAt = rzeczywistaDataZakonczenia(i);
+        const completedLabel = isCompleted
+            ? `<span class="investment-ended-badge">ZAKOŃCZONA</span><small class="investment-ended-date">Zakończono: ${esc(formatujDateInwestycji(completedAt) || completedAt || "-")}</small>`
+            : "";
         const linkedEventId = pobierzPowiazanyTerminId(i);
         const calendarButton = linkedEventId
             ? `<button class="btn btn-secondary small-btn" onclick="pokazInwestycjeWTerminarzu('${esc(i.id)}')">Pokaż w Terminarzu</button>`
@@ -5458,7 +5564,7 @@ function renderujInwestycje() {
 
         return `
             <tr>
-                <td><strong>${esc(i.nazwa)}</strong><br><small>${esc(i.adres || "")}</small></td>
+                <td><strong>${esc(i.nazwa)}</strong>${completedLabel}<br><small>${esc(i.adres || "")}</small></td>
                 <td>${esc(i.klient || "-")}</td>
                 <td class="nowrap-cell">${zaliczki.toFixed(2)} PLN</td>
                 <td class="nowrap-cell">${koszty.toFixed(2)} PLN</td>
@@ -6044,8 +6150,8 @@ function renderujPanelInwestycji() {
     if (meta) {
         const { dataStart, dataKoniec } = pobierzDatyInwestycji(inwestycja);
         const completedAt = rzeczywistaDataZakonczenia(inwestycja);
-        const completionInfo = czyStatusInwestycjiZakonczony(inwestycja.status)
-            ? `<p><strong>Status:</strong> Zakończona${completedAt ? `, rzeczywiste zakończenie: ${esc(completedAt)}` : ""}</p>`
+        const completionInfo = czyInwestycjaZakonczona(inwestycja)
+            ? `<p><span class="investment-ended-badge">ZAKOŃCZONA</span></p><p><strong>Zakończono:</strong> ${esc(formatujDateInwestycji(completedAt) || completedAt || "-")}</p>`
             : "";
         meta.innerHTML = `
             <p><strong>Telefon:</strong> ${esc(inwestycja.telefon || "-")}</p>

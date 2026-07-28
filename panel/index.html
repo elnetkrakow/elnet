@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EL-Net - Panel</title>
-    <link rel="stylesheet" href="styles.css?v=20260610-27">
+    <link rel="stylesheet" href="styles.css?v=20260613-27">
     <style>
         .terminarz-status-stack {
             display: flex;
@@ -977,6 +977,30 @@
         <p>Kontroluj pobrane zaliczki, koszty i rozliczenie każdej inwestycji.</p>
     </div>
 
+    <div class="card investment-filter-card">
+        <div class="investment-tabs" role="tablist" aria-label="Widok inwestycji">
+            <button class="investment-tab active" type="button" data-investment-tab="active">Aktywne <span id="count-invest-active">0</span></button>
+            <button class="investment-tab" type="button" data-investment-tab="completed">Zakończone <span id="count-invest-completed">0</span></button>
+            <button class="investment-tab" type="button" data-investment-tab="all">Wszystkie <span id="count-invest-all">0</span></button>
+        </div>
+        <div class="investment-filters">
+            <input type="text" id="inwestycje-search" placeholder="Szukaj po nazwie, kliencie, adresie lub telefonie...">
+            <label class="compact-filter">Data od
+                <input type="date" id="inwestycje-date-from">
+            </label>
+            <label class="compact-filter">Data do
+                <input type="date" id="inwestycje-date-to">
+            </label>
+            <select id="inwestycje-sort" aria-label="Sortowanie inwestycji">
+                <option value="newest">Najnowsze</option>
+                <option value="oldest">Najstarsze</option>
+                <option value="name-az">Nazwa A-Z</option>
+                <option value="name-za">Nazwa Z-A</option>
+            </select>
+            <button id="btn-wyczysc-filtry-inwestycji" class="btn btn-secondary small-btn" type="button">Wyczyść filtry</button>
+        </div>
+    </div>
+
     <div class="layout-two">
         <div class="card" id="card-inwestycje-form">
             <h2 id="inwestycja-form-title">Nowa inwestycja</h2>
@@ -1034,19 +1058,6 @@
 
         <div class="card">
             <h2>Lista inwestycji</h2>
-
-            <div class="toolbar">
-                <input type="text" id="inwestycje-search" placeholder="Szukaj inwestycji...">
-                <select id="inwestycje-sort">
-                    <option value="newest">Najnowsze</option>
-                    <option value="oldest">Najstarsze</option>
-                    <option value="name-az">Nazwa A-Z</option>
-                    <option value="name-za">Nazwa Z-A</option>
-                    <option value="client-az">Klient A-Z</option>
-                    <option value="balance-desc">Różnica od najwyższej</option>
-                    <option value="balance-asc">Różnica od najniższej</option>
-                </select>
-            </div>
 
             <div class="table-wrapper">
                 <table>
@@ -1683,6 +1694,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260613-26"></script>
+    <script src="script.js?v=20260613-27"></script>
 </body>
 </html>
