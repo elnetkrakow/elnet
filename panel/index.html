@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EL-Net - Panel</title>
-    <link rel="stylesheet" href="styles.css?v=20260613-27">
+    <link rel="stylesheet" href="styles.css?v=20260613-31">
     <style>
         .terminarz-status-stack {
             display: flex;
@@ -93,6 +93,16 @@
         .linked-event-note {
             color: #1f4f7a;
             background: #e8f2fb;
+        }
+
+        .completed-investment-note {
+            display: inline-flex;
+            max-width: 100%;
+            padding: 1px 0;
+            color: #94a3b8;
+            font-size: 11px;
+            line-height: 1.25;
+            white-space: normal;
         }
 
         .orphaned-warning {
@@ -977,30 +987,6 @@
         <p>Kontroluj pobrane zaliczki, koszty i rozliczenie każdej inwestycji.</p>
     </div>
 
-    <div class="card investment-filter-card">
-        <div class="investment-tabs" role="tablist" aria-label="Widok inwestycji">
-            <button class="investment-tab active" type="button" data-investment-tab="active">Aktywne <span id="count-invest-active">0</span></button>
-            <button class="investment-tab" type="button" data-investment-tab="completed">Zakończone <span id="count-invest-completed">0</span></button>
-            <button class="investment-tab" type="button" data-investment-tab="all">Wszystkie <span id="count-invest-all">0</span></button>
-        </div>
-        <div class="investment-filters">
-            <input type="text" id="inwestycje-search" placeholder="Szukaj po nazwie, kliencie, adresie lub telefonie...">
-            <label class="compact-filter">Data od
-                <input type="date" id="inwestycje-date-from">
-            </label>
-            <label class="compact-filter">Data do
-                <input type="date" id="inwestycje-date-to">
-            </label>
-            <select id="inwestycje-sort" aria-label="Sortowanie inwestycji">
-                <option value="newest">Najnowsze</option>
-                <option value="oldest">Najstarsze</option>
-                <option value="name-az">Nazwa A-Z</option>
-                <option value="name-za">Nazwa Z-A</option>
-            </select>
-            <button id="btn-wyczysc-filtry-inwestycji" class="btn btn-secondary small-btn" type="button">Wyczyść filtry</button>
-        </div>
-    </div>
-
     <div class="layout-two">
         <div class="card" id="card-inwestycje-form">
             <h2 id="inwestycja-form-title">Nowa inwestycja</h2>
@@ -1058,6 +1044,24 @@
 
         <div class="card">
             <h2>Lista inwestycji</h2>
+
+            <div class="toolbar">
+                <input type="text" id="inwestycje-search" placeholder="Szukaj inwestycji...">
+                <select id="inwestycje-sort">
+                    <option value="newest">Najnowsze</option>
+                    <option value="oldest">Najstarsze</option>
+                    <option value="name-az">Nazwa A-Z</option>
+                    <option value="name-za">Nazwa Z-A</option>
+                    <option value="client-az">Klient A-Z</option>
+                    <option value="balance-desc">Różnica od najwyższej</option>
+                    <option value="balance-asc">Różnica od najniższej</option>
+                </select>
+            </div>
+            <div class="investment-view-tabs" aria-label="Widok inwestycji">
+                <button type="button" class="investment-view-btn active" data-investment-view="aktywne">Aktywne</button>
+                <button type="button" class="investment-view-btn" data-investment-view="zakonczone">Zakończone</button>
+                <button type="button" class="investment-view-btn" data-investment-view="wszystkie">Wszystkie</button>
+            </div>
 
             <div class="table-wrapper">
                 <table>
@@ -1328,11 +1332,7 @@
 
                 <div class="layout-two">
                     <div class="card" id="card-terminarz-form">
-                        <h2>Nowe zadanie</h2>
-                        <div class="button-row">
-                            <button id="btn-terminarz-nowa-inwestycja" class="btn btn-main small-btn">Nowa inwestycja</button>
-                            <button id="btn-terminarz-nowe-zadanie" class="btn btn-secondary small-btn">Nowe zadanie</button>
-                        </div>
+                        <h2>Nowy wpis</h2>
 
                         <div class="form-group">
                             <label for="terminarz-data-start">Data rozpoczęcia</label>
@@ -1377,18 +1377,26 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="terminarz-type">Typ wpisu</label>
-                            <select id="terminarz-type">
-                                <option value="Zadanie">Zadanie</option>
-                                <option value="Urlop">Urlop</option>
-                                <option value="Pomiar">Pomiar</option>
-                                <option value="Spotkanie">Spotkanie</option>
-                                <option value="Serwis">Serwis</option>
+                            <label for="terminarz-entry-kind">Typ wpisu</label>
+                            <select id="terminarz-entry-kind">
                                 <option value="Inwestycja">Inwestycja</option>
+                                <option value="Termin">Termin</option>
+                                <option value="Zadanie" selected>Zadanie</option>
                             </select>
                         </div>
 
-                        <button id="btn-dodaj-termin" class="btn btn-main">Dodaj zadanie</button>
+                        <div class="form-group hidden" id="terminarz-term-subtype-group">
+                            <label for="terminarz-term-subtype">Rodzaj terminu</label>
+                            <select id="terminarz-term-subtype">
+                                <option value="Urlop">Urlop</option>
+                                <option value="Spotkanie">Spotkanie</option>
+                                <option value="Pomiar">Pomiar</option>
+                                <option value="Serwis">Serwis</option>
+                                <option value="Inne">Inne</option>
+                            </select>
+                        </div>
+
+                        <button id="btn-dodaj-termin" class="btn btn-main">Dodaj wpis</button>
                         <button id="btn-anuluj-termin" class="btn btn-secondary small-btn hidden">Anuluj edycję</button>
                     </div>
 
@@ -1460,6 +1468,7 @@
                     <button type="button" class="admin-tab-btn" data-admin-tab="logi">Logi</button>
                     <button type="button" class="admin-tab-btn" data-admin-tab="diagnostyka">Diagnostyka</button>
                     <button type="button" class="admin-tab-btn" data-admin-tab="magazyn">Magazyn</button>
+                    <button type="button" class="admin-tab-btn" data-admin-tab="notatki">Notatki</button>
                 </div>
 
                 <div id="admin-tab-podsumowanie" class="admin-tab-content active">
@@ -1615,6 +1624,33 @@
                         </div>
                     </div>
                 </div>
+
+                <div id="admin-tab-notatki" class="admin-tab-content">
+                    <div class="card admin-notes-card">
+                        <h2>Notatki</h2>
+
+                        <div class="form-group">
+                            <label for="admin-note-content">Nowa notatka</label>
+                            <textarea id="admin-note-content" maxlength="2000" placeholder="Wpisz krótką notatkę..."></textarea>
+                            <small class="form-hint">Maksymalnie 2000 znaków.</small>
+                        </div>
+
+                        <div class="btn-row">
+                            <button id="btn-zapisz-notatke" class="btn btn-main">Zapisz notatkę</button>
+                            <button id="btn-anuluj-notatke" class="btn btn-secondary small-btn hidden">Anuluj edycję</button>
+                            <button id="btn-refresh-notatki" class="btn btn-secondary small-btn">Odśwież listę</button>
+                        </div>
+
+                        <div id="admin-note-message" class="admin-note-message hidden"></div>
+
+                        <hr>
+
+                        <h3>Ostatnie notatki</h3>
+                        <div id="admin-notes-list" class="admin-notes-list">
+                            <p class="empty-row">Brak notatek.</p>
+                        </div>
+                    </div>
+                </div>
             </section>
         </main>
     </div>
@@ -1694,6 +1730,79 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=20260613-27"></script>
+    <div id="przeksztalc-inwestycje-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="przeksztalc-inwestycje-title">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content delete-investment-modal">
+            <div class="modal-header-row">
+                <h2 id="przeksztalc-inwestycje-title">Przekształć w inwestycję</h2>
+                <button id="btn-zamknij-przeksztalc-inwestycje-modal" class="modal-close-btn" type="button" aria-label="Zamknij">×</button>
+            </div>
+            <p class="delete-investment-lead">Zostanie utworzona inwestycja i powiązana z istniejącym wpisem Terminarza. Nowy wpis Terminarza nie zostanie utworzony.</p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="przeksztalc-inwestycje-nazwa">Nazwa inwestycji</label>
+                    <input type="text" id="przeksztalc-inwestycje-nazwa">
+                </div>
+                <div class="form-group">
+                    <label for="przeksztalc-inwestycje-status">Status</label>
+                    <select id="przeksztalc-inwestycje-status">
+                        <option value="aktywna">Aktywna</option>
+                        <option value="zakończona">Zakończona</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="przeksztalc-inwestycje-klient">Klient</label>
+                    <input type="text" id="przeksztalc-inwestycje-klient">
+                </div>
+                <div class="form-group">
+                    <label for="przeksztalc-inwestycje-telefon">Telefon</label>
+                    <input type="text" id="przeksztalc-inwestycje-telefon">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="przeksztalc-inwestycje-adres">Adres</label>
+                <input type="text" id="przeksztalc-inwestycje-adres">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="przeksztalc-inwestycje-data-start">Planowany start</label>
+                    <input type="date" id="przeksztalc-inwestycje-data-start">
+                </div>
+                <div class="form-group">
+                    <label for="przeksztalc-inwestycje-data-koniec">Planowany koniec</label>
+                    <input type="date" id="przeksztalc-inwestycje-data-koniec">
+                </div>
+            </div>
+            <div class="form-group hidden" id="przeksztalc-inwestycje-completed-group">
+                <label for="przeksztalc-inwestycje-completed-at">Rzeczywista data zakończenia</label>
+                <input type="date" id="przeksztalc-inwestycje-completed-at">
+            </div>
+            <div class="form-group">
+                <label for="przeksztalc-inwestycje-opis">Opis</label>
+                <textarea id="przeksztalc-inwestycje-opis"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-anuluj-przeksztalc-inwestycje" class="btn btn-secondary small-btn" type="button">Anuluj</button>
+                <button id="btn-potwierdz-przeksztalc-inwestycje" class="btn btn-main" type="button">Utwórz inwestycję</button>
+            </div>
+        </div>
+    </div>
+    <div id="uwaga-terminarza-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="uwaga-terminarza-title">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content delete-investment-modal calendar-attention-modal">
+            <div class="modal-header-row">
+                <h2 id="uwaga-terminarza-title">UWAGA — Terminarz wymaga uwagi</h2>
+                <button id="btn-zamknij-uwaga-terminarza" class="modal-close-btn" type="button" aria-label="Zamknij">×</button>
+            </div>
+            <p class="delete-investment-lead">Poniższe wpisy wymagają decyzji użytkownika.</p>
+            <div id="uwaga-terminarza-list" class="calendar-attention-list"></div>
+            <div class="modal-actions">
+                <button id="btn-ok-uwaga-terminarza" class="btn btn-secondary small-btn" type="button">Zamknij</button>
+            </div>
+        </div>
+    </div>
+    <script src="script.js?v=20260613-31"></script>
 </body>
 </html>

@@ -394,99 +394,6 @@ hr {
     min-width: 0;
 }
 
-.investment-filter-card {
-    margin-bottom: 18px;
-}
-
-.investment-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 14px;
-}
-
-.investment-tab {
-    border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 8px 12px;
-    cursor: pointer;
-    font-weight: 700;
-}
-
-.investment-tab span {
-    color: var(--accent);
-    margin-left: 4px;
-}
-
-.investment-tab.active {
-    border-color: var(--accent);
-    background: rgba(233, 185, 73, 0.14);
-}
-
-.investment-filters {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: end;
-    gap: 10px;
-}
-
-.investment-filters input[type="text"] {
-    min-width: min(360px, 100%);
-    flex: 1 1 260px;
-}
-
-.investment-filters select,
-.investment-filters .compact-filter {
-    flex: 0 1 170px;
-}
-
-.compact-filter {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    color: var(--text-muted);
-    font-size: 12px;
-}
-
-.investment-ended-badge {
-    display: inline-flex;
-    align-items: center;
-    width: fit-content;
-    margin: 0 0 0 8px;
-    padding: 3px 7px;
-    border-radius: 6px;
-    background: rgba(47, 185, 124, 0.15);
-    border: 1px solid rgba(47, 185, 124, 0.45);
-    color: #7ff0b0;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0;
-}
-
-.investment-ended-date {
-    display: block;
-    margin-top: 4px;
-    color: var(--text-muted);
-}
-
-@media (max-width: 700px) {
-    .investment-tabs,
-    .investment-filters {
-        align-items: stretch;
-    }
-
-    .investment-tab,
-    .investment-filters input[type="text"],
-    .investment-filters select,
-    .investment-filters .compact-filter,
-    #btn-wyczysc-filtry-inwestycji {
-        width: 100%;
-        flex-basis: 100%;
-    }
-}
-
 #section-wycena .table-wrapper td:last-child .wycena-actions .btn {
     padding: 6px 8px;
     min-width: 0;
@@ -1145,7 +1052,7 @@ button:disabled {
      font-size: 1rem;
      font-weight: 700;
      color: var(--text-main);
-     text-transform: capitalize;
+     text-transform: none;
  }
  
  #terminarz-calendar {
@@ -1236,6 +1143,13 @@ button:disabled {
 .pulpit-calendar-day.multiple {
     background: rgba(139, 92, 246, 0.12);
     color: #6b21a8;
+}
+
+.calendar-day.attention,
+.pulpit-calendar-day.attention {
+    background: rgba(245, 158, 11, 0.2);
+    color: #92400e;
+    border-color: rgba(245, 158, 11, 0.48);
 }
  
  .calendar-day.empty {
@@ -1373,6 +1287,31 @@ button:disabled {
      color: #15803d;
      border-color: rgba(34, 197, 94, 0.3);
  }
+
+.status-zrealizowane {
+    background: rgba(148, 163, 184, 0.16);
+    color: #475569;
+    border-color: rgba(148, 163, 184, 0.32);
+}
+
+.status-zakonczona-pi {
+    background: rgba(34, 197, 94, 0.14);
+    color: #15803d;
+    border-color: rgba(34, 197, 94, 0.35);
+}
+
+.status-do-wykonania {
+    background: rgba(20, 184, 166, 0.16);
+    color: #0f766e;
+    border-color: rgba(20, 184, 166, 0.35);
+}
+
+.status-po-terminie,
+.status-wymaga-potwierdzenia {
+    background: rgba(245, 158, 11, 0.18);
+    color: #b45309;
+    border-color: rgba(245, 158, 11, 0.42);
+}
  
  .status-przesunięte,
  .status-przesuniete {
@@ -1567,6 +1506,50 @@ td {
     flex-wrap: wrap;
 }
 
+.calendar-attention-modal {
+    max-width: 720px;
+}
+
+.calendar-attention-list {
+    display: grid;
+    gap: 10px;
+    margin: 14px 0 18px;
+}
+
+.calendar-attention-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid rgba(245, 158, 11, 0.32);
+    border-radius: 8px;
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.calendar-attention-item strong,
+.calendar-attention-item span,
+.calendar-attention-item small {
+    display: block;
+}
+
+.calendar-attention-item p {
+    margin: 6px 0 0;
+    color: var(--text-main);
+}
+
+.calendar-attention-item small {
+    margin-top: 4px;
+    color: var(--text-muted);
+}
+
+.calendar-attention-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
 @media (max-width: 700px) {
     .modal-content {
         width: 100%;
@@ -1574,6 +1557,14 @@ td {
 
     .checkbox-grid {
         grid-template-columns: 1fr;
+    }
+
+    .calendar-attention-item {
+        grid-template-columns: 1fr;
+    }
+
+    .calendar-attention-actions {
+        justify-content: flex-start;
     }
 }
 
@@ -1910,6 +1901,100 @@ td {
 
 .admin-tab-content.active {
     display: block;
+}
+
+.investment-view-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 0 14px;
+}
+
+.investment-view-btn {
+    border: 1px solid var(--border-soft);
+    background: var(--bg-card-light);
+    color: var(--text-main);
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.investment-view-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #07110c;
+}
+
+.admin-notes-card textarea {
+    min-height: 110px;
+    resize: vertical;
+}
+
+.form-hint {
+    display: block;
+    margin-top: 6px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.admin-note-message {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-weight: 700;
+}
+
+.admin-note-message.success {
+    background: rgba(16, 185, 129, 0.12);
+    color: #86efac;
+    border: 1px solid rgba(16, 185, 129, 0.24);
+}
+
+.admin-note-message.warning {
+    background: rgba(245, 158, 11, 0.12);
+    color: #fcd34d;
+    border: 1px solid rgba(245, 158, 11, 0.24);
+}
+
+.admin-note-message.danger {
+    background: rgba(239, 68, 68, 0.12);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.24);
+}
+
+.admin-notes-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.admin-note-item {
+    padding: 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.42);
+}
+
+.admin-note-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+    font-size: 12px;
+    flex-wrap: wrap;
+}
+
+.admin-note-content {
+    color: var(--text-main);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+}
+
+.admin-note-actions {
+    margin-top: 12px;
 }
 
 .admin-logs-toolbar {

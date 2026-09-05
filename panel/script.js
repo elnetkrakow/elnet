@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = "https://ebguhxeywwsmqbvnfhnp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JHiOY_XRueQ6R1ApozzfEA_ujc6ymvy";
-const APP_VERSION = "2026.06.13-27-ELNET";
+const APP_VERSION = "2026.06.13-31-ELNET";
 
 let accessToken = localStorage.getItem("elnet_token") || null;
 let zalogowanyUser = null;
@@ -18,6 +18,8 @@ let inwestycjeZaliczki = [];
 let inwestycjeKoszty = [];
 let inwestycjePraceDodatkowe = [];
 let logi = [];
+let notatki = [];
+let notatkiLoadError = "";
 let aktywnaInwestycjaId = null;
 
 let magazyn = [];
@@ -46,10 +48,13 @@ let edytowanyKosztId = null;
 let usunInwestycjeModalResolve = null;
 let usunInwestycjeModalWybor = null;
 let zakonczInwestycjeModalResolve = null;
-let aktywnaZakladkaInwestycji = "active";
+let terminarzUwagaPokazana = false;
 let trybEdycjiKosztorysu = false;
 let edytowanyKosztorysId = null;
 let aktualnyDrukowanyKosztorysId = null;
+let edytowanaNotatkaId = null;
+let inwestycjeWidok = "aktywne";
+let przeksztalcInwestycjeModalResolve = null;
 
 function headers() {
     return {
@@ -165,6 +170,38 @@ async function pobierzLogi() {
     } catch (err) {
         console.error("Błąd logów:", err);
         logi = [];
+    }
+}
+
+async function pobierzNotatki() {
+    if (rolaUsera !== "admin") {
+        notatki = [];
+        notatkiLoadError = "";
+        return;
+    }
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/notatki?select=*&order=created_at.desc&limit=50`, {
+            headers: headers()
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            notatkiLoadError = errorText;
+            console.error("Błąd pobierania notatek Supabase:", {
+                status: res.status,
+                statusText: res.statusText,
+                response: errorText
+            });
+            obsluzBladAutoryzacji(errorText);
+            throw new Error(errorText);
+        }
+
+        notatki = await res.json();
+        notatkiLoadError = "";
+    } catch (err) {
+        console.error("Błąd pobierania notatek:", err);
+        notatki = [];
     }
 }
 
@@ -368,33 +405,15 @@ function podepnijZdarzenia() {
     const inwestycjeSort = document.getElementById("inwestycje-sort");
     if (inwestycjeSort) inwestycjeSort.addEventListener("change", renderujInwestycje);
 
-    document.querySelectorAll("[data-investment-tab]").forEach(btn => {
+    document.querySelectorAll("[data-investment-view]").forEach(btn => {
         btn.addEventListener("click", () => {
-            aktywnaZakladkaInwestycji = btn.dataset.investmentTab || "active";
+            inwestycjeWidok = btn.dataset.investmentView || "aktywne";
             renderujInwestycje();
         });
     });
 
-    const inwestycjeDateFrom = document.getElementById("inwestycje-date-from");
-    if (inwestycjeDateFrom) inwestycjeDateFrom.addEventListener("change", renderujInwestycje);
-
-    const inwestycjeDateTo = document.getElementById("inwestycje-date-to");
-    if (inwestycjeDateTo) inwestycjeDateTo.addEventListener("change", renderujInwestycje);
-
-    const btnWyczyscFiltryInwestycji = document.getElementById("btn-wyczysc-filtry-inwestycji");
-    if (btnWyczyscFiltryInwestycji) btnWyczyscFiltryInwestycji.addEventListener("click", wyczyscFiltryInwestycji);
-
     const btnDodajInwestycje = document.getElementById("btn-dodaj-inwestycje");
     if (btnDodajInwestycje) btnDodajInwestycje.addEventListener("click", dodajInwestycje);
-
-    const btnTerminarzNowaInwestycja = document.getElementById("btn-terminarz-nowa-inwestycja");
-    if (btnTerminarzNowaInwestycja) btnTerminarzNowaInwestycja.addEventListener("click", () => otworzFormularzInwestycji({ source: "terminarz" }));
-
-    const btnTerminarzNoweZadanie = document.getElementById("btn-terminarz-nowe-zadanie");
-    if (btnTerminarzNoweZadanie) btnTerminarzNoweZadanie.addEventListener("click", () => {
-        anulujEdycjeTerminu();
-        document.getElementById("card-terminarz-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
 
     const btnZamknijInwestycje = document.getElementById("btn-zamknij-inwestycje");
     if (btnZamknijInwestycje) btnZamknijInwestycje.addEventListener("click", zamknijPanelInwestycji);
@@ -414,8 +433,23 @@ function podepnijZdarzenia() {
     const btnPotwierdzUsunInwestycje = document.getElementById("btn-potwierdz-usun-inwestycje");
     if (btnPotwierdzUsunInwestycje) btnPotwierdzUsunInwestycje.addEventListener("click", potwierdzWyborUsuwaniaInwestycji);
 
+    const btnZamknijPrzeksztalc = document.getElementById("btn-zamknij-przeksztalc-inwestycje-modal");
+    if (btnZamknijPrzeksztalc) btnZamknijPrzeksztalc.addEventListener("click", () => zamknijModalPrzeksztalceniaInwestycji(null));
+
+    const btnAnulujPrzeksztalc = document.getElementById("btn-anuluj-przeksztalc-inwestycje");
+    if (btnAnulujPrzeksztalc) btnAnulujPrzeksztalc.addEventListener("click", () => zamknijModalPrzeksztalceniaInwestycji(null));
+
+    const btnPotwierdzPrzeksztalc = document.getElementById("btn-potwierdz-przeksztalc-inwestycje");
+    if (btnPotwierdzPrzeksztalc) btnPotwierdzPrzeksztalc.addEventListener("click", potwierdzModalPrzeksztalceniaInwestycji);
+
+    const statusPrzeksztalc = document.getElementById("przeksztalc-inwestycje-status");
+    if (statusPrzeksztalc) statusPrzeksztalc.addEventListener("change", aktualizujModalPrzeksztalceniaInwestycji);
+
     const usunInwestycjeBackdrop = document.querySelector("#usun-inwestycje-modal .modal-backdrop");
     if (usunInwestycjeBackdrop) usunInwestycjeBackdrop.addEventListener("click", () => zamknijModalUsuwaniaInwestycji(null));
+
+    const przeksztalcBackdrop = document.querySelector("#przeksztalc-inwestycje-modal .modal-backdrop");
+    if (przeksztalcBackdrop) przeksztalcBackdrop.addEventListener("click", () => zamknijModalPrzeksztalceniaInwestycji(null));
 
     document.querySelectorAll("[data-delete-investment-choice]").forEach(btn => {
         btn.addEventListener("click", () => wybierzOpcjeUsuwaniaInwestycji(btn.dataset.deleteInvestmentChoice));
@@ -433,6 +467,15 @@ function podepnijZdarzenia() {
     const zakonczInwestycjeBackdrop = document.querySelector("#zakoncz-inwestycje-modal .modal-backdrop");
     if (zakonczInwestycjeBackdrop) zakonczInwestycjeBackdrop.addEventListener("click", () => zamknijModalZakonczeniaInwestycji(null));
 
+    const btnZamknijUwagaTerminarza = document.getElementById("btn-zamknij-uwaga-terminarza");
+    if (btnZamknijUwagaTerminarza) btnZamknijUwagaTerminarza.addEventListener("click", zamknijModalUwagiTerminarza);
+
+    const btnOkUwagaTerminarza = document.getElementById("btn-ok-uwaga-terminarza");
+    if (btnOkUwagaTerminarza) btnOkUwagaTerminarza.addEventListener("click", zamknijModalUwagiTerminarza);
+
+    const uwagaTerminarzaBackdrop = document.querySelector("#uwaga-terminarza-modal .modal-backdrop");
+    if (uwagaTerminarzaBackdrop) uwagaTerminarzaBackdrop.addEventListener("click", zamknijModalUwagiTerminarza);
+
     document.addEventListener("keydown", event => {
         const modal = document.getElementById("usun-inwestycje-modal");
         if (event.key === "Escape" && modal && !modal.classList.contains("hidden")) {
@@ -441,6 +484,10 @@ function podepnijZdarzenia() {
         const finishModal = document.getElementById("zakoncz-inwestycje-modal");
         if (event.key === "Escape" && finishModal && !finishModal.classList.contains("hidden")) {
             zamknijModalZakonczeniaInwestycji(null);
+        }
+        const uwagaModal = document.getElementById("uwaga-terminarza-modal");
+        if (event.key === "Escape" && uwagaModal && !uwagaModal.classList.contains("hidden")) {
+            zamknijModalUwagiTerminarza();
         }
     });
 
@@ -484,6 +531,18 @@ function podepnijZdarzenia() {
     const adminLogSort = document.getElementById("admin-log-sort");
     if (adminLogSort) adminLogSort.addEventListener("change", renderujLogi);
 
+    const btnZapiszNotatke = document.getElementById("btn-zapisz-notatke");
+    if (btnZapiszNotatke) btnZapiszNotatke.addEventListener("click", zapiszNotatke);
+
+    const btnAnulujNotatke = document.getElementById("btn-anuluj-notatke");
+    if (btnAnulujNotatke) btnAnulujNotatke.addEventListener("click", anulujEdycjeNotatki);
+
+    const btnRefreshNotatki = document.getElementById("btn-refresh-notatki");
+    if (btnRefreshNotatki) btnRefreshNotatki.addEventListener("click", async () => {
+        await pobierzNotatki();
+        renderujNotatki();
+    });
+
     const dzisiaj = formatDateLocal(new Date());
 
     const zaliczkaData = document.getElementById("zaliczka-data");
@@ -524,6 +583,9 @@ function podepnijZdarzenia() {
 
     const btnAnulujTermin = document.getElementById('btn-anuluj-termin');
     if (btnAnulujTermin) btnAnulujTermin.addEventListener('click', anulujEdycjeTerminu);
+
+    const terminarzEntryKind = document.getElementById('terminarz-entry-kind');
+    if (terminarzEntryKind) terminarzEntryKind.addEventListener('change', aktualizujFormularzTypuTerminarza);
 
     const terminSearch = document.getElementById('terminarz-search');
     if (terminSearch) terminSearch.addEventListener('input', renderujTerminarz);
@@ -698,6 +760,10 @@ function pokazSekcje(nazwa) {
     if (nazwa === "administrator") {
         pokazAdminTab("podsumowanie");
     }
+
+    if (nazwa === "terminarz" && previousSection !== "section-terminarz") {
+        setTimeout(() => pokazModalUwagiTerminarza(), 250);
+    }
 }
 
 // ==========================================
@@ -717,6 +783,7 @@ async function odswiezDane() {
         pobierzInwestycjeKoszty(),
         pobierzInwestycjePraceDodatkowe(),
         pobierzLogi(),
+        pobierzNotatki(),
         pobierzMagazyn(),
         pobierzTerminarz()
     ]);
@@ -899,6 +966,49 @@ async function pobierzTerminarz() {
     }
 }
 
+const TERMINARZ_TERM_SUBTYPES = ["Urlop", "Spotkanie", "Pomiar", "Serwis", "Inne"];
+
+function mapujTypTerminarzaNaFormularz(type) {
+    const normalizedType = String(type || "Zadanie").trim();
+    if (normalizedType === "Inwestycja") {
+        return { kind: "Inwestycja", subtype: "Urlop" };
+    }
+    if (TERMINARZ_TERM_SUBTYPES.includes(normalizedType)) {
+        return { kind: "Termin", subtype: normalizedType };
+    }
+    return { kind: "Zadanie", subtype: "Urlop" };
+}
+
+function pobierzTypTerminuZFormularza() {
+    const kind = document.getElementById("terminarz-entry-kind")?.value || "Zadanie";
+    if (kind === "Inwestycja") return "Inwestycja";
+    if (kind === "Termin") {
+        const subtype = document.getElementById("terminarz-term-subtype")?.value || "Inne";
+        return TERMINARZ_TERM_SUBTYPES.includes(subtype) ? subtype : "Inne";
+    }
+    return "Zadanie";
+}
+
+function ustawTypTerminuWFormularzu(type) {
+    const { kind, subtype } = mapujTypTerminarzaNaFormularz(type);
+    const kindEl = document.getElementById("terminarz-entry-kind");
+    const subtypeEl = document.getElementById("terminarz-term-subtype");
+    if (kindEl) kindEl.value = kind;
+    if (subtypeEl) subtypeEl.value = subtype;
+    aktualizujFormularzTypuTerminarza();
+}
+
+function aktualizujFormularzTypuTerminarza() {
+    const kind = document.getElementById("terminarz-entry-kind")?.value || "Zadanie";
+    const subtypeGroup = document.getElementById("terminarz-term-subtype-group");
+    if (subtypeGroup) subtypeGroup.classList.toggle("hidden", kind !== "Termin");
+
+    const btnDodajTermin = document.getElementById("btn-dodaj-termin");
+    if (btnDodajTermin && !edytowanyTerminId) {
+        btnDodajTermin.textContent = "Dodaj wpis";
+    }
+}
+
 async function dodajTermin() {
     if (rolaUsera === 'guest') {
         alert('Musisz być zalogowany, aby dodać termin.');
@@ -912,7 +1022,12 @@ async function dodajTermin() {
     const telefon = document.getElementById('terminarz-telefon')?.value.trim();
     const opis = document.getElementById('terminarz-opis')?.value.trim();
     const status = document.getElementById('terminarz-status')?.value || 'zaplanowane';
-    const type = document.getElementById('terminarz-type')?.value || 'Zadanie';
+    const type = pobierzTypTerminuZFormularza();
+    const edytowanyTermin = edytowanyTerminId
+        ? terminarz.find(item => String(item.id) === String(edytowanyTerminId)) || null
+        : null;
+    let investmentLinkAction = null;
+    let selectedInvestment = null;
 
     if (!dataStart || !dataKoniec) {
         alert('Podaj datę rozpoczęcia i zakończenia.');
@@ -929,6 +1044,18 @@ async function dodajTermin() {
 
     // Allow overlapping terms without blocking confirmation.
     // We still compute overlaps for informational purposes elsewhere, but do not block saving here.
+    if (type === "Inwestycja" && !pobierzPowiazanaInwestycjeId(edytowanyTermin)) {
+        investmentLinkAction = wybierzSposobPowiazaniaInwestycjiZTerminu();
+        if (!investmentLinkAction) return;
+        if (investmentLinkAction === "link") {
+            selectedInvestment = wybierzIstniejacaInwestycje();
+            if (!selectedInvestment) return;
+            if (czyInwestycjaMaInnyTermin(selectedInvestment, edytowanyTerminId)) {
+                alert("Wybrana inwestycja ma już powiązany wpis w Terminarzu. Najpierw użyj istniejącego powiązania albo odłącz je ręcznie.");
+                return;
+            }
+        }
+    }
 
     const payload = {
         data_start: dataStart,
@@ -968,15 +1095,45 @@ async function dodajTermin() {
         const zapisanyTermin = Array.isArray(zapisane) ? zapisane[0] : zapisane;
         const terminId = edytowanyTerminId || zapisanyTermin?.id;
         if (terminId) ustawTypTerminu(terminId, type);
+        if (type === "Inwestycja" && terminId && investmentLinkAction) {
+            const terminDoPowiazania = {
+                ...(edytowanyTermin || {}),
+                ...payload,
+                id: terminId
+            };
+            try {
+                if (investmentLinkAction === "create") {
+                    await utworzInwestycjeZTerminuZPayloadem(terminDoPowiazania, {
+                        status: statusInwestycjiDlaTerminu(terminDoPowiazania)
+                    });
+                    zapiszLog("Terminarz", "Utworzono inwestycję z wpisu Terminarza", terminId);
+                } else if (investmentLinkAction === "link" && selectedInvestment) {
+                    await zapiszPowiazanieInwestycjaTermin(selectedInvestment.id, terminId);
+                    zapiszDatyInwestycji(selectedInvestment.id, terminDoPowiazania.data_start, terminDoPowiazania.data_koniec || terminDoPowiazania.data_start);
+                    zapiszLog("Terminarz", "Powiązano wpis z istniejącą inwestycją", terminId);
+                }
+            } catch (linkErr) {
+                if (!edytowanyTerminId && terminId) {
+                    edytowanyTerminId = String(terminId);
+                    const btnDodajTermin = document.getElementById('btn-dodaj-termin');
+                    if (btnDodajTermin) btnDodajTermin.textContent = 'Zapisz zmiany';
+                    const btnAnulujTermin = document.getElementById('btn-anuluj-termin');
+                    if (btnAnulujTermin) btnAnulujTermin.classList.remove('hidden');
+                }
+                throw linkErr;
+            }
+        }
 
         await pobierzTerminarz();
+        await pobierzInwestycje();
         renderujTerminarz();
         renderujKalendarzTerminarza();
+        renderujInwestycje();
         zapiszLog('Terminarz', logAkcja, `${klient} ${dataStart}–${dataKoniec}`);
 
         edytowanyTerminId = null;
         const btnDodajTermin = document.getElementById('btn-dodaj-termin');
-        if (btnDodajTermin) btnDodajTermin.textContent = 'Dodaj zadanie';
+        if (btnDodajTermin) btnDodajTermin.textContent = 'Dodaj wpis';
         const btnAnulujTermin = document.getElementById('btn-anuluj-termin');
         if (btnAnulujTermin) btnAnulujTermin.classList.add('hidden');
 
@@ -987,8 +1144,7 @@ async function dodajTermin() {
         document.getElementById('terminarz-telefon').value = '';
         document.getElementById('terminarz-opis').value = '';
         document.getElementById('terminarz-status').value = 'zaplanowane';
-        const typeEl = document.getElementById('terminarz-type');
-        if (typeEl) typeEl.value = 'Zadanie';
+        ustawTypTerminuWFormularzu('Zadanie');
     } catch (err) {
         console.error('Błąd zapisu terminarza:', err);
         const msg = err?.message || String(err);
@@ -1019,8 +1175,7 @@ window.edytujTermin = function(id) {
     document.getElementById('terminarz-telefon').value = termin.telefon || '';
     document.getElementById('terminarz-opis').value = termin.opis || '';
     document.getElementById('terminarz-status').value = termin.status || 'zaplanowane';
-    const typeEl = document.getElementById('terminarz-type');
-    if (typeEl) typeEl.value = typTerminu(termin);
+    ustawTypTerminuWFormularzu(typTerminu(termin));
 
     const btnDodajTermin = document.getElementById('btn-dodaj-termin');
     if (btnDodajTermin) btnDodajTermin.textContent = 'Zapisz zmiany';
@@ -1037,11 +1192,10 @@ function anulujEdycjeTerminu() {
     document.getElementById('terminarz-telefon').value = '';
     document.getElementById('terminarz-opis').value = '';
     document.getElementById('terminarz-status').value = 'zaplanowane';
-    const typeEl = document.getElementById('terminarz-type');
-    if (typeEl) typeEl.value = 'Zadanie';
+    ustawTypTerminuWFormularzu('Zadanie');
 
     const btnDodajTermin = document.getElementById('btn-dodaj-termin');
-    if (btnDodajTermin) btnDodajTermin.textContent = 'Dodaj zadanie';
+    if (btnDodajTermin) btnDodajTermin.textContent = 'Dodaj wpis';
     const btnAnulujTermin = document.getElementById('btn-anuluj-termin');
     if (btnAnulujTermin) btnAnulujTermin.classList.add('hidden');
 }
@@ -1114,8 +1268,10 @@ function renderujTerminarz() {
     }
 
     function statusOrder(item) {
-        const order = ['zaplanowane', 'w trakcie', 'zakończone', 'przesunięte', 'odwołane'];
-        return order.indexOf((item.status || '').toLowerCase());
+        const order = ['zaplanowana · pi', 'zaplanowane', 'do wykonania', 'w trakcie · pi', 'w trakcie', 'po terminie', 'wymaga potwierdzenia · pi', 'zrealizowane', 'zakończona · pi', 'odwołane', 'anulowana · pi'];
+        const label = statusPrezentacyjnyTerminarza(item).label.toLowerCase();
+        const index = order.indexOf(label);
+        return index >= 0 ? index : order.length;
     }
 
     lista.sort((a, b) => {
@@ -1152,21 +1308,28 @@ function renderujTerminarz() {
         const days = start && end ? Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1) : '-';
         const status = String(item.status || '').toLowerCase();
         const itemType = typTerminu(item);
+        const statusInfo = statusPrezentacyjnyTerminarza(item, today);
         const investmentId = pobierzPowiazanaInwestycjeId(item);
         const linkedInvestment = investmentId ? znajdzInwestycjePoId(investmentId) : null;
         const orphanInvestmentLink = Boolean(investmentId && !linkedInvestment);
-        const isCompletedInvestmentEvent = Boolean(linkedInvestment && czyTerminLubInwestycjaZakonczona(item));
-        const statusText = isCompletedInvestmentEvent ? "Zakończona · PI" : (linkedInvestment ? `${status || '-'} · PI` : (status || '-'));
+        const isCompletedInvestmentEvent = Boolean(linkedInvestment && statusInfo.label === "Zakończona · PI");
+        const statusText = statusInfo.label || status || '-';
         const statusTitle = linkedInvestment ? 'PI — powiązana inwestycja' : '';
-        const statusLabel = `<span class="status-tag status-${status.replace(/\s/g, '-')}" title="${esc(statusTitle)}">${esc(statusText)}</span>`;
+        const statusLabel = `<span class="status-tag ${esc(statusInfo.className)}" title="${esc(statusTitle)}">${esc(statusText)}</span>`;
         const historicalEnd = linkedInvestment && !isCompletedInvestmentEvent
             ? (rzeczywistaDataZakonczeniaTerminu(item) || rzeczywistaDataZakonczenia(linkedInvestment))
             : "";
         const planInfo = linkedInvestment && isCompletedInvestmentEvent
             ? (() => {
                 const { dataStart: planStart, dataKoniec: planEnd } = pobierzDatyInwestycji(linkedInvestment);
-                const actualEnd = rzeczywistaDataZakonczeniaTerminu(item) || rzeczywistaDataZakonczenia(linkedInvestment) || "-";
-                return `<span class="linked-event-note">Rzeczywiste zakończenie: ${esc(actualEnd)}</span><span class="linked-event-note">Planowany termin: od ${esc(item.data_start || planStart || "-")} do ${esc(item.data_koniec || planEnd || planStart || "-")}</span>`;
+                const actualEnd = rzeczywistaDataZakonczeniaTerminu(item) || rzeczywistaDataZakonczenia(linkedInvestment);
+                const planStartValue = item.data_start || planStart || "";
+                const planEndValue = item.data_koniec || planEnd || planStartValue || "";
+                const actualLabel = formatDateShortPL(actualEnd, true) || "-";
+                const planStartLabel = formatDateShortPL(planStartValue) || "-";
+                const planEndLabel = formatDateShortPL(planEndValue, true) || "-";
+                const title = `Rzeczywiste zakończenie: ${actualLabel}; Planowany termin: ${planStartLabel}–${planEndLabel}`;
+                return `<span class="completed-investment-note" title="${esc(title)}">Zakończono: ${esc(actualLabel)} · Plan: ${esc(planStartLabel)}–${esc(planEndLabel)}</span>`;
             })()
             : historicalEnd
                 ? `<span class="linked-event-note">Poprzednio zakończono: ${esc(historicalEnd)}</span>`
@@ -1185,6 +1348,12 @@ function renderujTerminarz() {
         const deleteButton = canEdit && !orphanInvestmentLink
             ? `<button class="btn btn-danger small-btn" onclick="usunTermin('${esc(item.id)}')">Usuń</button>`
             : '';
+        const markDoneButton = canEdit && statusInfo.canMarkDone
+            ? `<button class="btn btn-secondary small-btn" onclick="oznaczZadanieJakoWykonane('${esc(item.id)}')">Oznacz jako wykonane</button>`
+            : '';
+        const transformButton = canEdit && statusInfo.klasa === "zadanie" && !investmentId
+            ? `<button class="btn btn-secondary small-btn" onclick="przeksztalcTerminWInwestycje('${esc(item.id)}')">Przekształć w inwestycję</button>`
+            : '';
         const investmentButton = orphanInvestmentLink
             ? `<button class="btn btn-danger small-btn" onclick="usunTermin('${esc(item.id)}')">Usuń wpis</button> <button class="btn btn-secondary small-btn" onclick="odlaczTermin('${esc(item.id)}')">Odłącz</button> <button class="btn btn-secondary small-btn" onclick="polaczTerminZInnaInwestycja('${esc(item.id)}')">Połącz z inną</button>`
             : investmentId
@@ -1195,7 +1364,7 @@ function renderujTerminarz() {
         const actionClass = orphanInvestmentLink ? "calendar-row-actions orphaned-actions" : "calendar-row-actions";
         const rowClass = orphanInvestmentLink ? ' class="orphaned-event"' : '';
         const rowIdAttr = ` data-calendar-event-id="${esc(item.id)}"`;
-        const akcje = [investmentButton, editButton, deleteButton].filter(Boolean).join(' ');
+        const akcje = [investmentButton, markDoneButton, transformButton, editButton, deleteButton].filter(Boolean).join(' ');
 
         return `
             <tr${rowClass}${rowIdAttr}>
@@ -1278,6 +1447,16 @@ function parseDateLocal(value) {
     return new Date(year, month - 1, day);
 }
 
+function formatDateShortPL(value, includeYear = false) {
+    const date = parseDateLocal(String(value || "").slice(0, 10));
+    if (!date) return "";
+    return date.toLocaleDateString("pl-PL", {
+        day: "2-digit",
+        month: "2-digit",
+        ...(includeYear ? { year: "numeric" } : {})
+    });
+}
+
 function typTerminu(item) {
     return item?.type || panelLinks.eventTypes?.[String(item?.id)] || "Zadanie";
 }
@@ -1294,6 +1473,95 @@ function pobierzPowiazanyTerminId(inwestycja) {
 
 function pobierzPowiazanaInwestycjeId(termin) {
     return termin?.investment_id || termin?.investmentId || panelLinks.events?.[String(termin?.id)]?.investmentId || null;
+}
+
+function czyInwestycjaMaInnyTermin(inwestycja, eventId) {
+    const linkedEventId = pobierzPowiazanyTerminId(inwestycja);
+    return Boolean(linkedEventId && String(linkedEventId) !== String(eventId || ""));
+}
+
+function klasyfikujWpisTerminarza(event) {
+    const type = String(typTerminu(event) || "Zadanie").trim();
+    const linkedInvestmentId = pobierzPowiazanaInwestycjeId(event);
+    const linkedInvestment = linkedInvestmentId ? znajdzInwestycjePoId(linkedInvestmentId) : null;
+
+    if (type === "Inwestycja" || linkedInvestment) return "inwestycja";
+    if (TERMINARZ_TERM_SUBTYPES.includes(type)) return "termin";
+    return "zadanie";
+}
+
+function czyStatusTerminuAnulowany(status) {
+    const normalized = normalizujStatusTekst(status);
+    return normalized === "odwolane" || normalized === "anulowane" || normalized === "anulowana";
+}
+
+function czyStatusTerminuRecznyKoncowy(status) {
+    return czyStatusTerminuZakonczony(status) || normalizujStatusTekst(status) === "zrealizowane";
+}
+
+function porownajDateZTerminem(termin, today = new Date()) {
+    const start = termin?.data_start ? parseDateLocal(termin.data_start) : null;
+    const endValue = termin?.data_koniec || termin?.data_start || "";
+    const end = endValue ? parseDateLocal(endValue) : start;
+    const normalizedToday = new Date(today);
+    normalizedToday.setHours(0, 0, 0, 0);
+    if (start) start.setHours(0, 0, 0, 0);
+    if (end) end.setHours(0, 0, 0, 0);
+
+    if (!start && !end) return "brak-daty";
+    if (start && normalizedToday < start) return "przed";
+    if (end && normalizedToday > end) return "po";
+    return "w-trakcie";
+}
+
+function statusPrezentacyjnyTerminarza(termin, today = new Date()) {
+    const klasa = klasyfikujWpisTerminarza(termin);
+    const manualStatus = termin?.status || "";
+    const manualNormalized = normalizujStatusTekst(manualStatus);
+    const linkedInvestmentId = pobierzPowiazanaInwestycjeId(termin);
+    const linkedInvestment = linkedInvestmentId ? znajdzInwestycjePoId(linkedInvestmentId) : null;
+    const investmentStatus = normalizujStatusTekst(linkedInvestment?.status);
+    const datePosition = porownajDateZTerminem(termin, today);
+    const manualActive = ["zaplanowane", "w trakcie", "przesuniete", "rezerwacja"].includes(manualNormalized);
+    const investmentActive = ["aktywna", "planowana", "do realizacji", "wstrzymana"].includes(investmentStatus);
+    const hasFormalEnd = Boolean(
+        czyStatusTerminuRecznyKoncowy(manualStatus)
+        || (linkedInvestment && czyStatusInwestycjiZakonczony(linkedInvestment.status))
+        || (!manualActive && !investmentActive && (rzeczywistaDataZakonczeniaTerminu(termin) || rzeczywistaDataZakonczenia(linkedInvestment)))
+    );
+    const isCanceled = czyStatusTerminuAnulowany(manualStatus)
+        || (linkedInvestment && normalizujStatusTekst(linkedInvestment.status) === "anulowana");
+
+    if (isCanceled) {
+        return { klasa, label: klasa === "inwestycja" ? "Anulowana · PI" : "Odwołane", className: "status-odwolane", requiresAttention: false, canMarkDone: false };
+    }
+
+    if (klasa === "inwestycja") {
+        if (hasFormalEnd) {
+            return { klasa, label: "Zakończona · PI", className: "status-zakonczona-pi", requiresAttention: false, canMarkDone: false };
+        }
+        if (datePosition === "przed") {
+            return { klasa, label: "Zaplanowana · PI", className: "status-zaplanowane", requiresAttention: false, canMarkDone: false };
+        }
+        if (datePosition === "po") {
+            return { klasa, label: "Wymaga potwierdzenia · PI", className: "status-wymaga-potwierdzenia", requiresAttention: Boolean(linkedInvestment), canMarkDone: false };
+        }
+        return { klasa, label: "W trakcie · PI", className: "status-w-trakcie", requiresAttention: false, canMarkDone: false };
+    }
+
+    if (czyStatusTerminuRecznyKoncowy(manualStatus)) {
+        return { klasa, label: "Zrealizowane", className: "status-zrealizowane", requiresAttention: false, canMarkDone: false };
+    }
+
+    if (klasa === "termin") {
+        if (datePosition === "przed") return { klasa, label: "Zaplanowane", className: "status-zaplanowane", requiresAttention: false, canMarkDone: false };
+        if (datePosition === "po") return { klasa, label: "Zrealizowane", className: "status-zrealizowane", requiresAttention: false, canMarkDone: false };
+        return { klasa, label: "W trakcie", className: "status-w-trakcie", requiresAttention: false, canMarkDone: false };
+    }
+
+    if (datePosition === "przed") return { klasa, label: "Zaplanowane", className: "status-zaplanowane", requiresAttention: false, canMarkDone: true };
+    if (datePosition === "po") return { klasa, label: "Po terminie", className: "status-po-terminie", requiresAttention: true, canMarkDone: true };
+    return { klasa, label: "Do wykonania", className: "status-do-wykonania", requiresAttention: false, canMarkDone: true };
 }
 
 async function zapiszPowiazanieInwestycjaTermin(investmentId, eventId) {
@@ -1396,6 +1664,7 @@ async function odlaczTerminOdInwestycji(termin, options = {}) {
 async function odswiezWidokiPoZmianieTerminarza() {
     await pobierzInwestycje();
     await pobierzTerminarz();
+    terminarzUwagaPokazana = false;
     renderujInwestycje();
     renderujTerminarz();
     renderujKalendarzTerminarza();
@@ -1422,6 +1691,10 @@ function czyStatusInwestycjiZakonczony(status) {
     return normalized === "zakonczona" || (normalized.includes("zako") && normalized.includes("czona"));
 }
 
+function czyInwestycjaWidzianaJakoAktywna(inwestycja) {
+    return !czyStatusInwestycjiZakonczony(inwestycja?.status) && normalizujStatusTekst(inwestycja?.status) !== "anulowana";
+}
+
 function czyStatusTerminuZakonczony(status) {
     const normalized = normalizujStatusTekst(status);
     return normalized === "zakonczone" || (normalized.includes("zako") && normalized.includes("czone"));
@@ -1429,28 +1702,6 @@ function czyStatusTerminuZakonczony(status) {
 
 function rzeczywistaDataZakonczenia(inwestycja) {
     return inwestycja?.completed_at || inwestycja?.completedAt || "";
-}
-
-function czyInwestycjaZakonczona(inwestycja) {
-    return Boolean(czyStatusInwestycjiZakonczony(inwestycja?.status) || rzeczywistaDataZakonczenia(inwestycja));
-}
-
-function czyInwestycjaBiezaca(inwestycja) {
-    const status = normalizujStatusTekst(inwestycja?.status);
-    return !czyInwestycjaZakonczona(inwestycja) && status !== "anulowana";
-}
-
-function dataReferencyjnaInwestycji(inwestycja, mode = "current") {
-    if (mode === "completed") {
-        return rzeczywistaDataZakonczenia(inwestycja) || inwestycja?.data_koniec || inwestycja?.data_zakonczenia || inwestycja?.end_date || inwestycja?.created_at || "";
-    }
-    const { dataStart, dataKoniec } = pobierzDatyInwestycji(inwestycja);
-    return dataStart || dataKoniec || inwestycja?.created_at || "";
-}
-
-function formatujDateInwestycji(value) {
-    const parsed = value ? parseDateLocal(String(value).slice(0, 10)) : null;
-    return parsed ? parsed.toLocaleDateString("pl-PL") : "";
 }
 
 function rzeczywistaDataZakonczeniaTerminu(termin) {
@@ -1682,6 +1933,225 @@ async function utworzInwestycjeZTerminu(termin, status = "planowana") {
     return inwestycja;
 }
 
+function statusInwestycjiDlaTerminu(termin) {
+    const normalized = normalizujStatusTekst(termin?.status);
+    if (normalized === "w trakcie") return "aktywna";
+    if (czyStatusTerminuZakonczony(termin?.status) || normalized === "zrealizowane") return "zakończona";
+    return "planowana";
+}
+
+async function utworzInwestycjeZTerminuZPayloadem(termin, overrides = {}) {
+    const completedAt = overrides.completed_at || null;
+    const status = overrides.status || statusInwestycjiDlaTerminu(termin);
+    const payload = {
+        nazwa: overrides.nazwa ?? (termin.opis || `Inwestycja ${termin.klient || termin.data_start || ""}`.trim()),
+        klient: overrides.klient ?? (termin.klient || ""),
+        adres: overrides.adres ?? (termin.adres || ""),
+        telefon: overrides.telefon ?? (termin.telefon || ""),
+        data_start: overrides.data_start ?? (termin.data_start || null),
+        data_koniec: overrides.data_koniec ?? (termin.data_koniec || termin.data_start || null),
+        status,
+        opis: overrides.opis ?? (termin.opis || ""),
+        user_id: zalogowanyUser?.id || null
+    };
+
+    if (completedAt) {
+        payload.completed_at = completedAt;
+    }
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify(payload)
+    });
+    const text = await res.text();
+    let created = null;
+    try {
+        created = text ? JSON.parse(text) : null;
+    } catch (err) {
+        console.error("Błąd parsowania odpowiedzi tworzenia inwestycji:", err);
+    }
+    if (!res.ok) {
+        console.error("Błąd tworzenia inwestycji z Terminarza:", {
+            status: res.status,
+            text,
+            payload
+        });
+        throw new Error(text);
+    }
+
+    const inwestycja = Array.isArray(created) ? created[0] : created;
+    if (!inwestycja?.id) {
+        throw new Error("Supabase nie zwrócił ID utworzonej inwestycji.");
+    }
+
+    await zapiszPowiazanieInwestycjaTermin(inwestycja.id, termin.id);
+    zapiszDatyInwestycji(inwestycja.id, payload.data_start, payload.data_koniec || payload.data_start);
+
+    const terminarzPayload = {
+        type: "Inwestycja",
+        investment_id: inwestycja.id,
+        status: statusTerminuDlaInwestycji(status)
+    };
+    if (completedAt) {
+        terminarzPayload.actual_end_date = completedAt;
+    }
+    const terminarzRes = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${encodeURIComponent(termin.id)}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify(terminarzPayload)
+    });
+    if (!terminarzRes.ok) {
+        const terminarzText = await terminarzRes.text();
+        console.error("Błąd aktualizacji wpisu Terminarza po utworzeniu inwestycji:", {
+            status: terminarzRes.status,
+            text: terminarzText,
+            payload: terminarzPayload
+        });
+        throw new Error(terminarzText);
+    }
+
+    return inwestycja;
+}
+
+function wybierzSposobPowiazaniaInwestycjiZTerminu() {
+    const wybor = prompt("Wybierz opcję:\n1 - Utwórz inwestycję z tego wpisu\n2 - Połącz z istniejącą inwestycją", "1");
+    if (wybor === "1") return "create";
+    if (wybor === "2") return "link";
+    return null;
+}
+
+function ustawStanModalaPrzeksztalceniaInwestycji(isSaving) {
+    const modal = document.getElementById("przeksztalc-inwestycje-modal");
+    if (!modal) return;
+    modal.querySelectorAll("button, input, textarea, select").forEach(el => {
+        el.disabled = isSaving;
+    });
+}
+
+function aktualizujModalPrzeksztalceniaInwestycji() {
+    const status = document.getElementById("przeksztalc-inwestycje-status")?.value || "aktywna";
+    const completedGroup = document.getElementById("przeksztalc-inwestycje-completed-group");
+    if (completedGroup) completedGroup.classList.toggle("hidden", !czyStatusInwestycjiZakonczony(status));
+}
+
+function zamknijModalPrzeksztalceniaInwestycji(result) {
+    const modal = document.getElementById("przeksztalc-inwestycje-modal");
+    if (modal) modal.classList.add("hidden");
+    ustawStanModalaPrzeksztalceniaInwestycji(false);
+    if (przeksztalcInwestycjeModalResolve) {
+        const resolve = przeksztalcInwestycjeModalResolve;
+        przeksztalcInwestycjeModalResolve = null;
+        resolve(result);
+    }
+}
+
+function pokazModalPrzeksztalceniaInwestycji(termin) {
+    const modal = document.getElementById("przeksztalc-inwestycje-modal");
+    if (!modal) return Promise.resolve(null);
+
+    const setValue = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value || "";
+    };
+    setValue("przeksztalc-inwestycje-nazwa", termin.opis || `Inwestycja ${termin.klient || termin.data_start || ""}`.trim());
+    setValue("przeksztalc-inwestycje-klient", termin.klient || "");
+    setValue("przeksztalc-inwestycje-adres", termin.adres || "");
+    setValue("przeksztalc-inwestycje-telefon", termin.telefon || "");
+    setValue("przeksztalc-inwestycje-data-start", termin.data_start || "");
+    setValue("przeksztalc-inwestycje-data-koniec", termin.data_koniec || termin.data_start || "");
+    setValue("przeksztalc-inwestycje-opis", termin.opis || "");
+    setValue("przeksztalc-inwestycje-completed-at", wyswietlanaDataKoncaTerminu(termin) || termin.data_koniec || termin.data_start || formatDateLocal(new Date()));
+
+    const statusEl = document.getElementById("przeksztalc-inwestycje-status");
+    if (statusEl) {
+        const statusInfo = statusPrezentacyjnyTerminarza(termin);
+        statusEl.value = czyStatusTerminuZakonczony(termin.status) || statusInfo.label === "Zrealizowane"
+            ? "zakończona"
+            : "aktywna";
+    }
+    aktualizujModalPrzeksztalceniaInwestycji();
+
+    modal.classList.remove("hidden");
+    return new Promise(resolve => {
+        przeksztalcInwestycjeModalResolve = resolve;
+    });
+}
+
+function potwierdzModalPrzeksztalceniaInwestycji() {
+    const value = id => document.getElementById(id)?.value?.trim() || "";
+    const status = value("przeksztalc-inwestycje-status") || "aktywna";
+    const payload = {
+        nazwa: value("przeksztalc-inwestycje-nazwa"),
+        klient: value("przeksztalc-inwestycje-klient"),
+        adres: value("przeksztalc-inwestycje-adres"),
+        telefon: value("przeksztalc-inwestycje-telefon"),
+        data_start: value("przeksztalc-inwestycje-data-start") || null,
+        data_koniec: value("przeksztalc-inwestycje-data-koniec") || value("przeksztalc-inwestycje-data-start") || null,
+        opis: value("przeksztalc-inwestycje-opis"),
+        status
+    };
+
+    if (!payload.nazwa) {
+        alert("Wpisz nazwę inwestycji.");
+        return;
+    }
+    if (!payload.data_start) {
+        alert("Podaj planowany start inwestycji.");
+        return;
+    }
+    if (payload.data_start && payload.data_koniec && parseDateLocal(payload.data_koniec) < parseDateLocal(payload.data_start)) {
+        alert("Planowany koniec nie może być wcześniejszy niż planowany start.");
+        return;
+    }
+    if (czyStatusInwestycjiZakonczony(status)) {
+        const completedAt = value("przeksztalc-inwestycje-completed-at");
+        if (!completedAt) {
+            alert("Podaj rzeczywistą datę zakończenia.");
+            return;
+        }
+        payload.completed_at = completedAt;
+    }
+
+    ustawStanModalaPrzeksztalceniaInwestycji(true);
+    zamknijModalPrzeksztalceniaInwestycji(payload);
+}
+
+window.przeksztalcTerminWInwestycje = async function(id) {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może przekształcać wpisów w inwestycje.");
+        return;
+    }
+
+    const termin = terminarz.find(t => String(t.id) === String(id));
+    if (!termin) {
+        alert("Nie znaleziono wpisu Terminarza.");
+        return;
+    }
+    if (klasyfikujWpisTerminarza(termin) !== "zadanie" || pobierzPowiazanaInwestycjeId(termin)) {
+        alert("Ten wpis nie może zostać przekształcony w inwestycję.");
+        return;
+    }
+
+    const payload = await pokazModalPrzeksztalceniaInwestycji(termin);
+    if (!payload) return;
+
+    try {
+        await utworzInwestycjeZTerminuZPayloadem(termin, payload);
+        await pobierzInwestycje();
+        await pobierzTerminarz();
+        renderujInwestycje();
+        renderujTerminarz();
+        renderujKalendarzTerminarza();
+        renderujPulpit();
+        zapiszLog("Terminarz", "Przekształcono zadanie w inwestycję", id);
+        alert("Wpis został przekształcony w inwestycję.");
+    } catch (err) {
+        console.error("Błąd przekształcania wpisu w inwestycję:", err);
+        alert("Nie udało się przekształcić wpisu w inwestycję. Szczegóły są w konsoli.");
+    }
+};
+
 async function ustawStatusInwestycji(investmentId, status) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/inwestycje?id=eq.${encodeURIComponent(investmentId)}`, {
         method: "PATCH",
@@ -1711,13 +2181,19 @@ window.obsluzTerminInwestycji = async function(id) {
         return;
     }
 
-    const wybor = prompt("Wybierz opcję:\n1 - Utwórz inwestycję z tego wpisu\n2 - Połącz z istniejącą inwestycją\n3 - Zostaw tylko w Terminarzu", "3");
+    const wybor = prompt("Wybierz opcję:\n1 - Utwórz inwestycję z tego wpisu\n2 - Połącz z istniejącą inwestycją", "1");
     try {
         if (wybor === "1") {
-            await utworzInwestycjeZTerminu(termin, "planowana");
+            await utworzInwestycjeZTerminuZPayloadem(termin, {
+                status: statusInwestycjiDlaTerminu(termin)
+            });
         } else if (wybor === "2") {
             const inwestycja = wybierzIstniejacaInwestycje();
             if (!inwestycja) return;
+            if (czyInwestycjaMaInnyTermin(inwestycja, termin.id)) {
+                alert("Wybrana inwestycja ma już powiązany wpis w Terminarzu. Najpierw użyj istniejącego powiązania albo odłącz je ręcznie.");
+                return;
+            }
             await zapiszPowiazanieInwestycjaTermin(inwestycja.id, termin.id);
             zapiszDatyInwestycji(inwestycja.id, termin.data_start, termin.data_koniec || termin.data_start);
         } else {
@@ -1754,6 +2230,10 @@ window.polaczTerminZInnaInwestycja = async function(id) {
     if (!termin) return;
     const inwestycja = wybierzIstniejacaInwestycje();
     if (!inwestycja) return;
+    if (czyInwestycjaMaInnyTermin(inwestycja, termin.id)) {
+        alert("Wybrana inwestycja ma już powiązany wpis w Terminarzu. Najpierw użyj istniejącego powiązania albo odłącz je ręcznie.");
+        return;
+    }
     try {
         await zapiszPowiazanieInwestycjaTermin(inwestycja.id, termin.id);
         zapiszDatyInwestycji(inwestycja.id, termin.data_start, termin.data_koniec || termin.data_start);
@@ -1763,6 +2243,145 @@ window.polaczTerminZInnaInwestycja = async function(id) {
         console.error("Błąd łączenia wpisu terminarza z inwestycją:", err);
         alert("Nie udało się połączyć wpisu z inwestycją.");
     }
+};
+
+window.oznaczZadanieJakoWykonane = async function(id) {
+    if (rolaUsera === "guest") {
+        alert("Gość nie może oznaczać zadań jako wykonane.");
+        return;
+    }
+
+    const termin = terminarz.find(t => String(t.id) === String(id));
+    if (!termin) {
+        alert("Nie znaleziono zadania.");
+        return;
+    }
+
+    if (klasyfikujWpisTerminarza(termin) !== "zadanie") {
+        alert("Jako wykonane można oznaczyć tylko zadanie.");
+        return;
+    }
+
+    const statusInfo = statusPrezentacyjnyTerminarza(termin);
+    if (!statusInfo.canMarkDone) return;
+
+    try {
+        const payload = { status: "zakończone" };
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/terminarz?id=eq.${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            headers: headers(),
+            body: JSON.stringify(payload)
+        });
+        const text = await res.text();
+        if (!res.ok) {
+            console.error("Błąd oznaczania zadania jako wykonane:", {
+                status: res.status,
+                text,
+                payload,
+                id
+            });
+            throw new Error(text);
+        }
+
+        terminarzUwagaPokazana = false;
+        zamknijModalUwagiTerminarza();
+        await pobierzTerminarz();
+        terminarzUwagaPokazana = false;
+        renderujTerminarz();
+        renderujKalendarzTerminarza();
+        renderujPulpit();
+        zapiszLog("Terminarz", "Oznaczono zadanie jako wykonane", id);
+    } catch (err) {
+        console.error("Błąd oznaczania zadania jako wykonane:", err);
+        alert("Nie udało się oznaczyć zadania jako wykonane. Szczegóły są w konsoli.");
+    }
+};
+
+function pobierzWpisyTerminarzaWymagajaceUwagi() {
+    const today = new Date();
+    return (terminarz || [])
+        .map(termin => {
+            const statusInfo = statusPrezentacyjnyTerminarza(termin, today);
+            if (!statusInfo.requiresAttention) return null;
+
+            const klasa = klasyfikujWpisTerminarza(termin);
+            const investmentId = pobierzPowiazanaInwestycjeId(termin);
+            const linkedInvestment = investmentId ? znajdzInwestycjePoId(investmentId) : null;
+
+            if (klasa === "inwestycja") {
+                if (!linkedInvestment) return null;
+                return {
+                    id: termin.id,
+                    klasa,
+                    title: linkedInvestment.nazwa || termin.klient || termin.opis || "Inwestycja",
+                    subtitle: termin.opis || linkedInvestment.adres || "",
+                    date: termin.data_koniec || termin.data_start || "",
+                    message: "Termin inwestycji minął. Potwierdź jej zakończenie.",
+                    investmentId: linkedInvestment.id
+                };
+            }
+
+            if (klasa === "zadanie") {
+                return {
+                    id: termin.id,
+                    klasa,
+                    title: termin.klient || termin.opis || "Zadanie",
+                    subtitle: termin.opis || termin.adres || "",
+                    date: termin.data_koniec || termin.data_start || "",
+                    message: "Zadanie jest po terminie."
+                };
+            }
+
+            return null;
+        })
+        .filter(Boolean);
+}
+
+function zamknijModalUwagiTerminarza() {
+    const modal = document.getElementById("uwaga-terminarza-modal");
+    if (modal) modal.classList.add("hidden");
+}
+
+function pokazModalUwagiTerminarza() {
+    if (terminarzUwagaPokazana) return;
+    const items = pobierzWpisyTerminarzaWymagajaceUwagi();
+    if (!items.length) return;
+
+    const modal = document.getElementById("uwaga-terminarza-modal");
+    const list = document.getElementById("uwaga-terminarza-list");
+    if (!modal || !list) return;
+
+    list.innerHTML = items.map(item => {
+        const actions = item.klasa === "inwestycja"
+            ? `<button class="btn btn-secondary small-btn" type="button" onclick="otworzInwestycjeZUwagTerminarza('${esc(item.investmentId)}')">Otwórz inwestycję</button>`
+            : `<button class="btn btn-main small-btn" type="button" onclick="oznaczZadanieJakoWykonane('${esc(item.id)}')">Oznacz jako wykonane</button><button class="btn btn-secondary small-btn" type="button" onclick="edytujTerminZUwagTerminarza('${esc(item.id)}')">Edytuj</button>`;
+
+        return `
+            <div class="calendar-attention-item">
+                <div>
+                    <strong>${esc(item.title)}</strong>
+                    ${item.subtitle ? `<span>${esc(item.subtitle)}</span>` : ""}
+                    ${item.date ? `<small>Planowany koniec: ${esc(item.date)}</small>` : ""}
+                    <p>${esc(item.message)}</p>
+                </div>
+                <div class="calendar-attention-actions">${actions}</div>
+            </div>
+        `;
+    }).join("");
+
+    terminarzUwagaPokazana = true;
+    modal.classList.remove("hidden");
+}
+
+window.otworzInwestycjeZUwagTerminarza = function(id) {
+    zamknijModalUwagiTerminarza();
+    pokazSekcje("inwestycje");
+    window.otworzInwestycje(id);
+};
+
+window.edytujTerminZUwagTerminarza = function(id) {
+    zamknijModalUwagiTerminarza();
+    window.edytujTermin(id);
 };
 
 window.przejdzDoInwestycjiZTerminu = async function(id) {
@@ -1899,7 +2518,13 @@ function sprawdzDzisiejszeInwestycjeWTerminarzu() {
                     await utworzInwestycjeZTerminu(termin, "planowana");
                 } else if (wybor === "4") {
                     const inwestycja = wybierzIstniejacaInwestycje();
-                    if (inwestycja) await zapiszPowiazanieInwestycjaTermin(inwestycja.id, termin.id);
+                    if (inwestycja) {
+                        if (czyInwestycjaMaInnyTermin(inwestycja, termin.id)) {
+                            alert("Wybrana inwestycja ma już powiązany wpis w Terminarzu. Najpierw użyj istniejącego powiązania albo odłącz je ręcznie.");
+                            return;
+                        }
+                        await zapiszPowiazanieInwestycjaTermin(inwestycja.id, termin.id);
+                    }
                 } else {
                     return;
                 }
@@ -1917,10 +2542,9 @@ function getKalendarzStatus(date, precomputedCount) {
     normalized.setHours(0, 0, 0, 0);
     const count = typeof precomputedCount === 'number' ? precomputedCount : getTerminyCountForDay(normalized);
 
-    if (count >= 2) return 'multiple';
-
     let foundReserved = false;
     let foundBusy = false;
+    let foundAttention = false;
 
     (terminarz || []).forEach(item => {
         const start = item.data_start ? parseDateLocal(item.data_start) : null;
@@ -1929,16 +2553,21 @@ function getKalendarzStatus(date, precomputedCount) {
         start.setHours(0, 0, 0, 0);
         end.setHours(0, 0, 0, 0);
         if (normalized >= start && normalized <= end) {
+            const presentation = statusPrezentacyjnyTerminarza(item, normalized);
             const status = String(item.status || '').toLowerCase();
-            if (status === 'rezerwacja') {
+            if (presentation.requiresAttention) {
+                foundAttention = true;
+            } else if (status === 'rezerwacja') {
                 foundReserved = true;
-            } else if (['zaplanowane', 'w trakcie', 'zakończone', 'przesunięte'].includes(status)) {
+            } else if (!czyStatusTerminuAnulowany(status)) {
                 foundBusy = true;
             }
         }
     });
 
-    if (foundBusy) return 'busy';
+    if (foundAttention) return 'attention';
+    if (count >= 2) return 'multiple';
+    if (foundBusy) return foundReserved ? 'multiple' : 'busy';
     if (foundReserved) return 'reserved';
     return 'free';
 }
@@ -1955,8 +2584,7 @@ function getTerminyCountForDay(date) {
         end.setHours(0, 0, 0, 0);
         if (normalized >= start && normalized <= end) {
             // Ignore canceled entries
-            const status = String(item.status || '').toLowerCase();
-            if (status === 'odwołane' || status === 'odwolane') return;
+            if (czyStatusTerminuAnulowany(item.status)) return;
             count++;
         }
     });
@@ -2206,6 +2834,7 @@ function renderujAdministrator() {
     // render alerts for admin panel and update admin nav with count (only for admin)
     renderujOstrzezenia();
     renderujLogi();
+    renderujNotatki();
 }
 
 function pokazAdminTab(nazwa) {
@@ -2375,6 +3004,209 @@ function renderujLogi() {
         </div>
     `;
 }
+
+function pokazKomunikatNotatek(message, type = "success") {
+    const el = document.getElementById("admin-note-message");
+    if (!el) return;
+    el.textContent = message;
+    el.className = `admin-note-message ${type}`;
+    el.classList.remove("hidden");
+}
+
+function wyczyscKomunikatNotatek() {
+    const el = document.getElementById("admin-note-message");
+    if (!el) return;
+    el.textContent = "";
+    el.className = "admin-note-message hidden";
+}
+
+function renderujNotatki() {
+    const el = document.getElementById("admin-notes-list");
+    if (!el) return;
+
+    if (rolaUsera !== "admin") {
+        el.innerHTML = `<div class="admin-alert warning">Notatki są dostępne tylko dla administratora.</div>`;
+        return;
+    }
+
+    if (notatkiLoadError) {
+        el.innerHTML = `<div class="admin-alert warning">Tabela notatek nie jest jeszcze dostępna. Wykonaj migrację SQL w Supabase, a potem odśwież listę.</div>`;
+        return;
+    }
+
+    const lista = [...(notatki || [])].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+    if (!lista.length) {
+        el.innerHTML = `<p class="empty-row">Brak notatek.</p>`;
+        return;
+    }
+
+    el.innerHTML = lista.map(note => `
+        <article class="admin-note-item">
+            <div class="admin-note-meta">
+                <span>${esc(note.created_at ? formatujDatePL(note.created_at) : "-")}</span>
+                <span>${esc(note.author_email || "-")}</span>
+            </div>
+            <div class="admin-note-content">${esc(note.content || "")}</div>
+            <div class="table-actions admin-note-actions">
+                <button class="btn btn-secondary small-btn" type="button" onclick="edytujNotatke('${esc(note.id)}')">Edytuj</button>
+                <button class="btn btn-danger small-btn" type="button" onclick="usunNotatke('${esc(note.id)}')">Usuń</button>
+            </div>
+        </article>
+    `).join("");
+}
+
+async function zapiszNotatke() {
+    if (rolaUsera !== "admin") {
+        alert("Tylko administrator może zapisywać notatki.");
+        return;
+    }
+
+    const textarea = document.getElementById("admin-note-content");
+    const content = String(textarea?.value || "").trim();
+    wyczyscKomunikatNotatek();
+
+    if (!content) {
+        pokazKomunikatNotatek("Wpisz treść notatki.", "warning");
+        return;
+    }
+
+    if (content.length > 2000) {
+        pokazKomunikatNotatek("Notatka może mieć maksymalnie 2000 znaków.", "warning");
+        return;
+    }
+
+    const isEditing = Boolean(edytowanaNotatkaId);
+    const payload = isEditing
+        ? {
+            content,
+            updated_at: new Date().toISOString()
+        }
+        : {
+            user_id: zalogowanyUser?.id || null,
+            author_email: zalogowanyUser?.email || null,
+            content
+        };
+
+    try {
+        const url = isEditing
+            ? `${SUPABASE_URL}/rest/v1/notatki?id=eq.${encodeURIComponent(edytowanaNotatkaId)}`
+            : `${SUPABASE_URL}/rest/v1/notatki`;
+        const res = await fetch(url, {
+            method: isEditing ? "PATCH" : "POST",
+            headers: headers(),
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("Błąd zapisu notatki Supabase:", {
+                status: res.status,
+                statusText: res.statusText,
+                response: errorText,
+                payload
+            });
+            throw new Error(errorText);
+        }
+
+        const savedText = await res.text();
+        let saved = null;
+        try {
+            saved = savedText ? JSON.parse(savedText) : null;
+        } catch (err) {
+            console.warn("Nie udało się odczytać odpowiedzi notatki:", err);
+        }
+        const savedNote = Array.isArray(saved) ? saved[0] : saved;
+        const noteId = savedNote?.id || edytowanaNotatkaId || "";
+
+        await pobierzNotatki();
+        renderujNotatki();
+        anulujEdycjeNotatki(false);
+        pokazKomunikatNotatek(isEditing ? "Notatka została zaktualizowana." : "Notatka została zapisana.", "success");
+        zapiszLog("Notatki", isEditing ? "Edytowano notatkę" : "Dodano notatkę", noteId);
+    } catch (err) {
+        console.error("Błąd zapisu notatki:", err);
+        pokazKomunikatNotatek("Nie udało się zapisać notatki. Szczegóły błędu są w konsoli.", "danger");
+    }
+}
+
+window.edytujNotatke = function(id) {
+    if (rolaUsera !== "admin") {
+        alert("Tylko administrator może edytować notatki.");
+        return;
+    }
+
+    const note = notatki.find(item => String(item.id) === String(id));
+    if (!note) {
+        pokazKomunikatNotatek("Nie znaleziono notatki do edycji.", "warning");
+        return;
+    }
+
+    edytowanaNotatkaId = String(id);
+    const textarea = document.getElementById("admin-note-content");
+    if (textarea) {
+        textarea.value = note.content || "";
+        textarea.focus();
+    }
+
+    const btnZapisz = document.getElementById("btn-zapisz-notatke");
+    if (btnZapisz) btnZapisz.textContent = "Zapisz zmiany";
+
+    const btnAnuluj = document.getElementById("btn-anuluj-notatke");
+    if (btnAnuluj) btnAnuluj.classList.remove("hidden");
+
+    document.getElementById("admin-tab-notatki")?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+function anulujEdycjeNotatki(clearMessage = true) {
+    edytowanaNotatkaId = null;
+
+    const textarea = document.getElementById("admin-note-content");
+    if (textarea) textarea.value = "";
+
+    const btnZapisz = document.getElementById("btn-zapisz-notatke");
+    if (btnZapisz) btnZapisz.textContent = "Zapisz notatkę";
+
+    const btnAnuluj = document.getElementById("btn-anuluj-notatke");
+    if (btnAnuluj) btnAnuluj.classList.add("hidden");
+
+    if (clearMessage) wyczyscKomunikatNotatek();
+}
+
+window.usunNotatke = async function(id) {
+    if (rolaUsera !== "admin") {
+        alert("Tylko administrator może usuwać notatki.");
+        return;
+    }
+
+    if (!confirm("Czy na pewno chcesz usunąć tę notatkę?")) return;
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/notatki?id=eq.${encodeURIComponent(id)}`, {
+            method: "DELETE",
+            headers: headers()
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("Błąd usuwania notatki Supabase:", {
+                status: res.status,
+                statusText: res.statusText,
+                response: errorText,
+                id
+            });
+            throw new Error(errorText);
+        }
+
+        await pobierzNotatki();
+        renderujNotatki();
+        pokazKomunikatNotatek("Notatka została usunięta.", "success");
+        zapiszLog("Notatki", "Usunięto notatkę", id);
+    } catch (err) {
+        console.error("Błąd usuwania notatki:", err);
+        pokazKomunikatNotatek("Nie udało się usunąć notatki. Szczegóły błędu są w konsoli.", "danger");
+    }
+};
 
 function cenaUslugi(u) {
     return Number(u.cena_netto ?? u.cena ?? 0);
@@ -2705,15 +3537,9 @@ async function zapiszPowiazanieKosztorysuZInwestycja(kosztorysId, investmentId) 
 // ==========================================
 
 function renderujPulpit() {
-    const biezaceInwestycje = (inwestycje || []).filter(czyInwestycjaBiezaca);
-    const biezaceInwestycjeIds = new Set(biezaceInwestycje.map(i => String(i.id)));
-    const aktywne = biezaceInwestycje.length;
-    const sumaZaliczek = inwestycjeZaliczki
-        .filter(z => biezaceInwestycjeIds.has(String(z.inwestycja_id)))
-        .reduce((s, z) => s + Number(z.kwota || 0), 0);
-    const sumaKosztow = inwestycjeKoszty
-        .filter(k => biezaceInwestycjeIds.has(String(k.inwestycja_id)))
-        .reduce((s, k) => s + Number(k.kwota || 0), 0);
+    const aktywne = inwestycje.filter(i => i.status === "aktywna").length;
+    const sumaZaliczek = inwestycjeZaliczki.reduce((s, z) => s + Number(z.kwota || 0), 0);
+    const sumaKosztow = inwestycjeKoszty.reduce((s, k) => s + Number(k.kwota || 0), 0);
 
     // Zaplanowane terminy - liczenie przyszłych terminów
     const dzisiaj = new Date();
@@ -2727,7 +3553,7 @@ function renderujPulpit() {
         .sort((a, b) => new Date(b.data) - new Date(a.data))
         .slice(0, 5);
 
-    const ostatnieInwestycje = [...biezaceInwestycje]
+    const ostatnieInwestycje = [...inwestycje]
         .slice(-5)
         .reverse();
 
@@ -5441,118 +6267,72 @@ function sumaKosztowDlaInwestycji(inwestycjaId) {
         .reduce((s, k) => s + Number(k.kwota || 0), 0);
 }
 
-function aktualizujZakladkiInwestycji() {
-    const all = inwestycje || [];
-    const activeCount = all.filter(czyInwestycjaBiezaca).length;
-    const completedCount = all.filter(czyInwestycjaZakonczona).length;
-    const allCount = all.length;
-
-    const counters = {
-        active: document.getElementById("count-invest-active"),
-        completed: document.getElementById("count-invest-completed"),
-        all: document.getElementById("count-invest-all")
-    };
-    if (counters.active) counters.active.textContent = activeCount;
-    if (counters.completed) counters.completed.textContent = completedCount;
-    if (counters.all) counters.all.textContent = allCount;
-
-    document.querySelectorAll("[data-investment-tab]").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.investmentTab === aktywnaZakladkaInwestycji);
-    });
-}
-
-function czyFiltryInwestycjiAktywne() {
-    return Boolean(
-        document.getElementById("inwestycje-search")?.value.trim()
-        || document.getElementById("inwestycje-date-from")?.value
-        || document.getElementById("inwestycje-date-to")?.value
-    );
-}
-
-function wyczyscFiltryInwestycji() {
-    const search = document.getElementById("inwestycje-search");
-    const dateFrom = document.getElementById("inwestycje-date-from");
-    const dateTo = document.getElementById("inwestycje-date-to");
-    const sort = document.getElementById("inwestycje-sort");
-    if (search) search.value = "";
-    if (dateFrom) dateFrom.value = "";
-    if (dateTo) dateTo.value = "";
-    if (sort) sort.value = "newest";
-    renderujInwestycje();
-}
-
 function renderujInwestycje() {
     const tbody = document.getElementById("tabela-inwestycji");
     if (!tbody) return;
 
-    aktualizujZakladkiInwestycji();
-
     let lista = [...(inwestycje || [])];
     const searchValue = document.getElementById("inwestycje-search")?.value.toLowerCase().trim() || "";
     const sortValue = document.getElementById("inwestycje-sort")?.value || "newest";
-    const dateFromValue = document.getElementById("inwestycje-date-from")?.value || "";
-    const dateToValue = document.getElementById("inwestycje-date-to")?.value || "";
 
-    if (aktywnaZakladkaInwestycji === "active") {
-        lista = lista.filter(czyInwestycjaBiezaca);
-    } else if (aktywnaZakladkaInwestycji === "completed") {
-        lista = lista.filter(czyInwestycjaZakonczona);
+    document.querySelectorAll("[data-investment-view]").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.investmentView === inwestycjeWidok);
+    });
+
+    if (inwestycjeWidok === "aktywne") {
+        lista = lista.filter(czyInwestycjaWidzianaJakoAktywna);
+    } else if (inwestycjeWidok === "zakonczone") {
+        lista = lista.filter(i => czyStatusInwestycjiZakonczony(i.status));
     }
 
     if (searchValue) {
         lista = lista.filter(i => {
-            const combined = [i.nazwa, i.klient, i.adres, i.telefon]
+            const combined = [i.nazwa, i.klient, i.adres, i.status]
                 .map(v => String(v || "").toLowerCase())
                 .join(" ");
             return combined.includes(searchValue);
         });
     }
 
-    if (dateFromValue || dateToValue) {
-        const dateFrom = dateFromValue ? parseDateLocal(dateFromValue) : null;
-        const dateTo = dateToValue ? parseDateLocal(dateToValue) : null;
-        lista = lista.filter(i => {
-            const mode = czyInwestycjaZakonczona(i) ? "completed" : "current";
-            const value = dataReferencyjnaInwestycji(i, mode);
-            const parsed = value ? parseDateLocal(String(value).slice(0, 10)) : null;
-            if (!parsed) return false;
-            if (dateFrom && parsed < dateFrom) return false;
-            if (dateTo && parsed > dateTo) return false;
-            return true;
-        });
-    }
-
     if (sortValue === "newest") {
-        lista.sort((a, b) => new Date(dataReferencyjnaInwestycji(b, czyInwestycjaZakonczona(b) ? "completed" : "current") || 0) - new Date(dataReferencyjnaInwestycji(a, czyInwestycjaZakonczona(a) ? "completed" : "current") || 0));
+        lista.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
     } else if (sortValue === "oldest") {
-        lista.sort((a, b) => new Date(dataReferencyjnaInwestycji(a, czyInwestycjaZakonczona(a) ? "completed" : "current") || 0) - new Date(dataReferencyjnaInwestycji(b, czyInwestycjaZakonczona(b) ? "completed" : "current") || 0));
+        lista.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
     } else if (sortValue === "name-az") {
         lista.sort((a, b) => String(a.nazwa || "").localeCompare(String(b.nazwa || ""), 'pl'));
     } else if (sortValue === "name-za") {
         lista.sort((a, b) => String(b.nazwa || "").localeCompare(String(a.nazwa || ""), 'pl'));
+    } else if (sortValue === "client-az") {
+        lista.sort((a, b) => String(a.klient || "").localeCompare(String(b.klient || ""), 'pl'));
+    } else if (sortValue === "balance-desc") {
+        lista.sort((a, b) => {
+            const aBalance = sumaZaliczekDlaInwestycji(a.id) - sumaKosztowDlaInwestycji(a.id);
+            const bBalance = sumaZaliczekDlaInwestycji(b.id) - sumaKosztowDlaInwestycji(b.id);
+            return bBalance - aBalance;
+        });
+    } else if (sortValue === "balance-asc") {
+        lista.sort((a, b) => {
+            const aBalance = sumaZaliczekDlaInwestycji(a.id) - sumaKosztowDlaInwestycji(a.id);
+            const bBalance = sumaZaliczekDlaInwestycji(b.id) - sumaKosztowDlaInwestycji(b.id);
+            return aBalance - bBalance;
+        });
     }
 
     if (!lista.length) {
-        const emptyText = czyFiltryInwestycjiAktywne()
-            ? "Brak inwestycji spełniających wybrane kryteria."
-            : aktywnaZakladkaInwestycji === "completed"
-                ? "Brak zakończonych inwestycji."
-                : aktywnaZakladkaInwestycji === "active"
-                    ? "Brak aktywnych inwestycji."
-                    : "Brak inwestycji w bazie.";
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-row">${emptyText}</td></tr>`;
+        const emptyText = inwestycjeWidok === "zakonczone"
+            ? "Brak zakończonych inwestycji."
+            : inwestycjeWidok === "aktywne"
+                ? "Brak aktywnych inwestycji."
+                : "Brak inwestycji w bazie.";
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-row">${esc(emptyText)}</td></tr>`;
         return;
     }
 
     tbody.innerHTML = lista.map(i => {
+        const statusClass = `status-${String(i.status || "aktywna").toLowerCase()}`;
         const zaliczki = sumaZaliczekDlaInwestycji(i.id);
         const koszty = sumaKosztowDlaInwestycji(i.id);
         const roznica = zaliczki - koszty;
-        const isCompleted = czyInwestycjaZakonczona(i);
-        const completedAt = rzeczywistaDataZakonczenia(i);
-        const completedLabel = isCompleted
-            ? `<span class="investment-ended-badge">ZAKOŃCZONA</span><small class="investment-ended-date">Zakończono: ${esc(formatujDateInwestycji(completedAt) || completedAt || "-")}</small>`
-            : "";
         const linkedEventId = pobierzPowiazanyTerminId(i);
         const calendarButton = linkedEventId
             ? `<button class="btn btn-secondary small-btn" onclick="pokazInwestycjeWTerminarzu('${esc(i.id)}')">Pokaż w Terminarzu</button>`
@@ -5564,7 +6344,7 @@ function renderujInwestycje() {
 
         return `
             <tr>
-                <td><strong>${esc(i.nazwa)}</strong>${completedLabel}<br><small>${esc(i.adres || "")}</small></td>
+                <td><strong>${esc(i.nazwa)}</strong><br><small>${esc(i.adres || "")}</small></td>
                 <td>${esc(i.klient || "-")}</td>
                 <td class="nowrap-cell">${zaliczki.toFixed(2)} PLN</td>
                 <td class="nowrap-cell">${koszty.toFixed(2)} PLN</td>
@@ -5716,6 +6496,11 @@ async function dodajInwestycje() {
     if (!payload) return;
 
     const editingId = edytowanaInwestycjaId;
+    if (!editingId && !payload.data_start) {
+        alert("Podaj planowaną datę rozpoczęcia inwestycji. Nowa inwestycja musi być widoczna w Terminarzu.");
+        return;
+    }
+
     const poprzedniaInwestycja = editingId
         ? inwestycje.find(i => String(i.id) === String(editingId)) || null
         : null;
@@ -6150,8 +6935,8 @@ function renderujPanelInwestycji() {
     if (meta) {
         const { dataStart, dataKoniec } = pobierzDatyInwestycji(inwestycja);
         const completedAt = rzeczywistaDataZakonczenia(inwestycja);
-        const completionInfo = czyInwestycjaZakonczona(inwestycja)
-            ? `<p><span class="investment-ended-badge">ZAKOŃCZONA</span></p><p><strong>Zakończono:</strong> ${esc(formatujDateInwestycji(completedAt) || completedAt || "-")}</p>`
+        const completionInfo = czyStatusInwestycjiZakonczony(inwestycja.status)
+            ? `<p><strong>Status:</strong> Zakończona${completedAt ? `, rzeczywiste zakończenie: ${esc(completedAt)}` : ""}</p>`
             : "";
         meta.innerHTML = `
             <p><strong>Telefon:</strong> ${esc(inwestycja.telefon || "-")}</p>
